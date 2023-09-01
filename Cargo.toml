@@ -1,0 +1,31 @@
+[package]
+name = "cryptonamo"
+version = "0.1.0"
+edition = "2021"
+
+# Starting in Rust 1.62 you can use `cargo add` to add dependencies 
+# to your project.
+#
+# If you're using an older Rust version,
+# download cargo-edit(https://github.com/killercup/cargo-edit#installation) 
+# to install the `add` subcommand.
+#
+# Running `cargo add DEPENDENCY_NAME` will
+# add the latest version of a dependency to the list,
+# and it will keep the alphabetic ordering for you.
+
+[dependencies]
+aws-sdk-dynamodb = "0.29.0"
+lambda_http = "0.8.1"
+lambda_runtime = "0.8.1"
+aws-config = "0.56.0"
+tokio = { version = "1", features = ["full"] }
+tracing = { version = "0.1", features = ["log"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
+hmac = "0.12.1"
+sha2 = "0.10.7"
+serde = "1.0.183"
+serde_dynamo = { version = "4.2.4", features = ["aws-sdk-dynamodb+0_29"] }
+serde_bytes = "0.11.9"
+aes = "0.8.3"
+
