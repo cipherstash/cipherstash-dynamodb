@@ -1,4 +1,4 @@
-use cryptonamo::dict::Dict;
+use cryptonamo::{stack::AddPostingOperation, Key, user::{Manager, User}};
 use lambda_http::{run, service_fn, Body, Error, Request, RequestExt, Response};
 use aws_sdk_dynamodb as dynamodb;
 
@@ -39,12 +39,12 @@ async fn main() -> Result<(), Error> {
 
     let client = aws_sdk_dynamodb::Client::new(&config);
 
-    let dict = Dict::init(&client);
-    for id in 1..100 {
-        dict.add("dan", &format!("id-{id}")).await;
-    }
+    let manager = Manager::init(&client).await;
 
-    //dbg!(dict.query("dan").await);
+    let dan = User::new("1234", "Dan Draper");
+    manager.put(&dan).await;
+
+    
 
     //run(service_fn(function_handler)).await
     Ok(())
