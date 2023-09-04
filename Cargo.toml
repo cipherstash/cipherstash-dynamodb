@@ -29,3 +29,6 @@ serde_dynamo = { version = "4.2.4", features = ["aws-sdk-dynamodb+0_29"] }
 serde_bytes = "0.11.9"
 aes = "0.8.3"
 
+cipherstash-client = { path = "../../cipherstash-suite/packages/cipherstash-client/", features = [ "dictionaries", "tokio" ] }
+async-trait = "0.1.73"
+

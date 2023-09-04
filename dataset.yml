@@ -1,0 +1,18 @@
+tables:
+  - path: users
+    fields:
+      - name: full_name
+        in_place: false
+        cast_type: utf8-str
+        mode: encrypted-duplicate
+        indexes:
+          - version: 1
+            kind: match
+            tokenizer:
+              kind: ngram
+              token_length: 3
+            token_filters:
+              - kind: downcase
+            k: 6
+            m: 2048
+            include_original: true
