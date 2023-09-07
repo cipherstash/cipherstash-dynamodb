@@ -41,8 +41,15 @@ async fn main() -> Result<(), Error> {
 
     let manager = Manager::init(&client).await;
 
-    let dan = User::new("1234", "Dan Draper");
-    manager.put(&dan).await;
+    let dan = User::new("dan@coderdan.co", "Dan Draper");
+    let lauren = User::new("lauren@laurenneko.com", "Drap");
+    let dan2 = User::new("daniel@example.net", "Daniel Johnson");
+
+    /*manager.put(&dan).await;
+    manager.put(&lauren).await;
+    manager.put(&dan2).await;*/
+
+    dbg!(manager.query("name", "Dan").await);
 
     
 
