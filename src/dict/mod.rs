@@ -1,17 +1,59 @@
-use aws_sdk_dynamodb::{Client, types::{AttributeValue}, primitives::Blob};
+use aws_sdk_dynamodb::{Client, types::AttributeValue};
 use hmac::{Hmac, Mac};
+use serde::{Deserialize, Serialize};
 use serde_dynamo::{from_item, to_item};
 use sha2::Sha256;
 use async_trait::async_trait;
 use cipherstash_client::encryption::{Dictionary, DictEntry};
-
 use crate::Key;
 type HmacSha256 = Hmac<Sha256>;
 
+const DICT_TABLE: &'static str = "users";
 
 pub struct DynamoDict<'c> {
     client: &'c Client,
     key: Key,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct DynamoDictEntry {
+    pk: String,
+    #[serde(with = "hex")]
+    sk: Vec<u8>,
+    ctr: u64,
+    size: u64,
+}
+
+impl DynamoDictEntry {
+    // TODO: Make a dict entry trait (and derive) so that users don't have to define this
+    fn incr(self) -> Self {
+        Self {
+            ctr: self.ctr + 1,
+            size: self.size + 1,
+            ..self
+        }
+    }
+}
+
+impl From<DictEntry> for DynamoDictEntry {
+    fn from(dict_entry: DictEntry) -> Self {
+        DynamoDictEntry {
+            pk: "dict".to_string(),
+            sk: dict_entry.term_key,
+            ctr: dict_entry.ctr,
+            size: dict_entry.size,
+        }
+    }
+}
+
+impl From<DynamoDictEntry> for DictEntry {
+    fn from(dynamo_dict_entry: DynamoDictEntry) -> Self {
+        DictEntry {
+            term_key: dynamo_dict_entry.sk,
+            ctr: dynamo_dict_entry.ctr,
+            size: dynamo_dict_entry.size,
+        }
+    }
 }
 
 #[async_trait]
@@ -22,7 +64,7 @@ impl<'c> Dictionary for DynamoDict<'c> {
             S: Sync + Send + AsRef<[u8]>
     {
         let term_key = hmac(&self.key, plaintext, scope);
-        self.add_term(term_key).await
+        self.add_term(&term_key).await
     }
 
     // TODO: We probably want to implement entries as well so we can do a bulk op
@@ -33,28 +75,32 @@ impl<'c> DynamoDict<'c> {
         Self { client, key }
     }
 
-    async fn get_dict_entry(&self, term: &[u8]) -> Result<Option<DictEntry>, serde_dynamo::Error> {
+    async fn get_dict_entry(&self, term: &[u8]) -> DynamoDictEntry {
         let entry = self
             .client
             .get_item()
-            .key("term_key", AttributeValue::B(Blob::new(term.to_vec())))
-            .table_name("dict")
+            .key("pk", AttributeValue::S("dict".to_string()))
+            .key("sk", AttributeValue::S(hex::encode(term)))
+            .table_name(DICT_TABLE)
             .send()
             .await
             //.map_err(|e| PersistenceError::AdapterError(e.to_string()))?
             .expect("Get to succeed");
 
-        entry.item.map(|de| from_item(de)).transpose()
+        entry.item.and_then(|item| {
+            let dynamo_item: Result<DynamoDictEntry, _> = from_item(item);
+            dynamo_item.ok()
+        })
+        .unwrap_or(DictEntry::new(term.to_vec()).into())
+
     }
 
     // TODO: TermKey type
-    async fn add_term(&self, term: Vec<u8>) -> DictEntry {
+    async fn add_term(&self, term: &[u8]) -> DictEntry {
 
         let dict_entry = self
             .get_dict_entry(&term)
             .await
-            .unwrap()
-            .unwrap_or(DictEntry::new(term))
             .incr();
 
         let new_item = to_item(&dict_entry).unwrap();
@@ -62,12 +108,12 @@ impl<'c> DynamoDict<'c> {
         self.client
             .put_item()
             .set_item(Some(new_item))
-            .table_name("dict")
+            .table_name(DICT_TABLE)
             .send()
             .await
             .unwrap();
 
-        dict_entry
+        dict_entry.into()
     }
 
    

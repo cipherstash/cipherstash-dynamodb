@@ -58,7 +58,7 @@ impl AddPostingOperation {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Posting {
+struct Posting {
     #[serde(with = "serde_bytes")]
     term: Vec<u8>,
     docid: String, // ref?
