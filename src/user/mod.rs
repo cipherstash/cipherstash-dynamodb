@@ -1,16 +1,19 @@
-use std::sync::Arc;
-use serde::{Deserialize, Serialize};
-use aws_sdk_dynamodb::{Client, types::{Put, TransactWriteItem, AttributeValue}};
-use cipherstash_client::{
-    schema::{column::{Tokenizer, TokenFilter, Index, IndexType}},
-    encryption::{Encryption, Plaintext, IndexTerm, Posting},
-    config::{console_config::ConsoleConfig, vitur_config::ViturConfig},
-    vitur::Vitur,
-    credentials::{auto_refresh::AutoRefresh, vitur_credentials::ViturCredentials},
+use aws_sdk_dynamodb::{
+    types::{AttributeValue, Put, TransactWriteItem},
+    Client,
 };
-use serde_dynamo::{to_item, from_items};
+use cipherstash_client::{
+    config::{console_config::ConsoleConfig, vitur_config::ViturConfig},
+    credentials::{auto_refresh::AutoRefresh, vitur_credentials::ViturCredentials},
+    encryption::{Encryption, IndexTerm, Plaintext, Posting},
+    schema::column::{Index, IndexType, TokenFilter, Tokenizer},
+    vitur::Vitur,
+};
+use serde::{Deserialize, Serialize};
+use serde_dynamo::{from_items, to_item};
+use std::sync::Arc;
 
-use crate::{dict::DynamoDict};
+use crate::dict::DynamoDict;
 
 #[derive(Debug)]
 pub struct User {
@@ -38,7 +41,7 @@ impl EncryptedRecord for EncryptedUser {
         Self {
             partition_key: user.email.as_bytes().to_vec(), // TODO: DE
             email: user.email.as_bytes().to_vec(),
-            name: user.email.as_bytes().to_vec()
+            name: user.email.as_bytes().to_vec(),
         }
     }
 
@@ -111,7 +114,10 @@ impl<'d, A: Serialize + Deserialize<'d> + EncryptedRecord> TableEntry<A> {
 
 impl User {
     pub fn new(email: impl Into<String>, name: impl Into<String>) -> Self {
-        Self { email: email.into(), name: name.into() }
+        Self {
+            email: email.into(),
+            name: name.into(),
+        }
     }
 }
 
@@ -128,10 +134,10 @@ impl<'c> Manager<'c> {
     pub async fn init(db: &'c Client) -> Manager<'c> {
         let console_config = ConsoleConfig::builder().with_env().build().unwrap();
         let vitur_config = ViturConfig::builder()
-                            .with_env()
-                            .console_config(&console_config)
-                            .build_with_client_key()
-                            .unwrap();
+            .with_env()
+            .console_config(&console_config)
+            .build_with_client_key()
+            .unwrap();
 
         let vitur_client = Vitur::new_with_client_key(
             &vitur_config.base_url(),
@@ -140,30 +146,40 @@ impl<'c> Manager<'c> {
             vitur_config.client_key(),
         );
 
-        let dataset_config = vitur_client
-                            .load_dataset_config()
-                            .await
-                            .unwrap();
+        let dataset_config = vitur_client.load_dataset_config().await.unwrap();
 
-        let cipher =
-            Arc::new(Encryption::new(dataset_config.index_root_key, vitur_client));
+        let cipher = Arc::new(Encryption::new(dataset_config.index_root_key, vitur_client));
 
         // TODO: Keep the dictionary in an Arc and implement the trait for the Arc?
         let dictionary = DynamoDict::init(&db, dataset_config.index_root_key);
 
-        Self { db, cipher, dictionary }
+        Self {
+            db,
+            cipher,
+            dictionary,
+        }
     }
 
     pub async fn query(self, field_name: &str, query: &str) -> Vec<User> {
         // TODO: Load from Vitur config
         let index_type = Index::new_match().index_type;
-        if let IndexTerm::PostingArrayQuery(terms) = self.cipher.query_with_dictionary(
-            &Plaintext::Utf8Str(Some(query.to_string())),
-            &index_type,
-            "name",
-            &self.dictionary
-        ).await.unwrap() {
-            let terms_list: String = terms.iter().enumerate().map(|(i, _)| format!(":t{i}")).collect::<Vec<String>>().join(",");
+        if let IndexTerm::PostingArrayQuery(terms) = self
+            .cipher
+            .query_with_dictionary(
+                &Plaintext::Utf8Str(Some(query.to_string())),
+                &index_type,
+                "name",
+                &self.dictionary,
+            )
+            .await
+            .unwrap()
+        {
+            let terms_list: String = terms
+                .iter()
+                .enumerate()
+                .map(|(i, _)| format!(":t{i}"))
+                .collect::<Vec<String>>()
+                .join(",");
 
             let mut query = self
                 .db
@@ -175,14 +191,20 @@ impl<'c> Manager<'c> {
                 .filter_expression(format!("term in ({terms_list})"));
 
             for (i, term) in terms.iter().enumerate() {
-                query = query.expression_attribute_values(format!(":t{i}"), AttributeValue::S(hex::encode(term)));
+                query = query.expression_attribute_values(
+                    format!(":t{i}"),
+                    AttributeValue::S(hex::encode(term)),
+                );
             }
 
             let result = query.send().await.unwrap();
 
-            let table_entries: Vec<TableEntry<EncryptedUser>> = from_items(result.items.unwrap()).unwrap();
-            table_entries.into_iter().map(|te| te.attributes.decrypt()).collect()
-
+            let table_entries: Vec<TableEntry<EncryptedUser>> =
+                from_items(result.items.unwrap()).unwrap();
+            table_entries
+                .into_iter()
+                .map(|te| te.attributes.decrypt())
+                .collect()
         } else {
             unreachable!()
         }
@@ -198,23 +220,32 @@ impl<'c> Manager<'c> {
         // FIXME: There is an API problem here, the indexing code should be on the match types
         // and we should have a DictIndex or something
         let index_type = IndexType::Match {
-            tokenizer: Tokenizer::EdgeGram { min_length: 3, max_length: 10 },
+            tokenizer: Tokenizer::EdgeGram {
+                min_length: 3,
+                max_length: 10,
+            },
             token_filters: vec![TokenFilter::Downcase],
-            k: 6, m: 2048, include_original: false
+            k: 6,
+            m: 2048,
+            include_original: false,
         };
 
         let enc_user = EncryptedUser::encrypt(user);
 
         // TODO: Create an index function on the EncryptedType
         // Indexes don't need all attributes
-        if let IndexTerm::PostingArray(postings) = self.cipher.index_with_dictionary(
-            &Plaintext::Utf8Str(Some(user.name.to_string())),
-            &index_type,
-            "name",
-            &user.name,
-            &self.dictionary
-        ).await.unwrap() {
-
+        if let IndexTerm::PostingArray(postings) = self
+            .cipher
+            .index_with_dictionary(
+                &Plaintext::Utf8Str(Some(user.name.to_string())),
+                &index_type,
+                "name",
+                &user.name,
+                &self.dictionary,
+            )
+            .await
+            .unwrap()
+        {
             let mut items: Vec<TransactWriteItem> = Vec::with_capacity(postings.len() + 1);
 
             // TODO: Delete old postings
@@ -227,8 +258,9 @@ impl<'c> Manager<'c> {
                             Put::builder()
                                 .table_name("users")
                                 .set_item(Some(to_item(item).unwrap()))
-                                .build()
-                        ).build()
+                                .build(),
+                        )
+                        .build(),
                 );
             }
 
@@ -240,8 +272,9 @@ impl<'c> Manager<'c> {
                         Put::builder()
                             .table_name("users")
                             .set_item(Some(to_item(item).unwrap()))
-                            .build()
-                    ).build()
+                            .build(),
+                    )
+                    .build(),
             );
 
             self.db
@@ -250,7 +283,6 @@ impl<'c> Manager<'c> {
                 .send()
                 .await
                 .unwrap();
-
         } else {
             unreachable!()
         }
@@ -269,8 +301,6 @@ impl<'c> Manager<'c> {
         //self
         //    .client
         //    .put_item()
-
-
     }
 
     // query

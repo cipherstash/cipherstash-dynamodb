@@ -1,4 +1,7 @@
-use cryptonamo::{Key, user::{Manager, User}};
+use cryptonamo::{
+    user::{Manager, User},
+    Key,
+};
 use lambda_http::{run, service_fn, Body, Error, Request, RequestExt, Response};
 
 /// This is the main body for the function.
@@ -23,7 +26,6 @@ async fn function_handler(event: Request) -> Result<Response<Body>, Error> {
     Ok(resp)
 }
 
-
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     tracing_subscriber::fmt()
@@ -34,7 +36,10 @@ async fn main() -> Result<(), Error> {
         .without_time()
         .init();
 
-    let config = aws_config::from_env().endpoint_url("http://localhost:8000").load().await;
+    let config = aws_config::from_env()
+        .endpoint_url("http://localhost:8000")
+        .load()
+        .await;
 
     let client = aws_sdk_dynamodb::Client::new(&config);
 
@@ -49,8 +54,6 @@ async fn main() -> Result<(), Error> {
     manager.put(&dan2).await;*/
 
     dbg!(manager.query("name", "Dan").await);
-
-    
 
     //run(service_fn(function_handler)).await
     Ok(())
