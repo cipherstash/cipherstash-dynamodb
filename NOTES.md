@@ -60,14 +60,32 @@ To that bloom filter we add the numbers 0..175 except 120.
 We now have a list of tuples which each contain k and bloom filter (k, b).
 We now also generate for each k, an OPE term which represents 200 encoded with the key from 120.
 
+## Demo
+* Encrypt the partition key
+* Put
+* Query
+* Get
+* Decryption
+* Delete?
+* Error Handling
+* Adding a subtype? (e.g. DriversLicense)
+
 
 ## Production Implementation
 
+* Control which attributes end up in indexes (like projections in Dynamo)
+* Ability to support encrypted and plaintext attributes
 * Load field configs from Vitur/Dataset (add Dict Indexer type to schema)
 - How to manage changing config (encryption migrations)
 - Perhaps a config fingerprint is used in the sortkey somehow (there are multiple versions of a record based on config)
 * Use Blob instead of string where possible
 * Lambda stream handler for compaction
 * Counter contention mitigation
+* Derive Macros
+* Other data types
+* "StartsWith" operator
+
+## Later
+* How to migrate an existing table?
 
 

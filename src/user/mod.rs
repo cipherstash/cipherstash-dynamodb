@@ -8,8 +8,8 @@ use aws_sdk_dynamodb::{
 use cipherstash_client::{
     config::{console_config::ConsoleConfig, vitur_config::ViturConfig},
     credentials::{auto_refresh::AutoRefresh, vitur_credentials::{ViturCredentials, ViturToken}, Credentials},
-    encryption::{Encryption, IndexTerm, Plaintext, Posting},
-    schema::{column::{Index, IndexType, TokenFilter, Tokenizer}, TableConfig},
+    encryption::{Encryption, IndexTerm, Plaintext, Posting, Dictionary},
+    schema::{column::{Index, IndexType, TokenFilter, Tokenizer}, TableConfig, operator::Operator},
     vitur::{Vitur, DatasetConfigWithIndexRootKey},
 };
 use serde::{Deserialize, Serialize};
@@ -43,27 +43,78 @@ impl EncryptedRecord for User {
         self.email.to_string()
     }
 
+    /// TODO: this probably isn't needed
     fn sort_key(&self) -> String {
         "user".to_string()
     }
 
     fn type_name() -> &'static str {
-        "users"
+        "user"
     }
 
-    fn plaintext_targets(&self, config: &TableConfig) -> HashMap<String, Plaintext> {
+    fn attributes(&self) -> HashMap<String, Plaintext> {
         HashMap::from([
-            ("name".to_string(), Plaintext::from(self.name.to_string()))
+            ("name".to_string(), Plaintext::from(self.name.to_string())),
+            ("email".to_string(), Plaintext::from(self.email.to_string())),
         ])
     }
 }
 
-async fn encrypt<E, C>(target: &E, cipher: &Encryption<C>, config: &TableConfig) -> Vec<TableEntry>
+fn index_type_hack(index_type: IndexType) -> IndexType {
+    if let IndexType::Match { .. } = index_type {
+        IndexType::Match {
+            tokenizer: Tokenizer::EdgeGram {
+                min_length: 3,
+                max_length: 10,
+            },
+            token_filters: vec![TokenFilter::Downcase],
+            include_original: true,
+            k: 0, m: 0
+        }
+    } else {
+        index_type
+    }
+}
+
+fn encrypted_targets<E: EncryptedRecord>(target: &E, config: &TableConfig) -> HashMap<String, Plaintext> {
+    target
+        .attributes()
+        .iter()
+        .filter_map(|(attr, plaintext)| {
+            config.get_column(attr).ok().flatten().and_then(|_| Some((attr.to_string(), plaintext.clone())))
+        })
+        .collect()
+}
+
+/// All index settings that support fuzzy matches
+fn encrypted_indexes<E: EncryptedRecord>(target: &E, config: &TableConfig) -> HashMap<String, (Plaintext, IndexType)> {
+    target
+        .attributes()
+        .iter()
+        .filter_map(|(attr, plaintext)| {
+            config.get_column(attr).ok().flatten()
+                .and_then(|column| column.index_for_operator(&Operator::ILike))
+                // Hack the index type
+                .and_then(|index| Some((
+                    attr.to_string(),
+                    (plaintext.clone(), index_type_hack(index.index_type.clone())))
+                ))
+        })
+        .collect()
+}
+
+async fn encrypt<E, C, D>(
+    target: &E,
+    cipher: &Encryption<C>,
+    config: &TableConfig,
+    dictionary: &D
+) -> Vec<TableEntry>
 where
     E: EncryptedRecord,
-    C: Credentials<Token = ViturToken>
+    C: Credentials<Token = ViturToken>,
+    D: Dictionary
 {
-    let plaintexts = target.plaintext_targets(config);
+    let plaintexts = encrypted_targets(target, config);
     // TODO: Maybe use a wrapper type?
     let mut attributes: HashMap<String, String> = Default::default();
     for (name, plaintext) in plaintexts.iter() {
@@ -75,26 +126,35 @@ where
         }
     }
 
-    let root = TableEntry {
-        pk: target.partition_key(),
+    let mut table_entries: Vec<TableEntry> = Vec::new();
+    table_entries.push(TableEntry {
+        pk: target.partition_key(), // TODO: MUST BE ENCRYPTED
         sk: target.sort_key(),
         term: None,
         field: None,
-        attributes
-    };
+        attributes: attributes.clone()
+    });
 
-    // TODO: Indexes
+    // Indexes
+    for (name, (plaintext, index_type)) in encrypted_indexes(target, config).iter() {
+        if let IndexTerm::PostingArray(postings) = cipher
+            .index_with_dictionary(plaintext, &index_type, name, &target.partition_key(), dictionary) // TODO: use encrypted partition key
+            .await
+            .unwrap() {
+                postings.iter().for_each(|posting| {
+                    table_entries.push(TableEntry::new_posting(&target.partition_key(), name, posting, attributes.clone()));
+                });
+            }
+    }
 
-    vec![root]
+    table_entries
 }
 
 pub trait EncryptedRecord {
     fn type_name() -> &'static str;
     fn partition_key(&self) -> String;
     fn sort_key(&self) -> String;
-
-    fn plaintext_targets(&self, config: &TableConfig) -> HashMap<String, Plaintext>;
-    //fn indexes(&self) -> 
+    fn attributes(&self) -> HashMap<String, Plaintext>;
 }
 
 #[skip_serializing_none]
@@ -118,20 +178,25 @@ pub struct TableEntry {
     attributes: HashMap<String, String>, // TODO: We will need to handle other types for plaintext values
 }
 
-/*impl TableEntry {
-    fn new_posting(posting: Posting, attributes: HashMap<Vec<u8>, Vec<u8>>) -> Self {
+impl TableEntry {
+    fn new_posting(
+        partition_key: impl Into<String>,
+        field: impl Into<String>,
+        posting: &Posting,
+        attributes: HashMap<String, String>
+    ) -> Self {
+        let field: String = field.into();
         Self {
-            pk: attributes.partition_key(),
-            // TODO: we need to prefix this with plaintext field name too so we can delete these later
-            sk: posting.field,
-            term: posting.term,
+            pk: partition_key.into(),
+            // We need to prefix this with plaintext field name too so we can delete these later
+            sk: format!("{}#{}", &field, hex::encode(&posting.field)),
+            term: Some(hex::encode(&posting.term)),
             attributes,
-            field: "name".to_string(), // TODO: Don't hard code the name
-            _phantom: PhantomData,
+            field: Some(field),
         }
     }
 
-    fn new(attributes: &A) -> Self {
+    /*fn new(attributes: &A) -> Self {
         Self {
             pk: attributes.partition_key(),
             sk: attributes.sort_key(),
@@ -140,8 +205,8 @@ pub struct TableEntry {
             field: "base".to_string(),
             _phantom: PhantomData,
         }
-    }
-}*/
+    }*/
+}
 
 impl User {
     pub fn new(email: impl Into<String>, name: impl Into<String>) -> Self {
@@ -249,10 +314,6 @@ impl<'c> Manager<'c> {
         }
     }
 
-    // TODO: get, update, delete
-
-    // TODO: Encrypt all fields on the type (some sort of derive macro may be needed)
-    // TODO: Encrypt the source values
     pub async fn put(&self, user: User) {
         let table_config = self
             .dataset_config
@@ -260,78 +321,8 @@ impl<'c> Manager<'c> {
             .get_table(&User::type_name())
             .expect("No config found for type");
 
-        // TODO: The default indexer doesn't downcase!
-        // FIXME: There is an API problem here, the indexing code should be on the match types
-        // and we should have a DictIndex or something
-        let index_type = IndexType::Match {
-            tokenizer: Tokenizer::EdgeGram {
-                min_length: 3,
-                max_length: 10,
-            },
-            token_filters: vec![TokenFilter::Downcase],
-            k: 6,
-            m: 2048,
-            include_original: false,
-        };
-
-        // TODO: Create an index function on the EncryptedType
-        // Indexes don't need all attributes
-        if let IndexTerm::PostingArray(postings) = self
-            .cipher
-            .index_with_dictionary(
-                &Plaintext::Utf8Str(Some(user.name.to_string())),
-                &index_type,
-                "name",
-                &user.name,
-                &self.dictionary,
-            )
-            .await
-            .unwrap()
-        {
-            let mut items: Vec<TransactWriteItem> = Vec::with_capacity(postings.len() + 1);
-
-
-            // TODO: Delete old postings
-            /*for posting in postings.into_iter() {
-                let item = TableEntry::new_posting(posting, &enc_user);
-
-                items.push(
-                    TransactWriteItem::builder()
-                        .put(
-                            Put::builder()
-                                .table_name("users")
-                                .set_item(Some(to_item(item).unwrap()))
-                                .build(),
-                        )
-                        .build(),
-                );
-            }*/
-
-            /*let item = TableEntry::new(&enc_user);
-
-            items.push(
-                TransactWriteItem::builder()
-                    .put(
-                        Put::builder()
-                            .table_name("users")
-                            .set_item(Some(to_item(item).unwrap()))
-                            .build(),
-                    )
-                    .build(),
-            );
-
-            self.db
-                .transact_write_items()
-                .set_transact_items(Some(items))
-                .send()
-                .await
-                .unwrap();*/
-        } else {
-            unreachable!()
-        }
-
         // TODO: Use a combinator
-        let table_entries = encrypt(&user, &self.cipher, table_config).await;
+        let table_entries = encrypt(&user, &self.cipher, table_config, &self.dictionary).await;
         let mut items: Vec<TransactWriteItem> = Vec::with_capacity(table_entries.len());
         for entry in table_entries.into_iter() {
             items.push(
