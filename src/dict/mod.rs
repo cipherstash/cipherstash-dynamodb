@@ -1,11 +1,11 @@
-use aws_sdk_dynamodb::{Client, types::AttributeValue};
+use crate::Key;
+use async_trait::async_trait;
+use aws_sdk_dynamodb::{types::AttributeValue, Client};
+use cipherstash_client::encryption::{DictEntry, Dictionary};
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
 use serde_dynamo::{from_item, to_item};
 use sha2::Sha256;
-use async_trait::async_trait;
-use cipherstash_client::encryption::{Dictionary, DictEntry};
-use crate::Key;
 type HmacSha256 = Hmac<Sha256>;
 
 const DICT_TABLE: &'static str = "users";
@@ -59,9 +59,9 @@ impl From<DynamoDictEntry> for DictEntry {
 #[async_trait]
 impl<'c> Dictionary for DynamoDict<'c> {
     async fn entry<T, S>(&self, plaintext: T, scope: S) -> DictEntry
-        where
-            T: Sync + Send + AsRef<[u8]>,
-            S: Sync + Send + AsRef<[u8]>
+    where
+        T: Sync + Send + AsRef<[u8]>,
+        S: Sync + Send + AsRef<[u8]>,
     {
         let term_key = hmac(&self.key, plaintext, scope);
         self.add_term(&term_key).await
@@ -87,21 +87,18 @@ impl<'c> DynamoDict<'c> {
             //.map_err(|e| PersistenceError::AdapterError(e.to_string()))?
             .expect("Get to succeed");
 
-        entry.item.and_then(|item| {
-            let dynamo_item: Result<DynamoDictEntry, _> = from_item(item);
-            dynamo_item.ok()
-        })
-        .unwrap_or(DictEntry::new(term.to_vec()).into())
-
+        entry
+            .item
+            .and_then(|item| {
+                let dynamo_item: Result<DynamoDictEntry, _> = from_item(item);
+                dynamo_item.ok()
+            })
+            .unwrap_or(DictEntry::new(term.to_vec()).into())
     }
 
     // TODO: TermKey type
     async fn add_term(&self, term: &[u8]) -> DictEntry {
-
-        let dict_entry = self
-            .get_dict_entry(&term)
-            .await
-            .incr();
+        let dict_entry = self.get_dict_entry(&term).await.incr();
 
         let new_item = to_item(&dict_entry).unwrap();
 
@@ -115,60 +112,58 @@ impl<'c> DynamoDict<'c> {
 
         dict_entry.into()
     }
-
-   
 }
 
-fn hmac<I: AsRef<[u8]>, S: AsRef<[u8]>>(key: &Key, input: I, scope: S) -> Vec<u8> { // TODO: Use the vec that works on the stack
+fn hmac<I: AsRef<[u8]>, S: AsRef<[u8]>>(key: &Key, input: I, scope: S) -> Vec<u8> {
+    // TODO: Use the vec that works on the stack
     let mut mac = HmacSha256::new_from_slice(key).unwrap();
     mac.update(scope.as_ref());
     mac.update(input.as_ref());
     mac.finalize().into_bytes()[0..8].to_vec()
 }
 
+// IDEA: To handle skip lists we may want to keep 2 counters
+// 1. A term counter so we can fetch N postings for that term in a batch
+// 2. A global dictionary counter so that we can skip ahead if needed
+// The global counter would maintain a form of universal ordering
+/*pub async fn query(&self, term_str: &str) -> Vec<String> {
+    let term = hmac(&Default::default(), term_str, None::<&[u8]>);
+    let de = self.get_dict_entry(&term).await.unwrap();
+    if de.is_some() {
+        let start = de.unwrap().count;
+        // TODO: Instead of saturating, we may want to add some random terms
+        let mut builder = KeysAndAttributes::builder();
+        for c in start.saturating_sub(100)..start { // TODO: Use a combinator
+            let term = hmac(&Default::default(), &term, Some(c.to_be_bytes()));
 
-  // IDEA: To handle skip lists we may want to keep 2 counters
-    // 1. A term counter so we can fetch N postings for that term in a batch
-    // 2. A global dictionary counter so that we can skip ahead if needed
-    // The global counter would maintain a form of universal ordering
-    /*pub async fn query(&self, term_str: &str) -> Vec<String> {
-        let term = hmac(&Default::default(), term_str, None::<&[u8]>);
-        let de = self.get_dict_entry(&term).await.unwrap();
-        if de.is_some() {
-            let start = de.unwrap().count;
-            // TODO: Instead of saturating, we may want to add some random terms
-            let mut builder = KeysAndAttributes::builder();
-            for c in start.saturating_sub(100)..start { // TODO: Use a combinator
-                let term = hmac(&Default::default(), &term, Some(c.to_be_bytes()));
-                
-                builder = builder.keys(HashMap::from([(
-                    "term".to_string(),
-                    AttributeValue::B(Blob::new(term)),
-                )]))
-            }
-
-
-            let result = self.
-                client
-                .batch_get_item()
-                .request_items(
-                    "dict",
-                   builder.build(),
-                )
-                .send()
-                .await
-                .unwrap();
-
-            let items = result
-                .responses()
-                .unwrap()
-                .get("dict")
-                .unwrap();
-
-            // FIXME: The to_vec is bad
-            let postings: Vec<Posting> = from_items(items.to_vec()).unwrap();
-            postings.iter().map(|p| p.doc_id.to_string()).collect()
-        } else {
-            vec![]
+            builder = builder.keys(HashMap::from([(
+                "term".to_string(),
+                AttributeValue::B(Blob::new(term)),
+            )]))
         }
-    }*/
+
+
+        let result = self.
+            client
+            .batch_get_item()
+            .request_items(
+                "dict",
+               builder.build(),
+            )
+            .send()
+            .await
+            .unwrap();
+
+        let items = result
+            .responses()
+            .unwrap()
+            .get("dict")
+            .unwrap();
+
+        // FIXME: The to_vec is bad
+        let postings: Vec<Posting> = from_items(items.to_vec()).unwrap();
+        postings.iter().map(|p| p.doc_id.to_string()).collect()
+    } else {
+        vec![]
+    }
+}*/
