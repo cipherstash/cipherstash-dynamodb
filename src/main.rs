@@ -49,11 +49,11 @@ async fn main() -> Result<(), Error> {
     let lauren = User::new("lauren@laurenneko.com", "Drap");
     let dan2 = User::new("daniel@example.net", "Daniel Johnson");
 
-    /*manager.put(&dan).await;
-    manager.put(&lauren).await;
-    manager.put(&dan2).await;*/
+    manager.put(dan).await;
+    /*manager.put(lauren).await;
+    manager.put(dan2).await;*/
 
-    dbg!(manager.query("name", "Dan").await);
+    //dbg!(manager.query("name", "Dan").await);
 
     //run(service_fn(function_handler)).await
     Ok(())
