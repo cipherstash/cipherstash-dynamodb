@@ -1,10 +1,10 @@
 tables:
-  - path: users
+  - path: user
     fields:
-      - name: full_name
+      - name: name
         in_place: false
         cast_type: utf8-str
-        mode: encrypted-duplicate
+        mode: encrypted
         indexes:
           - version: 1
             kind: match
