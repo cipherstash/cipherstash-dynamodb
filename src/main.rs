@@ -1,6 +1,5 @@
-use cryptonamo::{stack::AddPostingOperation, Key, user::{Manager, User}};
+use cryptonamo::{Key, user::{Manager, User}};
 use lambda_http::{run, service_fn, Body, Error, Request, RequestExt, Response};
-use aws_sdk_dynamodb as dynamodb;
 
 /// This is the main body for the function.
 /// Write your code inside it.

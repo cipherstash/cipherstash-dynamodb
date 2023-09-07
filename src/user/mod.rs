@@ -1,8 +1,8 @@
-use std::{sync::Arc, collections::HashMap, marker::PhantomData};
+use std::sync::Arc;
 use serde::{Deserialize, Serialize};
-use aws_sdk_dynamodb::{Client, types::{Put, TransactWriteItem, KeysAndAttributes, AttributeValue, builders::KeysAndAttributesBuilder}, primitives::Blob};
+use aws_sdk_dynamodb::{Client, types::{Put, TransactWriteItem, AttributeValue}};
 use cipherstash_client::{
-    schema::{column::{Tokenizer, TokenFilter, Index, IndexType}, ColumnConfig},
+    schema::{column::{Tokenizer, TokenFilter, Index, IndexType}},
     encryption::{Encryption, Plaintext, IndexTerm, Posting},
     config::{console_config::ConsoleConfig, vitur_config::ViturConfig},
     vitur::Vitur,
