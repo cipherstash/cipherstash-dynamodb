@@ -32,4 +32,5 @@ hex = { version = "0.4.3", features = [ "serde" ] }
 
 cipherstash-client = { path = "../../cipherstash-suite/packages/cipherstash-client/", features = [ "dictionaries", "tokio" ] }
 async-trait = "0.1.73"
+serde_with = "3.3.0"
 
