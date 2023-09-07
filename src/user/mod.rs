@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde_with::skip_serializing_none;
+use std::collections::HashMap;
 
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Put, TransactWriteItem},
@@ -7,10 +7,18 @@ use aws_sdk_dynamodb::{
 };
 use cipherstash_client::{
     config::{console_config::ConsoleConfig, vitur_config::ViturConfig},
-    credentials::{auto_refresh::AutoRefresh, vitur_credentials::{ViturCredentials, ViturToken}, Credentials},
-    encryption::{Encryption, IndexTerm, Plaintext, Posting, Dictionary},
-    schema::{column::{Index, IndexType, TokenFilter, Tokenizer}, TableConfig, operator::Operator},
-    vitur::{Vitur, DatasetConfigWithIndexRootKey},
+    credentials::{
+        auto_refresh::AutoRefresh,
+        vitur_credentials::{ViturCredentials, ViturToken},
+        Credentials,
+    },
+    encryption::{Dictionary, Encryption, IndexTerm, Plaintext, Posting},
+    schema::{
+        column::{Index, IndexType, TokenFilter, Tokenizer},
+        operator::Operator,
+        TableConfig,
+    },
+    vitur::{DatasetConfigWithIndexRootKey, Vitur},
 };
 use serde::{Deserialize, Serialize};
 use serde_dynamo::{from_items, to_item};
@@ -69,36 +77,52 @@ fn index_type_hack(index_type: IndexType) -> IndexType {
             },
             token_filters: vec![TokenFilter::Downcase],
             include_original: true,
-            k: 0, m: 0
+            k: 0,
+            m: 0,
         }
     } else {
         index_type
     }
 }
 
-fn encrypted_targets<E: EncryptedRecord>(target: &E, config: &TableConfig) -> HashMap<String, Plaintext> {
+fn encrypted_targets<E: EncryptedRecord>(
+    target: &E,
+    config: &TableConfig,
+) -> HashMap<String, Plaintext> {
     target
         .attributes()
         .iter()
         .filter_map(|(attr, plaintext)| {
-            config.get_column(attr).ok().flatten().and_then(|_| Some((attr.to_string(), plaintext.clone())))
+            config
+                .get_column(attr)
+                .ok()
+                .flatten()
+                .and_then(|_| Some((attr.to_string(), plaintext.clone())))
         })
         .collect()
 }
 
 /// All index settings that support fuzzy matches
-fn encrypted_indexes<E: EncryptedRecord>(target: &E, config: &TableConfig) -> HashMap<String, (Plaintext, IndexType)> {
+fn encrypted_indexes<E: EncryptedRecord>(
+    target: &E,
+    config: &TableConfig,
+) -> HashMap<String, (Plaintext, IndexType)> {
     target
         .attributes()
         .iter()
         .filter_map(|(attr, plaintext)| {
-            config.get_column(attr).ok().flatten()
+            config
+                .get_column(attr)
+                .ok()
+                .flatten()
                 .and_then(|column| column.index_for_operator(&Operator::ILike))
                 // Hack the index type
-                .and_then(|index| Some((
-                    attr.to_string(),
-                    (plaintext.clone(), index_type_hack(index.index_type.clone())))
-                ))
+                .and_then(|index| {
+                    Some((
+                        attr.to_string(),
+                        (plaintext.clone(), index_type_hack(index.index_type.clone())),
+                    ))
+                })
         })
         .collect()
 }
@@ -107,12 +131,12 @@ async fn encrypt<E, C, D>(
     target: &E,
     cipher: &Encryption<C>,
     config: &TableConfig,
-    dictionary: &D
+    dictionary: &D,
 ) -> Vec<TableEntry>
 where
     E: EncryptedRecord,
     C: Credentials<Token = ViturToken>,
-    D: Dictionary
+    D: Dictionary,
 {
     let plaintexts = encrypted_targets(target, config);
     // TODO: Maybe use a wrapper type?
@@ -121,8 +145,10 @@ where
         // TODO: Use the bulk encrypt
         if let Some(ct) = cipher
             .encrypt_single(&plaintext, &format!("{}#{}", E::type_name(), name))
-            .await.unwrap() {
-                attributes.insert(name.to_string(), ct);
+            .await
+            .unwrap()
+        {
+            attributes.insert(name.to_string(), ct);
         }
     }
 
@@ -132,19 +158,31 @@ where
         sk: target.sort_key(),
         term: None,
         field: None,
-        attributes: attributes.clone()
+        attributes: attributes.clone(),
     });
 
     // Indexes
     for (name, (plaintext, index_type)) in encrypted_indexes(target, config).iter() {
         if let IndexTerm::PostingArray(postings) = cipher
-            .index_with_dictionary(plaintext, &index_type, name, &target.partition_key(), dictionary) // TODO: use encrypted partition key
+            .index_with_dictionary(
+                plaintext,
+                &index_type,
+                name,
+                &target.partition_key(),
+                dictionary,
+            ) // TODO: use encrypted partition key
             .await
-            .unwrap() {
-                postings.iter().for_each(|posting| {
-                    table_entries.push(TableEntry::new_posting(&target.partition_key(), name, posting, attributes.clone()));
-                });
-            }
+            .unwrap()
+        {
+            postings.iter().for_each(|posting| {
+                table_entries.push(TableEntry::new_posting(
+                    &target.partition_key(),
+                    name,
+                    posting,
+                    attributes.clone(),
+                ));
+            });
+        }
     }
 
     table_entries
@@ -183,7 +221,7 @@ impl TableEntry {
         partition_key: impl Into<String>,
         field: impl Into<String>,
         posting: &Posting,
-        attributes: HashMap<String, String>
+        attributes: HashMap<String, String>,
     ) -> Self {
         let field: String = field.into();
         Self {
@@ -254,7 +292,7 @@ impl<'c> Manager<'c> {
             db,
             cipher,
             dictionary,
-            dataset_config
+            dataset_config,
         }
     }
 
@@ -297,9 +335,8 @@ impl<'c> Manager<'c> {
 
             let result = query.send().await.unwrap();
 
-            let table_entries: Vec<TableEntry> =
-                from_items(result.items.unwrap()).unwrap();
-            
+            let table_entries: Vec<TableEntry> = from_items(result.items.unwrap()).unwrap();
+
             let mut results: Vec<User> = Vec::with_capacity(table_entries.len());
 
             for te in table_entries.into_iter() {
@@ -308,7 +345,6 @@ impl<'c> Manager<'c> {
             }
 
             results
-            
         } else {
             unreachable!()
         }
@@ -338,11 +374,11 @@ impl<'c> Manager<'c> {
         }
 
         self.db
-                .transact_write_items()
-                .set_transact_items(Some(items))
-                .send()
-                .await
-                .unwrap();
+            .transact_write_items()
+            .set_transact_items(Some(items))
+            .send()
+            .await
+            .unwrap();
 
         //let cipher = Encryption::new(field_key, client);
         // TODO: Use the column config but create a new kind of index for this scheme
