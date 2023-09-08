@@ -1,10 +1,10 @@
 tables:
-  - path: users
+  - path: user
     fields:
-      - name: full_name
+      - name: name
         in_place: false
         cast_type: utf8-str
-        mode: encrypted-duplicate
+        mode: encrypted
         indexes:
           - version: 1
             kind: match
@@ -16,3 +16,21 @@ tables:
             k: 6
             m: 2048
             include_original: true
+      - name: email
+        in_place: false
+        cast_type: utf8-str
+        mode: encrypted
+        indexes: []
+  - path: license
+    fields:
+      - name: number
+        in_place: false
+        cast_type: utf8-str
+        mode: encrypted
+        indexes: []
+      - name: expires
+        in_place: false
+        cast_type: utf8-str
+        mode: encrypted
+        indexes: []
+        
