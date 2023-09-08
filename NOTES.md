@@ -77,6 +77,8 @@ Stretch
 
 ## Production Implementation
 
+* Packaging up the crate
+* Comprehensive tests
 * Credential caching/lambda
 * Control which attributes end up in indexes (like projections in Dynamo)
 * Ability to support encrypted and plaintext attributes

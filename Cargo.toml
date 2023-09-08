@@ -33,4 +33,6 @@ hex = { version = "0.4.3", features = [ "serde" ] }
 cipherstash-client = { path = "../../cipherstash-suite/packages/cipherstash-client/", features = [ "dictionaries", "tokio" ] }
 async-trait = "0.1.73"
 serde_with = "3.3.0"
+log = "0.4.20"
+env_logger = "0.10.0"
 

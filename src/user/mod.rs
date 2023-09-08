@@ -1,4 +1,5 @@
 use serde_with::skip_serializing_none;
+use log::info;
 use std::{collections::HashMap, hash::Hash};
 
 use aws_sdk_dynamodb::{
@@ -353,6 +354,7 @@ pub struct Manager<'c> {
 // TODO: Instantiate an indexer based on a generic type when initializing the manager
 impl<'c> Manager<'c> {
     pub async fn init(db: &'c Client) -> Manager<'c> {
+        info!("Initializing...");
         let console_config = ConsoleConfig::builder().with_env().build().unwrap();
         let vitur_config = ViturConfig::builder()
             .with_env()
@@ -367,12 +369,14 @@ impl<'c> Manager<'c> {
             vitur_config.client_key(),
         );
 
+        info!("Fetching dataset config...");
         let dataset_config = vitur_client.load_dataset_config().await.unwrap();
-
         let cipher = Box::new(Encryption::new(dataset_config.index_root_key, vitur_client));
 
         // TODO: Keep the dictionary in an Arc and implement the trait for the Arc?
         let dictionary = DynamoDict::init(&db, dataset_config.index_root_key);
+
+        info!("Ready!");
 
         Self {
             db,

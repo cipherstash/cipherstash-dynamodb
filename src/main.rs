@@ -36,6 +36,8 @@ async fn main() -> Result<(), Error> {
         .without_time()
         .init();
 
+    env_logger::init();
+
     let config = aws_config::from_env()
         .endpoint_url("http://localhost:8000")
         .load()
@@ -49,16 +51,16 @@ async fn main() -> Result<(), Error> {
     let lauren = User::new("lauren@laurenneko.com", "Lauren Neko");
     let dan2 = User::new("daniel@example.net", "Daniel Johnson");
 
-    /*manager.put(dan).await;
+    manager.put(dan).await;
     manager.put(lauren).await;
-    manager.put(dan2).await;*/
+    manager.put(dan2).await;
 
     //let results: Vec<UserResultByName> = manager.query("name", "Dan").await;
     //let results: Vec<User> = manager.query("name", "Dan").await;
     //dbg!(results);
 
-    let result: Option<User> = manager.get("foo@bar").await;
-    dbg!(result);
+    /*let result: Option<User> = manager.get("foo@bar").await;
+    dbg!(result);*/
 
     //run(service_fn(function_handler)).await
     Ok(())
