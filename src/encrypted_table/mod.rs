@@ -117,7 +117,7 @@ impl<'c> EncryptedTable<'c> {
     where
         T: EncryptedRecord + DecryptedRecord,
     {
-        let pk = encrypt_partition_key(T::type_name(), pk, &self.cipher);
+        let pk = encrypt_partition_key(pk, &self.cipher);
         let result = self
             .db
             .get_item()

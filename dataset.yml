@@ -21,3 +21,16 @@ tables:
         cast_type: utf8-str
         mode: encrypted
         indexes: []
+  - path: license
+    fields:
+      - name: number
+        in_place: false
+        cast_type: utf8-str
+        mode: encrypted
+        indexes: []
+      - name: expires
+        in_place: false
+        cast_type: utf8-str
+        mode: encrypted
+        indexes: []
+        
