@@ -1,5 +1,5 @@
+use cryptonamo::{DecryptedRecord, DynamoTarget, Plaintext};
 use std::collections::HashMap;
-use cryptonamo::{DynamoTarget, DecryptedRecord, Plaintext};
 
 #[derive(Debug)]
 pub struct UserResultByName {

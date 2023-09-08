@@ -1,20 +1,18 @@
-use log::info;
+use crate::{
+    crypto::*, dict::DynamoDict, table_entry::TableEntry, DecryptedRecord, EncryptedRecord,
+};
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Put, TransactWriteItem},
     Client,
 };
 use cipherstash_client::{
     config::{console_config::ConsoleConfig, vitur_config::ViturConfig},
-    credentials::{
-        auto_refresh::AutoRefresh,
-        vitur_credentials::ViturCredentials,
-    },
+    credentials::{auto_refresh::AutoRefresh, vitur_credentials::ViturCredentials},
     encryption::Encryption,
     vitur::{DatasetConfigWithIndexRootKey, Vitur},
 };
+use log::info;
 use serde_dynamo::{aws_sdk_dynamodb_0_29::from_item, from_items, to_item};
-use crate::{dict::DynamoDict, EncryptedRecord, DecryptedRecord, table_entry::TableEntry, crypto::*};
-
 
 pub struct EncryptedTable<'c> {
     db: &'c Client,
@@ -56,7 +54,7 @@ impl<'c> EncryptedTable<'c> {
             cipher,
             dictionary,
             dataset_config,
-            table_name: table_name.into()
+            table_name: table_name.into(),
         }
     }
 
@@ -139,7 +137,10 @@ impl<'c> EncryptedTable<'c> {
         }
     }
 
-    pub async fn put<T>(&self, record: &T) where T: EncryptedRecord {
+    pub async fn put<T>(&self, record: &T)
+    where
+        T: EncryptedRecord,
+    {
         let table_config = self
             .dataset_config
             .config

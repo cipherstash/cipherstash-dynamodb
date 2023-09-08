@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 
 use cipherstash_client::{
-    credentials::{
-        vitur_credentials::ViturToken,
-        Credentials,
-    },
+    credentials::{vitur_credentials::ViturToken, Credentials},
     encryption::{Dictionary, Encryption, IndexTerm, Plaintext},
     schema::{
         column::{Index, IndexType, TokenFilter, Tokenizer},
@@ -178,7 +175,11 @@ where
     table_entries
 }
 
-pub(crate) fn encrypt_partition_key<C>(type_name: &str, value: &str, cipher: &Encryption<C>) -> String
+pub(crate) fn encrypt_partition_key<C>(
+    type_name: &str,
+    value: &str,
+    cipher: &Encryption<C>,
+) -> String
 where
     C: Credentials<Token = ViturToken>,
 {
