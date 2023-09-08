@@ -1,6 +1,6 @@
 use serde_with::skip_serializing_none;
 use log::info;
-use std::{collections::HashMap, hash::Hash};
+use std::{collections::HashMap, hash::Hash, fmt::Debug};
 
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Put, TransactWriteItem},
@@ -62,10 +62,6 @@ impl EncryptedRecord for User {
         "user".to_string()
     }
 
-    fn type_name() -> &'static str {
-        "user"
-    }
-
     fn attributes(&self) -> HashMap<String, Plaintext> {
         HashMap::from([
             ("name".to_string(), Plaintext::from(self.name.to_string())),
@@ -73,6 +69,19 @@ impl EncryptedRecord for User {
         ])
     }
 }
+
+impl DynamoTarget for User {
+    fn type_name() -> &'static str {
+        "user"
+    }
+}
+
+impl DynamoTarget for UserResultByName {
+    fn type_name() -> &'static str {
+        "user"
+    }
+}
+
 
 impl DecryptedRecord for User {
     fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {
@@ -271,15 +280,18 @@ where
 }
 
 // TODO: These are analogous to serde (rename to Encrypt and Decrypt)
-pub trait EncryptedRecord {
-    fn type_name() -> &'static str;
+pub trait EncryptedRecord: DynamoTarget {
     fn partition_key(&self) -> String;
     fn sort_key(&self) -> String;
     fn attributes(&self) -> HashMap<String, Plaintext>;
 }
 
-pub trait DecryptedRecord {
+pub trait DecryptedRecord: DynamoTarget {
     fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self;
+}
+
+pub trait DynamoTarget: Debug {
+    fn type_name() -> &'static str;
 }
 
 #[skip_serializing_none]
@@ -320,17 +332,6 @@ impl TableEntry {
             field: Some(field),
         }
     }
-
-    /*fn new(attributes: &A) -> Self {
-        Self {
-            pk: attributes.partition_key(),
-            sk: attributes.sort_key(),
-            term: vec![0, 0], // FIXME: term should be optional
-            attributes: attributes.clone(),
-            field: "base".to_string(),
-            _phantom: PhantomData,
-        }
-    }*/
 }
 
 impl User {
@@ -347,13 +348,14 @@ pub struct Manager<'c> {
     cipher: Box<Encryption<AutoRefresh<ViturCredentials>>>,
     dataset_config: DatasetConfigWithIndexRootKey,
     dictionary: DynamoDict<'c>,
+    table_name: String,
 }
 
 // TODO: impl CipherStash::Searchable (or something)
 // or make it generic/pass a config to it?
 // TODO: Instantiate an indexer based on a generic type when initializing the manager
 impl<'c> Manager<'c> {
-    pub async fn init(db: &'c Client) -> Manager<'c> {
+    pub async fn init(db: &'c Client, table_name: impl Into<String>) -> Manager<'c> {
         info!("Initializing...");
         let console_config = ConsoleConfig::builder().with_env().build().unwrap();
         let vitur_config = ViturConfig::builder()
@@ -383,6 +385,7 @@ impl<'c> Manager<'c> {
             cipher,
             dictionary,
             dataset_config,
+            table_name: table_name.into()
         }
     }
 
@@ -393,7 +396,7 @@ impl<'c> Manager<'c> {
         let table_config = self
             .dataset_config
             .config
-            .get_table(&User::type_name())
+            .get_table(&R::type_name())
             .expect("No config found for type");
 
         let terms = encrypt_query(
@@ -415,7 +418,7 @@ impl<'c> Manager<'c> {
         let mut query = self
             .db
             .query()
-            .table_name("users")
+            .table_name(&self.table_name)
             .index_name("TermIndex")
             .key_condition_expression("field = :field")
             .expression_attribute_values(":field", AttributeValue::S(field_name.to_string()))
@@ -449,9 +452,9 @@ impl<'c> Manager<'c> {
         let result = self
             .db
             .get_item()
-            .table_name("users")
+            .table_name(&self.table_name)
             .key("pk", AttributeValue::S(pk))
-            .key("sk", AttributeValue::S("user".to_string()))
+            .key("sk", AttributeValue::S(T::type_name().to_string()))
             .send()
             .await
             .unwrap();
@@ -465,22 +468,22 @@ impl<'c> Manager<'c> {
         }
     }
 
-    pub async fn put(&self, user: User) {
+    pub async fn put<T>(&self, record: &T) where T: EncryptedRecord {
         let table_config = self
             .dataset_config
             .config
-            .get_table(&User::type_name())
-            .expect("No config found for type");
+            .get_table(&T::type_name())
+            .expect(&format!("No config found for type {:?}", record));
 
         // TODO: Use a combinator
-        let table_entries = encrypt(&user, &self.cipher, table_config, &self.dictionary).await;
+        let table_entries = encrypt(record, &self.cipher, table_config, &self.dictionary).await;
         let mut items: Vec<TransactWriteItem> = Vec::with_capacity(table_entries.len());
         for entry in table_entries.into_iter() {
             items.push(
                 TransactWriteItem::builder()
                     .put(
                         Put::builder()
-                            .table_name("users") // TODO: Make this an arg to the manager
+                            .table_name(&self.table_name)
                             .set_item(Some(to_item(entry).unwrap()))
                             .build(),
                     )
