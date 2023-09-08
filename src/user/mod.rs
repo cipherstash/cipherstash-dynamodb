@@ -1,5 +1,5 @@
 use serde_with::skip_serializing_none;
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Put, TransactWriteItem},
@@ -27,8 +27,13 @@ use crate::dict::DynamoDict;
 
 #[derive(Debug)]
 pub struct User {
-    email: String,
-    name: String,
+    pub email: String,
+    pub name: String,
+}
+
+#[derive(Debug)]
+pub struct UserResultByName {
+    pub name: String,
 }
 
 // FIXME: Lots of copies going on here! Cow?
@@ -65,6 +70,22 @@ impl EncryptedRecord for User {
             ("name".to_string(), Plaintext::from(self.name.to_string())),
             ("email".to_string(), Plaintext::from(self.email.to_string())),
         ])
+    }
+}
+
+impl DecryptedRecord for User {
+    fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {
+        Self {
+            email: attributes.get("email").unwrap().try_into().unwrap(),
+            name: attributes.get("name").unwrap().try_into().unwrap(),
+        }
+    }
+}
+
+impl DecryptedRecord for UserResultByName {
+    fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {
+        // TODO: Don't unwrap, make try_from_attributes and return a Result
+        UserResultByName { name: attributes.get("name").unwrap().try_into().unwrap() }
     }
 }
 
@@ -127,6 +148,47 @@ fn encrypted_indexes<E: EncryptedRecord>(
         .collect()
 }
 
+async fn encrypt_query<C, D>(
+    query: &Plaintext,
+    field_name: &str,
+    cipher: &Encryption<C>,
+    config: &TableConfig,
+    dictionary: &D,
+) -> Vec<String>
+where
+    C: Credentials<Token = ViturToken>,
+    D: Dictionary,
+{
+    let index_type = config.get_column(field_name).unwrap().and_then(|c| c.index_for_operator(&Operator::ILike)).unwrap().index_type.clone();
+
+    if let IndexTerm::PostingArrayQuery(terms) = cipher
+        .query_with_dictionary(
+            query,
+            &index_type_hack(index_type),
+            field_name,
+            dictionary,
+        )
+        .await
+        .unwrap() {
+            terms.into_iter().map(hex::encode).collect()
+        } else {
+            vec![]
+        }
+}
+
+async fn decrypt<C>(
+    ciphertexts: HashMap<String, String>,
+    cipher: &Encryption<C>,
+) -> HashMap<String, Plaintext>
+where
+    C: Credentials<Token = ViturToken>,
+{
+    let values: Vec<&String> = ciphertexts.values().collect();
+    let plaintexts: Vec<Plaintext> = cipher.decrypt(values).await.unwrap();
+    ciphertexts.into_keys().zip(plaintexts.into_iter()).collect()
+}
+
+
 async fn encrypt<E, C, D>(
     target: &E,
     cipher: &Encryption<C>,
@@ -188,11 +250,16 @@ where
     table_entries
 }
 
+// TODO: These are analogous to serde (rename to Encrypt and Decrypt)
 pub trait EncryptedRecord {
     fn type_name() -> &'static str;
     fn partition_key(&self) -> String;
     fn sort_key(&self) -> String;
     fn attributes(&self) -> HashMap<String, Plaintext>;
+}
+
+pub trait DecryptedRecord {
+    fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self;
 }
 
 #[skip_serializing_none]
@@ -296,58 +363,52 @@ impl<'c> Manager<'c> {
         }
     }
 
-    pub async fn query(self, field_name: &str, query: &str) -> Vec<User> {
-        // TODO: Load from Vitur config
-        let index_type = Index::new_match().index_type;
-        if let IndexTerm::PostingArrayQuery(terms) = self
-            .cipher
-            .query_with_dictionary(
-                &Plaintext::Utf8Str(Some(query.to_string())),
-                &index_type,
-                "name",
-                &self.dictionary,
-            )
-            .await
-            .unwrap()
-        {
-            let terms_list: String = terms
-                .iter()
-                .enumerate()
-                .map(|(i, _)| format!(":t{i}"))
-                .collect::<Vec<String>>()
-                .join(",");
+    pub async fn query<R>(self, field_name: &str, query: &str) -> Vec<R> where R: DecryptedRecord {
+        let table_config = self
+            .dataset_config
+            .config
+            .get_table(&User::type_name())
+            .expect("No config found for type");
 
-            let mut query = self
-                .db
-                .query()
-                .table_name("users")
-                .index_name("TermIndex")
-                .key_condition_expression("field = :field")
-                .expression_attribute_values(":field", AttributeValue::S(field_name.to_string()))
-                .filter_expression(format!("term in ({terms_list})"));
+        let terms = encrypt_query(&query.to_string().into(), field_name, &self.cipher, table_config, &self.dictionary).await;
 
-            for (i, term) in terms.iter().enumerate() {
-                query = query.expression_attribute_values(
-                    format!(":t{i}"),
-                    AttributeValue::S(hex::encode(term)),
-                );
-            }
+        let terms_list: String = terms
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!(":t{i}"))
+            .collect::<Vec<String>>()
+            .join(",");
 
-            let result = query.send().await.unwrap();
+        let mut query = self
+            .db
+            .query()
+            .table_name("users")
+            .index_name("TermIndex")
+            .key_condition_expression("field = :field")
+            .expression_attribute_values(":field", AttributeValue::S(field_name.to_string()))
+            .filter_expression(format!("term in ({terms_list})"));
 
-            let table_entries: Vec<TableEntry> = from_items(result.items.unwrap()).unwrap();
-
-            let mut results: Vec<User> = Vec::with_capacity(table_entries.len());
-
-            for te in table_entries.into_iter() {
-                // TODO: Bulk decrypt
-                //results.push(te.attributes.decrypt(&self.cipher).await);
-            }
-
-            results
-        } else {
-            unreachable!()
+        for (i, term) in terms.into_iter().enumerate() {
+            query = query.expression_attribute_values(
+                format!(":t{i}"),
+                AttributeValue::S(term),
+            );
         }
+
+        let result = query.send().await.unwrap();
+
+        let table_entries: Vec<TableEntry> = from_items(result.items.unwrap()).unwrap();
+
+        let mut results: Vec<R> = Vec::with_capacity(table_entries.len());
+
+        // TODO: Bulk Decrypt
+        for te in table_entries.into_iter() {
+            let attributes = decrypt(te.attributes, &self.cipher).await;
+            let record: R = R::from_attributes(attributes);
+            results.push(record);
+        }
+
+        results
     }
 
     pub async fn put(&self, user: User) {
@@ -379,28 +440,5 @@ impl<'c> Manager<'c> {
             .send()
             .await
             .unwrap();
-
-        //let cipher = Encryption::new(field_key, client);
-        // TODO: Use the column config but create a new kind of index for this scheme
-        //let config = ColumnConfig::build("name").add_index(Index::new_match());
-
-        // analyse user fields into terms
-        // generate term-keys
-        // get the terms from the dict (cache them)
-        // Generate postings for each term (based on the counts)
-        // Generate bloom filters for each term
-        // Encrypt each term
-        // Put all
-        //self
-        //    .client
-        //    .put_item()
     }
-
-    // query
-    // Generate the term keys for the terms
-    // Get the dict entries for each
-    // Decrypt the dict entries
-    // Find the least common dict entry, t
-    // For t, generate the first n terms to look up
-    // For each of these terms, generate a bloom filter containing all other query terms but using the term posting as the key
 }

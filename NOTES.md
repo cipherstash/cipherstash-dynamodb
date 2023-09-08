@@ -62,11 +62,14 @@ We now also generate for each k, an OPE term which represents 200 encoded with t
 
 ## Demo
 * Encrypt the partition key
-* Put
-* Query
+* Put ✅
+* Query ✅
 * Get
-* Decryption
+* Decryption ✅
 * Delete?
+
+Stretch
+* Distinguish between exact and startswith in the query method
 * Error Handling
 * Adding a subtype? (e.g. DriversLicense)
 
@@ -83,7 +86,9 @@ We now also generate for each k, an OPE term which represents 200 encoded with t
 * Counter contention mitigation
 * Derive Macros
 * Other data types
-* "StartsWith" operator
+* "StartsWith" operator in Vitur Schema
+* Conjunctive queries?
+* Bulk encrypt and decrypt
 
 ## Later
 * How to migrate an existing table?

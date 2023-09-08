@@ -1,5 +1,5 @@
 use cryptonamo::{
-    user::{Manager, User},
+    user::{Manager, User, UserResultByName},
     Key,
 };
 use lambda_http::{run, service_fn, Body, Error, Request, RequestExt, Response};
@@ -49,11 +49,13 @@ async fn main() -> Result<(), Error> {
     let lauren = User::new("lauren@laurenneko.com", "Lauren Neko");
     let dan2 = User::new("daniel@example.net", "Daniel Johnson");
 
-    manager.put(dan).await;
+    /*manager.put(dan).await;
     manager.put(lauren).await;
-    manager.put(dan2).await;
+    manager.put(dan2).await;*/
 
-    //dbg!(manager.query("name", "Dan").await);
+    //let results: Vec<UserResultByName> = manager.query("name", "Dan").await;
+    let results: Vec<User> = manager.query("name", "Dan").await;
+    dbg!(results);
 
     //run(service_fn(function_handler)).await
     Ok(())
