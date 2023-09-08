@@ -141,7 +141,7 @@ where
         }
     }
 
-    let partition_key = encrypt_partition_key(E::type_name(), &target.partition_key(), cipher);
+    let partition_key = encrypt_partition_key(&target.partition_key(), cipher);
 
     let mut table_entries: Vec<TableEntry> = Vec::new();
     // TODO: Make a constructor on TableEntry so the elements don't have to be pub
@@ -176,14 +176,14 @@ where
 }
 
 pub(crate) fn encrypt_partition_key<C>(
-    type_name: &str,
     value: &str,
     cipher: &Encryption<C>,
 ) -> String
 where
     C: Credentials<Token = ViturToken>,
 {
-    let plaintext: Plaintext = format!("{type_name}#{value}").into();
+    //let plaintext: Plaintext = format!("{type_name}#{value}").into();
+    let plaintext: Plaintext = value.to_string().into();
     let index_type = Index::new_unique().index_type;
     if let IndexTerm::Binary(bytes) = cipher.index(&plaintext, &index_type).unwrap() {
         hex::encode(bytes)

@@ -66,7 +66,7 @@ We now also generate for each k, an OPE term which represents 200 encoded with t
 * Query ✅
 * Get ✅
 * Decryption ✅
-* Bug: queries only update on the second call
+* Bug: queries only update on the second call (I think the count is stale)
 * Delete?
 
 Stretch
@@ -91,6 +91,7 @@ Stretch
 * Lambda stream handler for compaction
 * Counter contention mitigation
 * Derive Macros
+- Handle subtypes well (they must have the same partition key as the parent type)
 * Work out why the ciphertexts are so long!
 * Other data types
 * "StartsWith" operator in Vitur Schema
