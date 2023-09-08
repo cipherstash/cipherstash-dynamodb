@@ -220,9 +220,11 @@ where
         }
     }
 
+    let partition_key = encrypt_partition_key(E::type_name(), &target.partition_key(), cipher);
+
     let mut table_entries: Vec<TableEntry> = Vec::new();
     table_entries.push(TableEntry {
-        pk: target.partition_key(), // TODO: MUST BE ENCRYPTED
+        pk: partition_key.to_string(),
         sk: target.sort_key(),
         term: None,
         field: None,
@@ -230,13 +232,14 @@ where
     });
 
     // Indexes
+    // TODO: Do the indexes first to avoid clones
     for (name, (plaintext, index_type)) in encrypted_indexes(target, config).iter() {
         if let IndexTerm::PostingArray(postings) = cipher
             .index_with_dictionary(
                 plaintext,
                 &index_type,
                 name,
-                &target.partition_key(),
+                &partition_key,
                 dictionary,
             ) // TODO: use encrypted partition key
             .await
@@ -244,7 +247,7 @@ where
         {
             postings.iter().for_each(|posting| {
                 table_entries.push(TableEntry::new_posting(
-                    &target.partition_key(),
+                    &partition_key,
                     name,
                     posting,
                     attributes.clone(),
@@ -254,6 +257,21 @@ where
     }
 
     table_entries
+}
+
+fn encrypt_partition_key<C>(type_name: &str, value: &str, cipher: &Encryption<C>) -> String
+where C: Credentials<Token = ViturToken>,
+{
+    let plaintext: Plaintext = format!("{type_name}#{value}").into();
+    let index_type = Index::new_unique().index_type;
+    if let IndexTerm::Binary(bytes) = cipher.index(&plaintext, &index_type).unwrap() {
+        hex::encode(bytes)
+    } else {
+        // NOTE: This highlights an ergonomic issue with the way indexers currently work.
+        // When indexing with a Unique indexer, the return type should also be Binary.
+        // Because this is wrapped in an Enum, we can't guarantee that we'll get one!
+        unreachable!()
+    }
 }
 
 // TODO: These are analogous to serde (rename to Encrypt and Decrypt)
