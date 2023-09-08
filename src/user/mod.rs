@@ -21,7 +21,7 @@ use cipherstash_client::{
     vitur::{DatasetConfigWithIndexRootKey, Vitur},
 };
 use serde::{Deserialize, Serialize};
-use serde_dynamo::{from_items, to_item};
+use serde_dynamo::{aws_sdk_dynamodb_0_29::from_item, from_items, to_item};
 
 use crate::dict::DynamoDict;
 
@@ -435,6 +435,30 @@ impl<'c> Manager<'c> {
         }
 
         results
+    }
+
+    pub async fn get<T>(&self, pk: &str) -> Option<T>
+    where
+        T: EncryptedRecord + DecryptedRecord,
+    {
+        let pk = encrypt_partition_key(T::type_name(), pk, &self.cipher);
+        let result = self
+            .db
+            .get_item()
+            .table_name("users")
+            .key("pk", AttributeValue::S(pk))
+            .key("sk", AttributeValue::S("user".to_string()))
+            .send()
+            .await
+            .unwrap();
+        let table_entry: Option<TableEntry> = result.item.and_then(|item| from_item(item).unwrap());
+
+        if let Some(TableEntry { attributes, .. }) = table_entry {
+            let attributes = decrypt(attributes, &self.cipher).await;
+            Some(T::from_attributes(attributes))
+        } else {
+            None
+        }
     }
 
     pub async fn put(&self, user: User) {
