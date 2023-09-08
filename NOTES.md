@@ -64,8 +64,9 @@ We now also generate for each k, an OPE term which represents 200 encoded with t
 * Encrypt the partition key ✅ 
 * Put ✅
 * Query ✅
-* Get
+* Get ✅
 * Decryption ✅
+* Bug: queries only update on the second call
 * Delete?
 
 Stretch
@@ -73,6 +74,7 @@ Stretch
 * Distinguish between exact and startswith in the query method
 * Error Handling
 - Including if the target type cannot be deserialized
+* Encrypt the dict counts
 
 
 ## Production Implementation
@@ -94,6 +96,7 @@ Stretch
 * "StartsWith" operator in Vitur Schema
 * Conjunctive queries?
 * Bulk encrypt and decrypt
+* Indexers: index vs query settings to make edgegram queries possible
 
 ## Later
 * How to migrate an existing table?
