@@ -1,8 +1,8 @@
 use std::{collections::HashMap, fmt::Debug};
 
-pub mod encrypted_table;
-mod dict;
 mod crypto;
+mod dict;
+pub mod encrypted_table;
 mod table_entry;
 
 pub type Key = [u8; 32];

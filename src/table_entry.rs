@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use cipherstash_client::encryption::Posting;
-use serde_with::skip_serializing_none;
 use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 
 #[skip_serializing_none]
 #[derive(Serialize, Deserialize, Debug)]
