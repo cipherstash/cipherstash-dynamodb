@@ -45,19 +45,19 @@ async fn main() -> Result<(), Error> {
 
     let client = aws_sdk_dynamodb::Client::new(&config);
 
-    let manager = Manager::init(&client).await;
+    let manager = Manager::init(&client, "users").await;
 
     let dan = User::new("dan@coderdan.co", "Dan Draper");
     let lauren = User::new("lauren@laurenneko.com", "Lauren Neko");
     let dan2 = User::new("daniel@example.net", "Daniel Johnson");
 
-    manager.put(dan).await;
-    manager.put(lauren).await;
-    manager.put(dan2).await;
+    /*manager.put(&dan).await;
+    manager.put(&lauren).await;
+    manager.put(&dan2).await;*/
 
-    //let results: Vec<UserResultByName> = manager.query("name", "Dan").await;
+    let results: Vec<UserResultByName> = manager.query("name", "Dan").await;
     //let results: Vec<User> = manager.query("name", "Dan").await;
-    //dbg!(results);
+    dbg!(results);
 
     /*let result: Option<User> = manager.get("foo@bar").await;
     dbg!(result);*/
