@@ -53,9 +53,12 @@ async fn main() -> Result<(), Error> {
     manager.put(lauren).await;
     manager.put(dan2).await;*/
 
-    let results: Vec<UserResultByName> = manager.query("name", "Dan").await;
+    //let results: Vec<UserResultByName> = manager.query("name", "Dan").await;
     //let results: Vec<User> = manager.query("name", "Dan").await;
-    dbg!(results);
+    //dbg!(results);
+
+    let result: Option<User> = manager.get("foo@bar").await;
+    dbg!(result);
 
     //run(service_fn(function_handler)).await
     Ok(())

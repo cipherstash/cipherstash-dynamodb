@@ -61,7 +61,7 @@ We now have a list of tuples which each contain k and bloom filter (k, b).
 We now also generate for each k, an OPE term which represents 200 encoded with the key from 120.
 
 ## Demo
-* Encrypt the partition key
+* Encrypt the partition key ✅ 
 * Put ✅
 * Query ✅
 * Get
@@ -69,13 +69,15 @@ We now also generate for each k, an OPE term which represents 200 encoded with t
 * Delete?
 
 Stretch
+* Adding a subtype? (e.g. DriversLicense) (different type but with the same PK)
 * Distinguish between exact and startswith in the query method
 * Error Handling
-* Adding a subtype? (e.g. DriversLicense)
+- Including if the target type cannot be deserialized
 
 
 ## Production Implementation
 
+* Credential caching/lambda
 * Control which attributes end up in indexes (like projections in Dynamo)
 * Ability to support encrypted and plaintext attributes
 * Load field configs from Vitur/Dataset (add Dict Indexer type to schema)
@@ -85,6 +87,7 @@ Stretch
 * Lambda stream handler for compaction
 * Counter contention mitigation
 * Derive Macros
+* Work out why the ciphertexts are so long!
 * Other data types
 * "StartsWith" operator in Vitur Schema
 * Conjunctive queries?
@@ -92,5 +95,6 @@ Stretch
 
 ## Later
 * How to migrate an existing table?
+* Better dataset config structure (more broadly applicable)
 
 

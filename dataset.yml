@@ -16,3 +16,8 @@ tables:
             k: 6
             m: 2048
             include_original: true
+      - name: email
+        in_place: false
+        cast_type: utf8-str
+        mode: encrypted
+        indexes: []
