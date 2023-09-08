@@ -85,7 +85,9 @@ impl DecryptedRecord for User {
 impl DecryptedRecord for UserResultByName {
     fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {
         // TODO: Don't unwrap, make try_from_attributes and return a Result
-        UserResultByName { name: attributes.get("name").unwrap().try_into().unwrap() }
+        UserResultByName {
+            name: attributes.get("name").unwrap().try_into().unwrap(),
+        }
     }
 }
 
@@ -159,21 +161,23 @@ where
     C: Credentials<Token = ViturToken>,
     D: Dictionary,
 {
-    let index_type = config.get_column(field_name).unwrap().and_then(|c| c.index_for_operator(&Operator::ILike)).unwrap().index_type.clone();
+    let index_type = config
+        .get_column(field_name)
+        .unwrap()
+        .and_then(|c| c.index_for_operator(&Operator::ILike))
+        .unwrap()
+        .index_type
+        .clone();
 
     if let IndexTerm::PostingArrayQuery(terms) = cipher
-        .query_with_dictionary(
-            query,
-            &index_type_hack(index_type),
-            field_name,
-            dictionary,
-        )
+        .query_with_dictionary(query, &index_type_hack(index_type), field_name, dictionary)
         .await
-        .unwrap() {
-            terms.into_iter().map(hex::encode).collect()
-        } else {
-            vec![]
-        }
+        .unwrap()
+    {
+        terms.into_iter().map(hex::encode).collect()
+    } else {
+        vec![]
+    }
 }
 
 async fn decrypt<C>(
@@ -185,9 +189,11 @@ where
 {
     let values: Vec<&String> = ciphertexts.values().collect();
     let plaintexts: Vec<Plaintext> = cipher.decrypt(values).await.unwrap();
-    ciphertexts.into_keys().zip(plaintexts.into_iter()).collect()
+    ciphertexts
+        .into_keys()
+        .zip(plaintexts.into_iter())
+        .collect()
 }
-
 
 async fn encrypt<E, C, D>(
     target: &E,
@@ -363,14 +369,24 @@ impl<'c> Manager<'c> {
         }
     }
 
-    pub async fn query<R>(self, field_name: &str, query: &str) -> Vec<R> where R: DecryptedRecord {
+    pub async fn query<R>(self, field_name: &str, query: &str) -> Vec<R>
+    where
+        R: DecryptedRecord,
+    {
         let table_config = self
             .dataset_config
             .config
             .get_table(&User::type_name())
             .expect("No config found for type");
 
-        let terms = encrypt_query(&query.to_string().into(), field_name, &self.cipher, table_config, &self.dictionary).await;
+        let terms = encrypt_query(
+            &query.to_string().into(),
+            field_name,
+            &self.cipher,
+            table_config,
+            &self.dictionary,
+        )
+        .await;
 
         let terms_list: String = terms
             .iter()
@@ -389,10 +405,7 @@ impl<'c> Manager<'c> {
             .filter_expression(format!("term in ({terms_list})"));
 
         for (i, term) in terms.into_iter().enumerate() {
-            query = query.expression_attribute_values(
-                format!(":t{i}"),
-                AttributeValue::S(term),
-            );
+            query = query.expression_attribute_values(format!(":t{i}"), AttributeValue::S(term));
         }
 
         let result = query.send().await.unwrap();
