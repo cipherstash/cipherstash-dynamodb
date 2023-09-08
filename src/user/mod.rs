@@ -235,13 +235,7 @@ where
     // TODO: Do the indexes first to avoid clones
     for (name, (plaintext, index_type)) in encrypted_indexes(target, config).iter() {
         if let IndexTerm::PostingArray(postings) = cipher
-            .index_with_dictionary(
-                plaintext,
-                &index_type,
-                name,
-                &partition_key,
-                dictionary,
-            ) // TODO: use encrypted partition key
+            .index_with_dictionary(plaintext, &index_type, name, &partition_key, dictionary) // TODO: use encrypted partition key
             .await
             .unwrap()
         {
@@ -260,7 +254,8 @@ where
 }
 
 fn encrypt_partition_key<C>(type_name: &str, value: &str, cipher: &Encryption<C>) -> String
-where C: Credentials<Token = ViturToken>,
+where
+    C: Credentials<Token = ViturToken>,
 {
     let plaintext: Plaintext = format!("{type_name}#{value}").into();
     let index_type = Index::new_unique().index_type;
