@@ -10,8 +10,8 @@ type HmacSha256 = Hmac<Sha256>;
 
 const DICT_TABLE: &'static str = "users";
 
-pub struct DynamoDict<'c> {
-    client: &'c Client,
+pub struct DynamoDict {
+    client: Client,
     key: Key,
 }
 
@@ -57,7 +57,7 @@ impl From<DynamoDictEntry> for DictEntry {
 }
 
 #[async_trait]
-impl<'c> Dictionary for DynamoDict<'c> {
+impl Dictionary for DynamoDict {
     async fn entry<T, S>(&self, plaintext: T, scope: S) -> DictEntry
     where
         T: Sync + Send + AsRef<[u8]>,
@@ -70,8 +70,8 @@ impl<'c> Dictionary for DynamoDict<'c> {
     // TODO: We probably want to implement entries as well so we can do a bulk op
 }
 
-impl<'c> DynamoDict<'c> {
-    pub fn init(client: &'c Client, key: Key) -> Self {
+impl DynamoDict {
+    pub fn init(client: Client, key: Key) -> Self {
         Self { client, key }
     }
 

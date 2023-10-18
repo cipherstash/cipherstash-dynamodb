@@ -15,9 +15,9 @@ use crate::{table_entry::TableEntry, EncryptedRecord};
 pub(crate) fn index_type_hack(index_type: IndexType) -> IndexType {
     if let IndexType::Match { .. } = index_type {
         IndexType::Match {
-            tokenizer: Tokenizer::EdgeGram {
-                min_length: 3,
-                max_length: 10,
+            tokenizer: Tokenizer::EdgeNgram {
+                min_gram: 3,
+                max_gram: 10,
             },
             token_filters: vec![TokenFilter::Downcase],
             include_original: true,

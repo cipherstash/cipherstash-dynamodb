@@ -14,16 +14,16 @@ use cipherstash_client::{
 use log::info;
 use serde_dynamo::{aws_sdk_dynamodb_0_29::from_item, from_items, to_item};
 
-pub struct EncryptedTable<'c> {
-    db: &'c Client,
+pub struct EncryptedTable {
+    db: Client,
     cipher: Box<Encryption<AutoRefresh<ViturCredentials>>>,
     dataset_config: DatasetConfigWithIndexRootKey,
-    dictionary: DynamoDict<'c>,
+    dictionary: DynamoDict,
     table_name: String,
 }
 
-impl<'c> EncryptedTable<'c> {
-    pub async fn init(db: &'c Client, table_name: impl Into<String>) -> EncryptedTable<'c> {
+impl EncryptedTable {
+    pub async fn init(db: Client, table_name: impl Into<String>) -> EncryptedTable {
         info!("Initializing...");
         let console_config = ConsoleConfig::builder().with_env().build().unwrap();
         let vitur_config = ViturConfig::builder()
@@ -45,7 +45,7 @@ impl<'c> EncryptedTable<'c> {
         let cipher = Box::new(Encryption::new(dataset_config.index_root_key, vitur_client));
 
         // TODO: Keep the dictionary in an Arc and implement the trait for the Arc?
-        let dictionary = DynamoDict::init(&db, dataset_config.index_root_key);
+        let dictionary = DynamoDict::init(db.clone(), dataset_config.index_root_key);
 
         info!("Ready!");
 
