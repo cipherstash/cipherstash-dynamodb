@@ -16,7 +16,7 @@ aws dynamodb create-table \
         AttributeName=pk,AttributeType=S \
         AttributeName=sk,AttributeType=S \
         AttributeName=field,AttributeType=S \
-        AttributeName=term,AttributeType=S \
+        AttributeName=terms,AttributeType=S \
      --key-schema \
         AttributeName=pk,KeyType=HASH \
         AttributeName=sk,KeyType=RANGE \

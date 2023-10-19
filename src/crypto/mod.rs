@@ -10,7 +10,7 @@ use cipherstash_client::{
     },
 };
 
-use crate::{table_entry::TableEntry, EncryptedRecord};
+use crate::{table_entry::TableEntry, CompositeAttribute, EncryptedRecord};
 
 pub(crate) fn index_type_hack(index_type: IndexType) -> IndexType {
     if let IndexType::Match { .. } = index_type {
@@ -71,6 +71,196 @@ pub(crate) fn encrypted_indexes<E: EncryptedRecord>(
         .collect()
 }
 
+pub fn encrypt_composite_query<C: Credentials<Token = ViturToken>>(
+    query: (&Plaintext, &Plaintext, &CompositeAttribute),
+    config: &TableConfig,
+    cipher: &Encryption<C>,
+) -> Result<(String, Vec<String>), Box<dyn std::error::Error>> {
+    let left_plaintext = query.0;
+    let right_plaintext = query.1;
+    let attribute = query.2;
+
+    match attribute {
+        CompositeAttribute::Exact(left, right) => {
+            let left_index_type = config
+                .get_column(left)?
+                .and_then(|x| x.index_for_operator(&Operator::Eq))
+                .and_then(|x| {
+                    if let IndexType::Unique { .. } = x.index_type {
+                        Some(x.index_type.clone())
+                    } else {
+                        None
+                    }
+                })
+                .unwrap();
+
+            let right_index_type = config
+                .get_column(right)?
+                .and_then(|x| x.index_for_operator(&Operator::Eq))
+                .and_then(|x| {
+                    if let IndexType::Unique { .. } = x.index_type {
+                        Some(x.index_type.clone())
+                    } else {
+                        None
+                    }
+                })
+                .unwrap();
+
+            let term = cipher.compound_index_exact(
+                (left_plaintext, &left_index_type),
+                (right_plaintext, &right_index_type),
+            )?;
+
+            Ok((format!("{left}#{right}#exact"), vec![hex::encode(term)]))
+        }
+
+        CompositeAttribute::Match(left, right) => {
+            let left_index_type = config
+                .get_column(left)?
+                .and_then(|x| x.index_for_operator(&Operator::ILike))
+                .and_then(|x| {
+                    if let IndexType::Match { .. } = x.index_type {
+                        Some(x.index_type.clone())
+                    } else {
+                        None
+                    }
+                })
+                .unwrap();
+
+            let right_index_type = config
+                .get_column(right)?
+                .and_then(|x| x.index_for_operator(&Operator::Eq))
+                .and_then(|x| {
+                    if let IndexType::Unique { .. } = x.index_type {
+                        Some(x.index_type.clone())
+                    } else {
+                        None
+                    }
+                })
+                .unwrap();
+
+            // Where do all these go?
+            let terms = cipher.compound_index_match(
+                (left_plaintext, &left_index_type),
+                (right_plaintext, &right_index_type),
+            )?;
+
+            Ok((
+                format!("{left}#{right}#match"),
+                terms.into_iter().map(hex::encode).collect(),
+            ))
+        }
+    }
+}
+
+fn encrypt_composite_indexes<E: EncryptedRecord, C: Credentials<Token = ViturToken>>(
+    parition_key: &str,
+    target: &E,
+    config: &TableConfig,
+    cipher: &Encryption<C>,
+    attributes: &HashMap<String, String>,
+    entries: &mut Vec<TableEntry>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let plaintext_attributes = target.attributes();
+
+    // yikes this should probably be split up a little
+    for attribute in target.composite_attributes() {
+        match attribute {
+            CompositeAttribute::Exact(left, right) => {
+                let left_index_type = config
+                    .get_column(&left)?
+                    .and_then(|x| x.index_for_operator(&Operator::Eq))
+                    .and_then(|x| {
+                        if let IndexType::Unique { .. } = x.index_type {
+                            Some(x.index_type.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap();
+
+                let right_index_type = config
+                    .get_column(&right)?
+                    .and_then(|x| x.index_for_operator(&Operator::Eq))
+                    .and_then(|x| {
+                        if let IndexType::Unique { .. } = x.index_type {
+                            Some(x.index_type.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap();
+
+                let left_plaintext = plaintext_attributes.get(&left).unwrap();
+                let right_plaintext = plaintext_attributes.get(&right).unwrap();
+
+                // Where do I put this?
+                let term = cipher.compound_index_exact(
+                    (left_plaintext, &left_index_type),
+                    (right_plaintext, &right_index_type),
+                )?;
+
+                let field = format!("{left}#{right}#exact");
+
+                entries.push(TableEntry {
+                    pk: parition_key.to_string(),
+                    sk: field.clone(),
+                    field: Some(field),
+                    terms: Some(vec![hex::encode(term)]),
+                    attributes: attributes.clone(),
+                });
+            }
+
+            CompositeAttribute::Match(left, right) => {
+                let left_index_type = config
+                    .get_column(&left)?
+                    .and_then(|x| x.index_for_operator(&Operator::ILike))
+                    .and_then(|x| {
+                        if let IndexType::Match { .. } = x.index_type {
+                            Some(x.index_type.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap();
+
+                let right_index_type = config
+                    .get_column(&right)?
+                    .and_then(|x| x.index_for_operator(&Operator::Eq))
+                    .and_then(|x| {
+                        if let IndexType::Unique { .. } = x.index_type {
+                            Some(x.index_type.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap();
+
+                let left_plaintext = plaintext_attributes.get(&left).unwrap();
+                let right_plaintext = plaintext_attributes.get(&right).unwrap();
+
+                // Where do all these go?
+                let terms = cipher.compound_index_match(
+                    (left_plaintext, &left_index_type),
+                    (right_plaintext, &right_index_type),
+                )?;
+
+                let field = format!("{left}#{right}#match");
+
+                entries.push(TableEntry {
+                    pk: parition_key.to_string(),
+                    sk: field.clone(),
+                    field: Some(field),
+                    terms: Some(terms.into_iter().map(hex::encode).collect()),
+                    attributes: attributes.clone(),
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
 pub(crate) async fn encrypt_query<C, D>(
     query: &Plaintext,
     field_name: &str,
@@ -128,6 +318,8 @@ where
     D: Dictionary,
 {
     let plaintexts = encrypted_targets(target, config);
+    let indexes = encrypted_indexes(target, config);
+
     // TODO: Maybe use a wrapper type?
     let mut attributes: HashMap<String, String> = Default::default();
     for (name, plaintext) in plaintexts.iter() {
@@ -148,14 +340,14 @@ where
     table_entries.push(TableEntry {
         pk: partition_key.to_string(),
         sk: E::type_name().to_string(),
-        term: None,
+        terms: None,
         field: None,
         attributes: attributes.clone(),
     });
 
     // Indexes
     // TODO: Do the indexes first to avoid clones
-    for (name, (plaintext, index_type)) in encrypted_indexes(target, config).iter() {
+    for (name, (plaintext, index_type)) in indexes.iter() {
         if let IndexTerm::PostingArray(postings) = cipher
             .index_with_dictionary(plaintext, &index_type, name, &partition_key, dictionary) // TODO: use encrypted partition key
             .await
@@ -172,13 +364,20 @@ where
         }
     }
 
+    encrypt_composite_indexes(
+        &partition_key,
+        target,
+        config,
+        cipher,
+        &attributes,
+        &mut table_entries,
+    )
+    .expect("Failed to encrypt composite indexes");
+
     table_entries
 }
 
-pub(crate) fn encrypt_partition_key<C>(
-    value: &str,
-    cipher: &Encryption<C>,
-) -> String
+pub(crate) fn encrypt_partition_key<C>(value: &str, cipher: &Encryption<C>) -> String
 where
     C: Credentials<Token = ViturToken>,
 {

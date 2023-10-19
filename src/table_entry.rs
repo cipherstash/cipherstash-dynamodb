@@ -13,8 +13,9 @@ pub struct TableEntry {
     pub(crate) pk: String,
     //#[serde(with = "hex")]
     pub(crate) sk: String,
+
     //#[serde(with = "hex")]
-    pub(crate) term: Option<String>, // TODO: Make term optional
+    pub(crate) terms: Option<Vec<String>>, // TODO: Make term optional
 
     /// Optional field specified by postings
     //field: Option<String>,
@@ -37,7 +38,7 @@ impl TableEntry {
             pk: partition_key.into(),
             // We need to prefix this with plaintext field name too so we can delete these later
             sk: format!("{}#{}", &field, hex::encode(&posting.field)),
-            term: Some(hex::encode(&posting.term)),
+            terms: Some(vec![hex::encode(&posting.term)]),
             attributes,
             field: Some(field),
         }
