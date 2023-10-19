@@ -10,10 +10,19 @@ pub type Key = [u8; 32];
 // Re-exports
 pub use cipherstash_client::encryption::Plaintext;
 
+pub enum CompositeAttribute {
+    Exact(String, String),
+    Match(String, String),
+}
+
 // These are analogous to serde (rename to Encrypt and Decrypt)
 pub trait EncryptedRecord: DynamoTarget {
     fn partition_key(&self) -> String;
     fn attributes(&self) -> HashMap<String, Plaintext>;
+
+    fn composite_attributes(&self) -> Vec<CompositeAttribute> {
+        Vec::with_capacity(0)
+    }
 }
 
 pub trait DecryptedRecord: DynamoTarget {

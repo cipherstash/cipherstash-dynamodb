@@ -30,7 +30,9 @@ serde_bytes = "0.11.9"
 aes = "0.8.3"
 hex = { version = "0.4.3", features = [ "serde" ] }
 
-cipherstash-client = { path = "../cipherstash-suite/packages/cipherstash-client/", features = [ "dictionaries", "tokio" ] }
+# cipherstash-client = { git = "../cipherstash-suite/packages/cipherstash-client/", features = [ "dictionaries", "tokio" ] }
+cipherstash-client = { git = "ssh://git@github.com/cipherstash/cipherstash-suite.git", branch = "feat/compound-spike", package = "cipherstash-client", features = [ "dictionaries", "tokio" ] }
+
 async-trait = "0.1.73"
 serde_with = "3.3.0"
 log = "0.4.20"

@@ -1,5 +1,8 @@
+use std::collections::HashSet;
+
 use crate::{
-    crypto::*, dict::DynamoDict, table_entry::TableEntry, DecryptedRecord, EncryptedRecord,
+    crypto::*, dict::DynamoDict, table_entry::TableEntry, CompositeAttribute, DecryptedRecord,
+    EncryptedRecord,
 };
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Put, TransactWriteItem},
@@ -8,7 +11,7 @@ use aws_sdk_dynamodb::{
 use cipherstash_client::{
     config::{console_config::ConsoleConfig, vitur_config::ViturConfig},
     credentials::{auto_refresh::AutoRefresh, vitur_credentials::ViturCredentials},
-    encryption::Encryption,
+    encryption::{Encryption, Plaintext},
     vitur::{DatasetConfigWithIndexRootKey, Vitur},
 };
 use log::info;
@@ -58,6 +61,64 @@ impl EncryptedTable {
         }
     }
 
+    pub async fn query_match_exact<R: DecryptedRecord>(
+        self,
+        left: (&str, &str),
+        right: (&str, &Plaintext),
+    ) -> Vec<R> {
+        let table_config = self
+            .dataset_config
+            .config
+            .get_table(&R::type_name())
+            .expect("No config found for type");
+
+        let query = (
+            &Plaintext::Utf8Str(Some(left.1.to_string())),
+            right.1,
+            &CompositeAttribute::Match(left.0.to_string(), right.0.to_string()),
+        );
+
+        let (field_name, terms) = encrypt_composite_query(query, table_config, &self.cipher)
+            .expect("Failed to encrypt query");
+
+        let filter_expression: String = terms
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("contains(terms, :t{i})"))
+            .collect::<Vec<String>>()
+            .join(" AND ");
+
+        println!("Expression: {filter_expression}");
+
+        let mut query = self
+            .db
+            .query()
+            .table_name(&self.table_name)
+            .index_name("TermIndex")
+            .key_condition_expression("field = :field")
+            .expression_attribute_values(":field", AttributeValue::S(field_name.to_string()))
+            .filter_expression(filter_expression);
+
+        for (i, term) in terms.into_iter().enumerate() {
+            query = query.expression_attribute_values(format!(":t{i}"), AttributeValue::S(term));
+        }
+
+        let result = query.send().await.unwrap();
+
+        let table_entries: Vec<TableEntry> = from_items(result.items.unwrap()).unwrap();
+
+        let mut results: Vec<R> = Vec::with_capacity(table_entries.len());
+
+        // TODO: Bulk Decrypt
+        for te in table_entries.into_iter() {
+            let attributes = decrypt(te.attributes, &self.cipher).await;
+            let record: R = R::from_attributes(attributes);
+            results.push(record);
+        }
+
+        results
+    }
+
     pub async fn query<R>(self, field_name: &str, query: &str) -> Vec<R>
     where
         R: DecryptedRecord,
@@ -77,12 +138,14 @@ impl EncryptedTable {
         )
         .await;
 
-        let terms_list: String = terms
+        let filter_expression: String = terms
             .iter()
             .enumerate()
-            .map(|(i, _)| format!(":t{i}"))
+            .map(|(i, _)| format!("contains(terms, :t{i})"))
             .collect::<Vec<String>>()
-            .join(",");
+            .join(" OR ");
+
+        println!("{filter_expression}");
 
         let mut query = self
             .db
@@ -91,7 +154,7 @@ impl EncryptedTable {
             .index_name("TermIndex")
             .key_condition_expression("field = :field")
             .expression_attribute_values(":field", AttributeValue::S(field_name.to_string()))
-            .filter_expression(format!("term in ({terms_list})"));
+            .filter_expression(filter_expression);
 
         for (i, term) in terms.into_iter().enumerate() {
             query = query.expression_attribute_values(format!(":t{i}"), AttributeValue::S(term));
@@ -151,12 +214,16 @@ impl EncryptedTable {
         let table_entries = encrypt(record, &self.cipher, table_config, &self.dictionary).await;
         let mut items: Vec<TransactWriteItem> = Vec::with_capacity(table_entries.len());
         for entry in table_entries.into_iter() {
+            let item = Some(to_item(entry).unwrap());
+
+            println!("ITEM: {item:#?}");
+
             items.push(
                 TransactWriteItem::builder()
                     .put(
                         Put::builder()
                             .table_name(&self.table_name)
-                            .set_item(Some(to_item(entry).unwrap()))
+                            .set_item(item)
                             .build(),
                     )
                     .build(),

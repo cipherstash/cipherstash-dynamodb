@@ -20,7 +20,9 @@ tables:
         in_place: false
         cast_type: utf8-str
         mode: encrypted
-        indexes: []
+        indexes:
+          - version: 1
+            kind: unique
   - path: license
     fields:
       - name: number
