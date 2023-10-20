@@ -1,8 +1,5 @@
-use std::collections::HashSet;
-
 use crate::{
-    crypto::*, dict::DynamoDict, table_entry::TableEntry, CompositeAttribute, DecryptedRecord,
-    EncryptedRecord,
+    crypto::*, table_entry::TableEntry, CompoundAttribute, DecryptedRecord, EncryptedRecord,
 };
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Put, TransactWriteItem},
@@ -21,7 +18,6 @@ pub struct EncryptedTable {
     db: Client,
     cipher: Box<Encryption<AutoRefresh<ViturCredentials>>>,
     dataset_config: DatasetConfigWithIndexRootKey,
-    dictionary: DynamoDict,
     table_name: String,
 }
 
@@ -47,15 +43,11 @@ impl EncryptedTable {
         let dataset_config = vitur_client.load_dataset_config().await.unwrap();
         let cipher = Box::new(Encryption::new(dataset_config.index_root_key, vitur_client));
 
-        // TODO: Keep the dictionary in an Arc and implement the trait for the Arc?
-        let dictionary = DynamoDict::init(db.clone(), dataset_config.index_root_key);
-
         info!("Ready!");
 
         Self {
             db,
             cipher,
-            dictionary,
             dataset_config,
             table_name: table_name.into(),
         }
@@ -75,90 +67,19 @@ impl EncryptedTable {
         let query = (
             &Plaintext::Utf8Str(Some(left.1.to_string())),
             right.1,
-            &CompositeAttribute::Match(left.0.to_string(), right.0.to_string()),
+            &CompoundAttribute::BeginsWith(left.0.to_string(), right.0.to_string()),
         );
 
-        let (field_name, terms) = encrypt_composite_query(query, table_config, &self.cipher)
+        let term = encrypt_composite_query(R::type_name(), query, table_config, &self.cipher)
             .expect("Failed to encrypt query");
 
-        let filter_expression: String = terms
-            .iter()
-            .enumerate()
-            .map(|(i, _)| format!("contains(terms, :t{i})"))
-            .collect::<Vec<String>>()
-            .join(" AND ");
-
-        println!("Expression: {filter_expression}");
-
-        let mut query = self
+        let query = self
             .db
             .query()
             .table_name(&self.table_name)
             .index_name("TermIndex")
-            .key_condition_expression("field = :field")
-            .expression_attribute_values(":field", AttributeValue::S(field_name.to_string()))
-            .filter_expression(filter_expression);
-
-        for (i, term) in terms.into_iter().enumerate() {
-            query = query.expression_attribute_values(format!(":t{i}"), AttributeValue::S(term));
-        }
-
-        let result = query.send().await.unwrap();
-
-        let table_entries: Vec<TableEntry> = from_items(result.items.unwrap()).unwrap();
-
-        let mut results: Vec<R> = Vec::with_capacity(table_entries.len());
-
-        // TODO: Bulk Decrypt
-        for te in table_entries.into_iter() {
-            let attributes = decrypt(te.attributes, &self.cipher).await;
-            let record: R = R::from_attributes(attributes);
-            results.push(record);
-        }
-
-        results
-    }
-
-    pub async fn query<R>(self, field_name: &str, query: &str) -> Vec<R>
-    where
-        R: DecryptedRecord,
-    {
-        let table_config = self
-            .dataset_config
-            .config
-            .get_table(&R::type_name())
-            .expect("No config found for type");
-
-        let terms = encrypt_query(
-            &query.to_string().into(),
-            field_name,
-            &self.cipher,
-            table_config,
-            &self.dictionary,
-        )
-        .await;
-
-        let filter_expression: String = terms
-            .iter()
-            .enumerate()
-            .map(|(i, _)| format!("contains(terms, :t{i})"))
-            .collect::<Vec<String>>()
-            .join(" OR ");
-
-        println!("{filter_expression}");
-
-        let mut query = self
-            .db
-            .query()
-            .table_name(&self.table_name)
-            .index_name("TermIndex")
-            .key_condition_expression("field = :field")
-            .expression_attribute_values(":field", AttributeValue::S(field_name.to_string()))
-            .filter_expression(filter_expression);
-
-        for (i, term) in terms.into_iter().enumerate() {
-            query = query.expression_attribute_values(format!(":t{i}"), AttributeValue::S(term));
-        }
+            .key_condition_expression("term = :term")
+            .expression_attribute_values(":term", AttributeValue::S(term));
 
         let result = query.send().await.unwrap();
 
@@ -180,7 +101,8 @@ impl EncryptedTable {
     where
         T: EncryptedRecord + DecryptedRecord,
     {
-        let pk = encrypt_partition_key(pk, &self.cipher);
+        let pk = encrypt_partition_key(pk, &self.cipher).unwrap();
+
         let result = self
             .db
             .get_item()
@@ -211,7 +133,7 @@ impl EncryptedTable {
             .expect(&format!("No config found for type {:?}", record));
 
         // TODO: Use a combinator
-        let table_entries = encrypt(record, &self.cipher, table_config, &self.dictionary).await;
+        let table_entries = encrypt(record, &self.cipher, table_config).await.unwrap();
         let mut items: Vec<TransactWriteItem> = Vec::with_capacity(table_entries.len());
         for entry in table_entries.into_iter() {
             let item = Some(to_item(entry).unwrap());

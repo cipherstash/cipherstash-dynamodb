@@ -1,6 +1,5 @@
+use cryptonamo::{DecryptedRecord, DynamoTarget, EncryptedRecord, Plaintext};
 use std::collections::HashMap;
-use cryptonamo::{Plaintext, EncryptedRecord, DynamoTarget, DecryptedRecord};
-
 
 #[derive(Debug)]
 pub struct License {
@@ -11,11 +10,15 @@ pub struct License {
 
 impl License {
     #[allow(dead_code)]
-    pub fn new(email: impl Into<String>, number: impl Into<String>, expires: impl Into<String>) -> Self {
+    pub fn new(
+        email: impl Into<String>,
+        number: impl Into<String>,
+        expires: impl Into<String>,
+    ) -> Self {
         Self {
             email: Some(email.into()),
             number: number.into(),
-            expires: expires.into()
+            expires: expires.into(),
         }
     }
 }
@@ -28,8 +31,14 @@ impl EncryptedRecord for License {
 
     fn attributes(&self) -> HashMap<String, Plaintext> {
         HashMap::from([
-            ("number".to_string(), Plaintext::from(self.number.to_string())),
-            ("expires".to_string(), Plaintext::from(self.expires.to_string())),
+            (
+                "number".to_string(),
+                Plaintext::Utf8Str(Some(self.number.to_string())),
+            ),
+            (
+                "expires".to_string(),
+                Plaintext::Utf8Str(Some(self.expires.to_string())),
+            ),
         ])
     }
 }

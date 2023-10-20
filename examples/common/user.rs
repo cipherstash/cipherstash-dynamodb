@@ -1,4 +1,4 @@
-use cryptonamo::{CompositeAttribute, DecryptedRecord, DynamoTarget, EncryptedRecord, Plaintext};
+use cryptonamo::{CompoundAttribute, DecryptedRecord, DynamoTarget, EncryptedRecord, Plaintext};
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -24,13 +24,19 @@ impl EncryptedRecord for User {
 
     fn attributes(&self) -> HashMap<String, Plaintext> {
         HashMap::from([
-            ("name".to_string(), Plaintext::from(self.name.to_string())),
-            ("email".to_string(), Plaintext::from(self.email.to_string())),
+            (
+                "name".to_string(),
+                Plaintext::Utf8Str(Some(self.name.to_string())),
+            ),
+            (
+                "email".to_string(),
+                Plaintext::Utf8Str(Some(self.email.to_string())),
+            ),
         ])
     }
 
-    fn composite_attributes(&self) -> Vec<CompositeAttribute> {
-        vec![CompositeAttribute::Match("name".into(), "email".into())]
+    fn composite_attributes(&self) -> Vec<CompoundAttribute> {
+        vec![CompoundAttribute::BeginsWith("name".into(), "email".into())]
     }
 }
 
