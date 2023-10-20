@@ -20,9 +20,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = aws_sdk_dynamodb::Client::new(&config);
 
     let table = EncryptedTable::init(client, "users").await;
-    let results: Vec<UserResultByName> = table.query("name", "Dan").await;
+    // let results: Vec<UserResultByName> = table.query("name", "Dan").await;
 
-    dbg!(results);
+    // dbg!(results);
 
     Ok(())
 }

@@ -15,11 +15,10 @@ aws dynamodb create-table \
     --attribute-definitions \
         AttributeName=pk,AttributeType=S \
         AttributeName=sk,AttributeType=S \
-        AttributeName=field,AttributeType=S \
-        AttributeName=terms,AttributeType=S \
+        AttributeName=term,AttributeType=S \
      --key-schema \
         AttributeName=pk,KeyType=HASH \
         AttributeName=sk,KeyType=RANGE \
     --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
-    --global-secondary-indexes "IndexName=TermIndex,KeySchema=[{AttributeName=field,KeyType=HASH},{AttributeName=pk,KeyType=RANGE}],Projection={ProjectionType=ALL},ProvisionedThroughput={ReadCapacityUnits=5,WriteCapacityUnits=5}" \
+    --global-secondary-indexes "IndexName=TermIndex,KeySchema=[{AttributeName=term,KeyType=HASH},{AttributeName=pk,KeyType=RANGE}],Projection={ProjectionType=ALL},ProvisionedThroughput={ReadCapacityUnits=5,WriteCapacityUnits=5}" \
     --endpoint-url http://localhost:8000
