@@ -1,7 +1,7 @@
 mod common;
 use crate::common::User;
 use cipherstash_client::encryption::compound_indexer::ComposablePlaintext;
-use cryptonamo::{encrypted_table::EncryptedTable};
+use cryptonamo::encrypted_table::EncryptedTable;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
