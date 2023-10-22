@@ -70,9 +70,33 @@ impl EncryptedTable {
             .truncate(12) // TODO: Make this configurable (maybe on E?)
             .terms();
 
-        dbg!(terms);
+        for t in terms.iter() {
+            dbg!(hex::encode(t));
+        }
 
-        vec![]
+        // FIXME: Using the last term is inefficient. We probably should have a compose_query method on composable index
+        let term = hex::encode(terms.last().unwrap());
+
+        let query = self
+            .db
+            .query()
+            .table_name(&self.table_name)
+            .index_name("TermIndex")
+            .key_condition_expression("term = :term")
+            .expression_attribute_values(":term", AttributeValue::S(term));
+
+        let result = query.send().await.unwrap();
+        let table_entries: Vec<TableEntry> = from_items(result.items.unwrap()).unwrap();
+        let mut results: Vec<R> = Vec::with_capacity(table_entries.len());
+
+        // TODO: Bulk Decrypt
+        for te in table_entries.into_iter() {
+            let attributes = decrypt(te.attributes, &self.cipher).await;
+            let record: R = R::from_attributes(attributes);
+            results.push(record);
+        }
+
+        results
     }
 
     // TODO: This can be replaced with the query above
