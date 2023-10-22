@@ -66,16 +66,14 @@ impl EncryptedTable {
         let key = [0; 32]; // FIXME: pass the cipher and use the key from there
         let terms = R::index_by_name("email#name")
             .expect("No index defined")
-            .compose_index(key, query, Accumulator::from_salt("email#name"))
+            .compose_index(key, query, dbg!(Accumulator::from_salt(format!("{}#{}", R::type_name(), "email#name"))))
             .unwrap() // FIXME
-            .truncate(12) // TODO: Make this configurable (maybe on E?)
+            .truncate(12) // TODO: Make this configurable (maybe on R?)
             .terms();
 
-        for t in terms.iter() {
-            dbg!(hex::encode(t));
-        }
-
         // FIXME: Using the last term is inefficient. We probably should have a compose_query method on composable index
+        // It also assumes that the last term is the longest edgegram (i.e. most relevant) but it might
+        // not always be the most relevant term for future index types.
         let term = hex::encode(terms.last().unwrap());
 
         let query = self

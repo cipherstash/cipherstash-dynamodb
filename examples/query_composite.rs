@@ -23,8 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let table = EncryptedTable::init(client, "users").await;
 
     let results: Vec<User> = table
-        .query(ComposablePlaintext::new("dan@coderdan.co").try_compose("Dan Drap")?)
-        //.query(("dan@coderdan.co", "Dan Drap")) // TODO: not sure why this isn't working!
+        .query(ComposablePlaintext::new("jane@smith.org").try_compose("Jane")?)
         .await;
 
     dbg!(results);
