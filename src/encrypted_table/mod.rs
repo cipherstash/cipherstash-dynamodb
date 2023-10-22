@@ -152,11 +152,13 @@ impl EncryptedTable {
             );
         }
 
+        dbg!(&items);
+
         self.db
             .transact_write_items()
             .set_transact_items(Some(items))
             .send()
             .await
-            .unwrap();
+            .unwrap(); // FIXME
     }
 }
