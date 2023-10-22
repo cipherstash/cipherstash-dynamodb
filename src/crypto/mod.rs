@@ -222,7 +222,7 @@ fn encrypt_indexes<E: EncryptedRecord + DynamoTarget>(
             let key = [0; 32]; // FIXME! Use the compose_index method on the cipher
             let salt = Accumulator::from_salt(format!("{}#{}", E::type_name(), index_name));
             index
-                .compose_index(key, attr.try_into()?, salt)?
+                .compose_index(key, attr.try_into()?, dbg!(salt))?
                 .truncate(term_length)
                 .terms()
                 .into_iter()
