@@ -1,6 +1,7 @@
 mod common;
-use crate::common::UserResultByName;
-use cryptonamo::{encrypted_table::EncryptedTable, Plaintext};
+use crate::common::User;
+use cipherstash_client::encryption::compound_indexer::ComposablePlaintext;
+use cryptonamo::{encrypted_table::EncryptedTable};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -21,14 +22,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let table = EncryptedTable::init(client, "users").await;
 
-    let results: Vec<UserResultByName> = table
-        .query_match_exact(
-            ("name", "Dan Drap"),
-            (
-                "email",
-                &Plaintext::Utf8Str(Some("dan@coderdan.co".to_string())),
-            ),
-        )
+    let results: Vec<User> = table
+        .query(ComposablePlaintext::new("dan@coderdan.co").try_compose("Dan Drap")?)
+        //.query(("dan@coderdan.co", "Dan Drap")) // TODO: not sure why this isn't working!
         .await;
 
     dbg!(results);
