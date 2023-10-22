@@ -1,5 +1,5 @@
 use crate::{
-    crypto::*, table_entry::TableEntry, CompoundAttribute, DecryptedRecord, EncryptedRecord,
+    crypto::*, table_entry::TableEntry, CompoundAttributeOrig, DecryptedRecord, EncryptedRecord,
 };
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Put, TransactWriteItem},
@@ -67,7 +67,7 @@ impl EncryptedTable {
         let query = (
             &Plaintext::Utf8Str(Some(left.1.to_string())),
             right.1,
-            &CompoundAttribute::BeginsWith(left.0.to_string(), right.0.to_string()),
+            &CompoundAttributeOrig::BeginsWith(left.0.to_string(), right.0.to_string()),
         );
 
         let term = encrypt_composite_query(R::type_name(), query, table_config, &self.cipher)

@@ -1,4 +1,5 @@
-use cryptonamo::{CompoundAttribute, DecryptedRecord, DynamoTarget, EncryptedRecord, Plaintext};
+use cipherstash_client::encryption::compound_indexer::{ComposableIndex, ExactIndex, ComposablePlaintext, PrefixIndex, CompoundIndex};
+use cryptonamo::{DecryptedRecord, DynamoTarget, EncryptedRecord, Plaintext};
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -22,21 +23,41 @@ impl EncryptedRecord for User {
         self.email.to_string()
     }
 
-    fn attributes(&self) -> HashMap<String, Plaintext> {
+    fn protected_indexes(&self) -> Vec<&'static str> {
+        vec!["name", "email#name"]
+    }
+
+   fn index_by_name(name: &str) -> Option<Box<dyn ComposableIndex>> {
+       match name {
+           "name" => Some(Box::new(ExactIndex::new(vec![]))),
+           "email#name" => Some(Box::new(
+                CompoundIndex::new(
+                    ExactIndex::new(vec![]))
+                        .and(PrefixIndex::new(vec![], 3, 10))
+            )),
+           _ => None,
+       }
+   }
+
+   fn attribute_for_index(&self, index_name: &str) -> Option<ComposablePlaintext> {
+         match index_name {
+              "name" => Some(ComposablePlaintext::from(self.name.to_string())),
+              "email#name" => (self.email.to_string(), self.name.to_string()).try_into().ok(),
+              _ => None,
+         }
+   }
+
+    fn protected_attributes(&self) -> HashMap<String, Plaintext> {
         HashMap::from([
             (
                 "name".to_string(),
-                Plaintext::Utf8Str(Some(self.name.to_string())),
+                self.name.to_string().into(),
             ),
             (
                 "email".to_string(),
-                Plaintext::Utf8Str(Some(self.email.to_string())),
+                self.email.to_string().into(),
             ),
         ])
-    }
-
-    fn composite_attributes(&self) -> Vec<CompoundAttribute> {
-        vec![CompoundAttribute::BeginsWith("name".into(), "email".into())]
     }
 }
 

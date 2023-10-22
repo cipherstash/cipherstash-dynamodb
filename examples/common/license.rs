@@ -29,7 +29,7 @@ impl EncryptedRecord for License {
         self.email.as_ref().unwrap().to_string()
     }
 
-    fn attributes(&self) -> HashMap<String, Plaintext> {
+    fn protected_attributes(&self) -> HashMap<String, Plaintext> {
         HashMap::from([
             (
                 "number".to_string(),

@@ -8,8 +8,10 @@ pub type Key = [u8; 32];
 
 // Re-exports
 pub use cipherstash_client::encryption::Plaintext;
+use cipherstash_client::encryption::compound_indexer::{ConsArg2, ComposableIndex, ConsArg3, ComposablePlaintext};
 
-pub enum CompoundAttribute {
+#[derive(Debug)]
+pub enum CompoundAttributeOrig {
     Exact(String, String),
     BeginsWith(String, String),
 }
@@ -17,10 +19,20 @@ pub enum CompoundAttribute {
 // These are analogous to serde (rename to Encrypt and Decrypt)
 pub trait EncryptedRecord: DynamoTarget {
     fn partition_key(&self) -> String;
-    fn attributes(&self) -> HashMap<String, Plaintext>;
+    fn protected_attributes(&self) -> HashMap<String, Plaintext>;
+    
+    fn protected_indexes(&self) -> Vec<&'static str> {
+        vec![]
+    }
 
-    fn composite_attributes(&self) -> Vec<CompoundAttribute> {
-        Vec::with_capacity(0)
+    #[allow(unused_variables)]
+    fn attribute_for_index(&self, index_name: &str) -> Option<ComposablePlaintext> {
+        None
+    }
+
+    #[allow(unused_variables)]
+    fn index_by_name(name: &str) -> Option<Box<dyn ComposableIndex>> {
+        None
     }
 }
 
