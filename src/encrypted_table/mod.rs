@@ -66,7 +66,15 @@ impl EncryptedTable {
         let key = [0; 32]; // FIXME: pass the cipher and use the key from there
         let terms = R::index_by_name("email#name")
             .expect("No index defined")
-            .compose_index(key, query, dbg!(Accumulator::from_salt(format!("{}#{}", R::type_name(), "email#name"))))
+            .compose_index(
+                key,
+                query,
+                dbg!(Accumulator::from_salt(format!(
+                    "{}#{}",
+                    R::type_name(),
+                    "email#name"
+                ))),
+            )
             .unwrap() // FIXME
             .truncate(12) // TODO: Make this configurable (maybe on R?)
             .terms();
