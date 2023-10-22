@@ -219,17 +219,18 @@ fn encrypt_indexes<E: EncryptedRecord + DynamoTarget>(
         if let Some((attr, index)) = target
             .attribute_for_index(index_name)
             .and_then(|attr| E::index_by_name(index_name).and_then(|index| Some((attr, index)))) {
-                let key = [0; 32]; // FIXME!
+                let key = [0; 32]; // FIXME! Use the compose_index method on the cipher
                 let salt = Accumulator::from_salt(format!("{}#{}", E::type_name(), index_name));
                 index
                     .compose_index(key, attr.try_into()?, salt)?
                     .truncate(term_length)
                     .terms()
                     .into_iter()
-                    .for_each(|term| {
+                    .enumerate()
+                    .for_each(|(i, term)| {
                         entries.push(TableEntry {
                             pk: parition_key.to_string(),
-                            sk: index_name.to_string(), // TODO: HMAC the sort key, too (users#index_name#pk)
+                            sk: format!("{}#{}#{}", E::type_name(), index_name, i), // TODO: HMAC the sort key, too (users#index_name#pk)
                             term: Some(hex::encode(term)),
                             attributes: attributes.clone(),
                         });
@@ -379,7 +380,15 @@ where
         attributes: attributes.clone(),
     });
 
-    encrypt_exact_indexes(
+    encrypt_indexes(
+        &partition_key,
+        target,
+        12, // output term length
+        &attributes,
+        &mut table_entries,
+    )?;
+
+    /*encrypt_exact_indexes(
         &partition_key,
         target,
         config,
@@ -404,7 +413,7 @@ where
         cipher,
         &attributes,
         &mut table_entries,
-    )?;
+    )?;*/
 
     Ok(table_entries)
 }
