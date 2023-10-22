@@ -8,7 +8,10 @@ use aws_sdk_dynamodb::{
 use cipherstash_client::{
     config::{console_config::ConsoleConfig, vitur_config::ViturConfig},
     credentials::{auto_refresh::AutoRefresh, vitur_credentials::ViturCredentials},
-    encryption::{Encryption, Plaintext, compound_indexer::{ComposablePlaintext, Accumulator}},
+    encryption::{
+        compound_indexer::{Accumulator, ComposablePlaintext},
+        Encryption, Plaintext,
+    },
     vitur::{DatasetConfigWithIndexRootKey, Vitur},
 };
 use log::info;
@@ -53,20 +56,18 @@ impl EncryptedTable {
         }
     }
 
-    pub async fn query<R, Q>(
-        self,
-        query: Q
-    ) -> Vec<R>
+    pub async fn query<R, Q>(self, query: Q) -> Vec<R>
     where
-    R: DecryptedRecord + EncryptedRecord, // FIXME: This be DecryptedRecord + QueryableRecord
-    Q: Into<ComposablePlaintext>
+        R: DecryptedRecord + EncryptedRecord, // FIXME: This be DecryptedRecord + QueryableRecord
+        Q: Into<ComposablePlaintext>,
     {
         let query: ComposablePlaintext = query.into();
 
         let key = [0; 32]; // FIXME: pass the cipher and use the key from there
         let terms = R::index_by_name("email#name")
             .expect("No index defined")
-            .compose_index(key, query, Accumulator::from_salt("email#name")).unwrap() // FIXME
+            .compose_index(key, query, Accumulator::from_salt("email#name"))
+            .unwrap() // FIXME
             .truncate(12) // TODO: Make this configurable (maybe on E?)
             .terms();
 

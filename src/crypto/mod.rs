@@ -2,14 +2,14 @@ use std::collections::HashMap;
 
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
-    encryption::{Encryption, Plaintext, compound_indexer::Accumulator},
+    encryption::{compound_indexer::Accumulator, Encryption, Plaintext},
     schema::{
         column::{Index, IndexType, Tokenizer},
         ColumnConfig, TableConfig,
     },
 };
 
-use crate::{table_entry::TableEntry, CompoundAttributeOrig, EncryptedRecord, DynamoTarget};
+use crate::{table_entry::TableEntry, CompoundAttributeOrig, DynamoTarget, EncryptedRecord};
 
 pub(crate) fn encrypted_targets<E: EncryptedRecord>(
     target: &E,
@@ -208,38 +208,37 @@ fn encrypt_exact_indexes<E: EncryptedRecord, C: Credentials<Token = ViturToken>>
 }
 
 fn encrypt_indexes<E: EncryptedRecord + DynamoTarget>(
-        parition_key: &str,
-        target: &E,
-        term_length: usize,
-        attributes: &HashMap<String, String>, // FIXME: Make a type for *encrypted attribute*
-        entries: &mut Vec<TableEntry>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-
+    parition_key: &str,
+    target: &E,
+    term_length: usize,
+    attributes: &HashMap<String, String>, // FIXME: Make a type for *encrypted attribute*
+    entries: &mut Vec<TableEntry>,
+) -> Result<(), Box<dyn std::error::Error>> {
     for index_name in target.protected_indexes().iter() {
         if let Some((attr, index)) = target
             .attribute_for_index(index_name)
-            .and_then(|attr| E::index_by_name(index_name).and_then(|index| Some((attr, index)))) {
-                let key = [0; 32]; // FIXME! Use the compose_index method on the cipher
-                let salt = Accumulator::from_salt(format!("{}#{}", E::type_name(), index_name));
-                index
-                    .compose_index(key, attr.try_into()?, salt)?
-                    .truncate(term_length)
-                    .terms()
-                    .into_iter()
-                    .enumerate()
-                    .for_each(|(i, term)| {
-                        entries.push(TableEntry {
-                            pk: parition_key.to_string(),
-                            sk: format!("{}#{}#{}", E::type_name(), index_name, i), // TODO: HMAC the sort key, too (users#index_name#pk)
-                            term: Some(hex::encode(term)),
-                            attributes: attributes.clone(),
-                        });
-                    })
-            }
+            .and_then(|attr| E::index_by_name(index_name).and_then(|index| Some((attr, index))))
+        {
+            let key = [0; 32]; // FIXME! Use the compose_index method on the cipher
+            let salt = Accumulator::from_salt(format!("{}#{}", E::type_name(), index_name));
+            index
+                .compose_index(key, attr.try_into()?, salt)?
+                .truncate(term_length)
+                .terms()
+                .into_iter()
+                .enumerate()
+                .for_each(|(i, term)| {
+                    entries.push(TableEntry {
+                        pk: parition_key.to_string(),
+                        sk: format!("{}#{}#{}", E::type_name(), index_name, i), // TODO: HMAC the sort key, too (users#index_name#pk)
+                        term: Some(hex::encode(term)),
+                        attributes: attributes.clone(),
+                    });
+                })
+        }
     }
 
     Ok(())
-
 }
 
 fn encrypt_composite_indexes<E: EncryptedRecord, C: Credentials<Token = ViturToken>>(

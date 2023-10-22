@@ -7,8 +7,10 @@ mod table_entry;
 pub type Key = [u8; 32];
 
 // Re-exports
+use cipherstash_client::encryption::compound_indexer::{
+    ComposableIndex, ComposablePlaintext, ConsArg2, ConsArg3,
+};
 pub use cipherstash_client::encryption::Plaintext;
-use cipherstash_client::encryption::compound_indexer::{ConsArg2, ComposableIndex, ConsArg3, ComposablePlaintext};
 
 #[derive(Debug)]
 pub enum CompoundAttributeOrig {
@@ -20,7 +22,7 @@ pub enum CompoundAttributeOrig {
 pub trait EncryptedRecord: DynamoTarget {
     fn partition_key(&self) -> String;
     fn protected_attributes(&self) -> HashMap<String, Plaintext>;
-    
+
     fn protected_indexes(&self) -> Vec<&'static str> {
         vec![]
     }
