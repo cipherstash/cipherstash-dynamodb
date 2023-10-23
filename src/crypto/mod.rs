@@ -2,11 +2,22 @@ use std::collections::HashMap;
 
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
-    encryption::{compound_indexer::CompoundIndex, Encryption, IndexTerm, Plaintext},
+    encryption::{
+        compound_indexer::CompoundIndex, Encryption, EncryptionError, IndexTerm, Plaintext,
+    },
     schema::{column::Index, TableConfig},
 };
 
 use crate::{table_entry::TableEntry, DynamoTarget, EncryptedRecord};
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum CryptoError {
+    #[error("EncryptionError: {0}")]
+    EncryptionError(#[from] EncryptionError),
+    #[error("{0}")]
+    Other(String),
+}
 
 pub(crate) fn encrypted_targets<E: EncryptedRecord>(
     target: &E,
@@ -32,7 +43,7 @@ fn encrypt_indexes<E: EncryptedRecord + DynamoTarget, C: Credentials<Token = Vit
     attributes: &HashMap<String, String>, // FIXME: Make a type for *encrypted attribute*
     entries: &mut Vec<TableEntry>,
     cipher: &Encryption<C>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), CryptoError> {
     for index_name in E::protected_indexes().iter() {
         if let Some((attr, index)) = target
             .attribute_for_index(index_name)
@@ -68,23 +79,23 @@ fn encrypt_indexes<E: EncryptedRecord + DynamoTarget, C: Credentials<Token = Vit
 pub(crate) async fn decrypt<C>(
     ciphertexts: HashMap<String, String>,
     cipher: &Encryption<C>,
-) -> HashMap<String, Plaintext>
+) -> Result<HashMap<String, Plaintext>, CryptoError>
 where
     C: Credentials<Token = ViturToken>,
 {
     let values: Vec<&String> = ciphertexts.values().collect();
-    let plaintexts: Vec<Plaintext> = cipher.decrypt(values).await.unwrap();
-    ciphertexts
+    let plaintexts: Vec<Plaintext> = cipher.decrypt(values).await?;
+    Ok(ciphertexts
         .into_keys()
         .zip(plaintexts.into_iter())
-        .collect()
+        .collect())
 }
 
 pub(crate) async fn encrypt<E, C>(
     target: &E,
     cipher: &Encryption<C>,
     config: &TableConfig,
-) -> Result<Vec<TableEntry>, Box<dyn std::error::Error>>
+) -> Result<Vec<TableEntry>, CryptoError>
 where
     E: EncryptedRecord,
     C: Credentials<Token = ViturToken>,
@@ -97,8 +108,7 @@ where
         // TODO: Use the bulk encrypt
         if let Some(ct) = cipher
             .encrypt_single(&plaintext, &format!("{}#{}", E::type_name(), name))
-            .await
-            .unwrap()
+            .await?
         {
             attributes.insert(name.to_string(), ct);
         }
@@ -131,16 +141,16 @@ where
 pub(crate) fn encrypt_partition_key<C>(
     value: &str,
     cipher: &Encryption<C>,
-) -> Result<String, Box<dyn std::error::Error>>
+) -> Result<String, CryptoError>
 where
     C: Credentials<Token = ViturToken>,
 {
     let plaintext = Plaintext::Utf8Str(Some(value.to_string()));
     let index_type = Index::new_unique().index_type;
 
-    Ok(cipher
+    cipher
         .index(&plaintext, &index_type)?
         .as_binary()
         .map(hex::encode)
-        .unwrap())
+        .ok_or_else(|| CryptoError::Other("Encrypting partition key returned invalid value".into()))
 }
