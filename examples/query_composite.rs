@@ -1,7 +1,6 @@
 mod common;
 use crate::common::User;
-use cipherstash_client::encryption::compound_indexer::ComposablePlaintext;
-use cryptonamo::encrypted_table::EncryptedTable;
+use cryptonamo::encrypted_table::{EncryptedTable, Query};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -23,7 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let table = EncryptedTable::init(client, "users").await;
 
     let results: Vec<User> = table
-        .query(ComposablePlaintext::new("jane@smith.org").try_compose("Jane")?)
+        .query(Query::new("email", "jane@smith.org").and("name", "Jane"))
         .await;
 
     dbg!(results);

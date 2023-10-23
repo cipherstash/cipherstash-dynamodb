@@ -1,6 +1,6 @@
-use crate::{
-    crypto::*, table_entry::TableEntry, CompoundAttributeOrig, DecryptedRecord, EncryptedRecord,
-};
+use std::marker::PhantomData;
+
+use crate::{crypto::*, table_entry::TableEntry, DecryptedRecord, EncryptedRecord};
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Put, TransactWriteItem},
     Client,
@@ -9,11 +9,12 @@ use cipherstash_client::{
     config::{console_config::ConsoleConfig, vitur_config::ViturConfig},
     credentials::{auto_refresh::AutoRefresh, vitur_credentials::ViturCredentials},
     encryption::{
-        compound_indexer::{Accumulator, ComposablePlaintext},
-        Encryption, Plaintext,
+        compound_indexer::{ComposablePlaintext, CompoundIndex},
+        Encryption, IndexTerm, Plaintext,
     },
     vitur::{DatasetConfigWithIndexRootKey, Vitur},
 };
+use itertools::Itertools;
 use log::info;
 use serde_dynamo::{aws_sdk_dynamodb_0_29::from_item, from_items, to_item};
 
@@ -22,6 +23,53 @@ pub struct EncryptedTable {
     cipher: Box<Encryption<AutoRefresh<ViturCredentials>>>,
     dataset_config: DatasetConfigWithIndexRootKey,
     table_name: String,
+}
+
+pub struct Query<T> {
+    parts: Vec<(String, Plaintext)>,
+    __table: PhantomData<T>,
+}
+
+impl<T: EncryptedRecord> Query<T> {
+    pub fn new(name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
+        Self {
+            parts: vec![(name.into(), plaintext.into())],
+            __table: Default::default(),
+        }
+    }
+
+    pub fn and(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
+        self.parts.push((name.into(), plaintext.into()));
+        self
+    }
+
+    pub fn build(self) -> Option<(String, ComposablePlaintext)> {
+        let indexes = T::protected_indexes();
+
+        let items_len = self.parts.len();
+
+        // this is the simplest way to brute force the index names
+        for perm in self.parts.iter().permutations(items_len) {
+            let (name, plaintexts): (Vec<&String>, Vec<&Plaintext>) =
+                perm.into_iter().map(|x| (&x.0, &x.1)).unzip();
+
+            let name = name.iter().join("#");
+
+            if indexes.contains(&name.as_str()) {
+                let mut plaintext = ComposablePlaintext::new(plaintexts[0].clone());
+
+                for p in plaintexts[1..].into_iter() {
+                    plaintext = plaintext
+                        .try_compose((*p).clone())
+                        .expect("Failed to compose");
+                }
+
+                return Some((name, plaintext));
+            }
+        }
+
+        None
+    }
 }
 
 impl EncryptedTable {
@@ -56,35 +104,32 @@ impl EncryptedTable {
         }
     }
 
-    pub async fn query<R, Q>(self, query: Q) -> Vec<R>
+    pub async fn query<R>(self, query: Query<R>) -> Vec<R>
     where
         R: DecryptedRecord + EncryptedRecord, // FIXME: This be DecryptedRecord + QueryableRecord
-        Q: Into<ComposablePlaintext>,
     {
-        let query: ComposablePlaintext = query.into();
+        let (index_name, plaintext) = query.build().expect("Invalid query");
 
-        // TODO: don't do this
-        let key = self.cipher.root_key;
+        let index = R::index_by_name(&index_name).expect("No index defined");
 
-        let terms = R::index_by_name("email#name")
-            .expect("No index defined")
-            .compose_index(
-                key,
-                query,
-                dbg!(Accumulator::from_salt(format!(
-                    "{}#{}",
-                    R::type_name(),
-                    "email#name"
-                ))),
+        let index_term = self
+            .cipher
+            .compound_index(
+                &CompoundIndex::new(index),
+                plaintext,
+                Some(format!("{}#{}", R::type_name(), index_name)),
+                12,
             )
-            .unwrap() // FIXME
-            .truncate(12) // TODO: Make this configurable (maybe on R?)
-            .terms();
+            .expect("Failed to index");
 
         // FIXME: Using the last term is inefficient. We probably should have a compose_query method on composable index
         // It also assumes that the last term is the longest edgegram (i.e. most relevant) but it might
-        // not always be the most relevant term for future index types.
-        let term = hex::encode(terms.last().unwrap());
+        // not always be the most relevant term for future index types. Also no unwrap.
+        let term = match index_term {
+            IndexTerm::Binary(x) => hex::encode(x),
+            IndexTerm::BinaryVec(x) => hex::encode(x.last().unwrap()),
+            _ => panic!("Invalid index term"),
+        };
 
         let query = self
             .db

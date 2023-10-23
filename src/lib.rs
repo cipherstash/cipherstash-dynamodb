@@ -23,13 +23,13 @@ pub trait EncryptedRecord: DynamoTarget {
     fn partition_key(&self) -> String;
     fn protected_attributes(&self) -> HashMap<String, Plaintext>;
 
-    fn protected_indexes(&self) -> Vec<&'static str> {
-        vec![]
-    }
-
     #[allow(unused_variables)]
     fn attribute_for_index(&self, index_name: &str) -> Option<ComposablePlaintext> {
         None
+    }
+
+    fn protected_indexes() -> Vec<&'static str> {
+        vec![]
     }
 
     #[allow(unused_variables)]
