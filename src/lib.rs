@@ -7,19 +7,12 @@ mod table_entry;
 pub type Key = [u8; 32];
 
 // Re-exports
-use cipherstash_client::encryption::compound_indexer::{
-    ComposableIndex, ComposablePlaintext, ConsArg2, ConsArg3,
-};
+use cipherstash_client::encryption::compound_indexer::{ComposableIndex, ComposablePlaintext};
 pub use cipherstash_client::encryption::Plaintext;
-
-#[derive(Debug)]
-pub enum CompoundAttributeOrig {
-    Exact(String, String),
-    BeginsWith(String, String),
-}
+use encrypted_table::Query;
 
 // These are analogous to serde (rename to Encrypt and Decrypt)
-pub trait EncryptedRecord: DynamoTarget {
+pub trait EncryptedRecord: DynamoTarget + Sized {
     fn partition_key(&self) -> String;
     fn protected_attributes(&self) -> HashMap<String, Plaintext>;
 
@@ -35,6 +28,10 @@ pub trait EncryptedRecord: DynamoTarget {
     #[allow(unused_variables)]
     fn index_by_name(name: &str) -> Option<Box<dyn ComposableIndex>> {
         None
+    }
+
+    fn find_where(name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Query<Self> {
+        Query::new(name, plaintext)
     }
 }
 

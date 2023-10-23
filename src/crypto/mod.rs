@@ -2,10 +2,7 @@ use std::collections::HashMap;
 
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
-    encryption::{
-        compound_indexer::{Accumulator, CompoundIndex},
-        Encryption, IndexTerm, Plaintext,
-    },
+    encryption::{compound_indexer::CompoundIndex, Encryption, IndexTerm, Plaintext},
     schema::{column::Index, TableConfig},
 };
 
