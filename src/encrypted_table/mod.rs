@@ -9,7 +9,7 @@ use cipherstash_client::{
     config::{console_config::ConsoleConfig, vitur_config::ViturConfig},
     credentials::{auto_refresh::AutoRefresh, vitur_credentials::ViturCredentials},
     encryption::{
-        compound_indexer::{ComposablePlaintext, CompoundIndex},
+        compound_indexer::{ComposableIndex, ComposablePlaintext, CompoundIndex},
         Encryption, IndexTerm, Plaintext,
     },
     vitur::{DatasetConfigWithIndexRootKey, Vitur},
@@ -43,19 +43,18 @@ impl<T: EncryptedRecord> Query<T> {
         self
     }
 
-    pub fn build(self) -> Option<(String, ComposablePlaintext)> {
-        let indexes = T::protected_indexes();
-
+    pub fn build(self) -> Option<(String, Box<dyn ComposableIndex>, ComposablePlaintext)> {
         let items_len = self.parts.len();
 
-        // this is the simplest way to brute force the index names
+        // this is the simplest way to brute force the index names but relies on some gross
+        // stringly typing which doesn't feel good
         for perm in self.parts.iter().permutations(items_len) {
             let (name, plaintexts): (Vec<&String>, Vec<&Plaintext>) =
                 perm.into_iter().map(|x| (&x.0, &x.1)).unzip();
 
             let name = name.iter().join("#");
 
-            if indexes.contains(&name.as_str()) {
+            if let Some(index) = T::index_by_name(name.as_str()) {
                 let mut plaintext = ComposablePlaintext::new(plaintexts[0].clone());
 
                 for p in plaintexts[1..].into_iter() {
@@ -64,7 +63,7 @@ impl<T: EncryptedRecord> Query<T> {
                         .expect("Failed to compose");
                 }
 
-                return Some((name, plaintext));
+                return Some((name, index, plaintext));
             }
         }
 
@@ -104,13 +103,12 @@ impl EncryptedTable {
         }
     }
 
-    pub async fn query<R>(self, query: Query<R>) -> Vec<R>
+    pub async fn query<R, Q>(self, query: Query<Q>) -> Vec<R>
     where
-        R: DecryptedRecord + EncryptedRecord, // FIXME: This be DecryptedRecord + QueryableRecord
+        Q: EncryptedRecord,
+        R: DecryptedRecord,
     {
-        let (index_name, plaintext) = query.build().expect("Invalid query");
-
-        let index = R::index_by_name(&index_name).expect("No index defined");
+        let (index_name, index, plaintext) = query.build().expect("Invalid query");
 
         let index_term = self
             .cipher

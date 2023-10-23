@@ -1,6 +1,6 @@
 mod common;
 use crate::common::User;
-use cryptonamo::encrypted_table::{EncryptedTable, Query};
+use cryptonamo::{encrypted_table::EncryptedTable, EncryptedRecord};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let table = EncryptedTable::init(client, "users").await;
 
     let results: Vec<User> = table
-        .query(Query::new("email", "jane@smith.org").and("name", "Jane"))
+        .query(User::find_where("email", "jane@smith.org").and("name", "Jane"))
         .await;
 
     dbg!(results);
