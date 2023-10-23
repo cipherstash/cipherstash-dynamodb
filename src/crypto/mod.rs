@@ -2,14 +2,14 @@ use std::collections::HashMap;
 
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
-    encryption::{compound_indexer::Accumulator, Encryption, Plaintext},
-    schema::{
-        column::{Index, IndexType, Tokenizer},
-        ColumnConfig, TableConfig,
+    encryption::{
+        compound_indexer::{Accumulator, CompoundIndex},
+        Encryption, IndexTerm, Plaintext,
     },
+    schema::{column::Index, TableConfig},
 };
 
-use crate::{table_entry::TableEntry, CompoundAttributeOrig, DynamoTarget, EncryptedRecord};
+use crate::{table_entry::TableEntry, DynamoTarget, EncryptedRecord};
 
 pub(crate) fn encrypted_targets<E: EncryptedRecord>(
     target: &E,
@@ -28,302 +28,42 @@ pub(crate) fn encrypted_targets<E: EncryptedRecord>(
         .collect()
 }
 
-pub fn encrypt_composite_query<C: Credentials<Token = ViturToken>>(
-    type_name: &str,
-    query: (&Plaintext, &Plaintext, &CompoundAttributeOrig),
-    config: &TableConfig,
-    cipher: &Encryption<C>,
-) -> Result<String, Box<dyn std::error::Error>> {
-    let left_plaintext = query.0;
-    let right_plaintext = query.1;
-    let attribute = query.2;
-
-    unimplemented!();
-
-    /*match attribute {
-        CompoundAttribute::Exact(left, right) => {
-            let left_index_type = config
-                .get_column(left)?
-                .and_then(get_exact_index_from_config)
-                .expect("Expected {left} to have a valid exact config");
-
-            let right_index_type = config
-                .get_column(right)?
-                .and_then(get_exact_index_from_config)
-                .expect("Expected {right} to have a valid exact config");
-
-            let term = cipher.compound_index_exact(
-                (left_plaintext, left_index_type),
-                (right_plaintext, right_index_type),
-            )?;
-
-            let field = format!("{type_name}#{left}#{right}#exact");
-
-            // TODO: field should be combined with term when hmacing not here
-            let term = format!("{field}#{}", hex::encode(term));
-
-            Ok(term)
-        }
-
-        CompoundAttribute::BeginsWith(left, right) => {
-            let left_index_type = config
-                .get_column(left)?
-                .and_then(get_begins_with_index_from_config)
-                .expect("Expected {left} to have a valid begins with config");
-
-            let right_index_type = config
-                .get_column(right)?
-                .and_then(get_exact_index_from_config)
-                .expect("Expected {right} to have a valid exact config");
-
-            // Where do all these go?
-            let terms = cipher.compound_index_match(
-                (left_plaintext, &left_index_type),
-                (right_plaintext, &right_index_type),
-            )?;
-
-            let field = format!("{type_name}#{left}#{right}#begins-with");
-            let term = terms.into_iter().last().map(hex::encode).unwrap();
-
-            // TODO: field should be combined with term when hmacing not here
-            let term = format!("{field}#{term}");
-
-            Ok(term)
-        }
-    }*/
-}
-
-fn get_exact_index_from_config(config: &ColumnConfig) -> Option<&IndexType> {
-    config.indexes.iter().find_map(|Index { index_type, .. }| {
-        if let IndexType::Unique { .. } = index_type {
-            Some(index_type)
-        } else {
-            None
-        }
-    })
-}
-
-fn get_begins_with_index_from_config(config: &ColumnConfig) -> Option<&IndexType> {
-    config.indexes.iter().find_map(|Index { index_type, .. }| {
-        if let IndexType::Match {
-            // In order to support begins with needs to be edge ngram
-            tokenizer: Tokenizer::EdgeNgram { .. },
-            ..
-        } = index_type
-        {
-            Some(index_type)
-        } else {
-            None
-        }
-    })
-}
-
-fn encrypt_beings_with_indexes<E: EncryptedRecord, C: Credentials<Token = ViturToken>>(
-    _parition_key: &str,
-    _target: &E,
-    _config: &TableConfig,
-    _cipher: &Encryption<C>,
-    _attributes: &HashMap<String, String>,
-    _entries: &mut Vec<TableEntry>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    // fill this in to support typeahead case
-
-    // let plaintext_attributes = target.attributes();
-    // let type_name = E::type_name();
-
-    // for (attribute_name, plaintext) in plaintext_attributes.iter() {
-    //     if let Some(config) = config.get_column(attribute_name)? {
-    //         for Index { index_type, .. } in config.indexes.iter() {
-    //             if let IndexType::Match {
-    //                 tokenizer: Tokenizer::EdgeNgram { .. },
-    //                 ..
-    //             } = index_type
-    //             {
-
-    //                 let unique = IndexType::unique();
-
-    //                 break;
-    //             } else {
-    //                 continue;
-    //             }
-    //         }
-    //     }
-    //     // let field = format!("{type_name}#{attribute_name}#exact");
-    //     // let term = cipher
-    //     //     .index(plaintext, &index_type)?
-    //     //     .as_binary()
-    //     //     .map(hex::encode)
-    //     //     .unwrap();
-
-    //     // entries.push(TableEntry {
-    //     //     pk: parition_key.to_string(),
-    //     //     sk: field.clone(),
-    //     //     field: Some(field),
-    //     //     term: Some(term),
-    //     //     attributes: attributes.clone(),
-    //     // });
-    // }
-
-    Ok(())
-}
-
-fn encrypt_exact_indexes<E: EncryptedRecord, C: Credentials<Token = ViturToken>>(
-    parition_key: &str,
-    target: &E,
-    config: &TableConfig,
-    cipher: &Encryption<C>,
-    attributes: &HashMap<String, String>,
-    entries: &mut Vec<TableEntry>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let plaintext_attributes = target.protected_attributes();
-
-    let type_name = E::type_name();
-
-    for (attribute_name, plaintext) in plaintext_attributes.iter() {
-        if let Some(index_type) = config
-            .get_column(attribute_name)?
-            .and_then(get_exact_index_from_config)
-        {
-            let field = format!("{type_name}#{attribute_name}#exact");
-
-            let term = cipher
-                .index(plaintext, &index_type)?
-                .as_binary()
-                .map(hex::encode)
-                .unwrap();
-
-            // TODO: combine field and term when hmacing
-            let term = format!("{field}#{term}");
-
-            entries.push(TableEntry {
-                pk: parition_key.to_string(),
-                sk: field.clone(),
-                term: Some(term),
-                attributes: attributes.clone(),
-            });
-        }
-    }
-
-    Ok(())
-}
-
-fn encrypt_indexes<E: EncryptedRecord + DynamoTarget>(
+fn encrypt_indexes<E: EncryptedRecord + DynamoTarget, C: Credentials<Token = ViturToken>>(
     parition_key: &str,
     target: &E,
     term_length: usize,
     attributes: &HashMap<String, String>, // FIXME: Make a type for *encrypted attribute*
     entries: &mut Vec<TableEntry>,
+    cipher: &Encryption<C>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     for index_name in target.protected_indexes().iter() {
         if let Some((attr, index)) = target
             .attribute_for_index(index_name)
             .and_then(|attr| E::index_by_name(index_name).and_then(|index| Some((attr, index))))
         {
-            let key = [0; 32]; // FIXME! Use the compose_index method on the cipher
-            let salt = Accumulator::from_salt(format!("{}#{}", E::type_name(), index_name));
-            index
-                .compose_index(key, attr.try_into()?, dbg!(salt))?
-                .truncate(term_length)
-                .terms()
-                .into_iter()
-                .enumerate()
-                .for_each(|(i, term)| {
-                    entries.push(TableEntry {
-                        pk: parition_key.to_string(),
-                        sk: format!("{}#{}#{}", E::type_name(), index_name, i), // TODO: HMAC the sort key, too (users#index_name#pk)
-                        term: Some(hex::encode(term)),
-                        attributes: attributes.clone(),
-                    });
-                })
-        }
-    }
+            let index_term = cipher.compound_index(
+                &CompoundIndex::new(index),
+                attr,
+                Some(format!("{}#{}", E::type_name(), index_name)),
+                term_length,
+            )?;
 
-    Ok(())
-}
+            let terms = match index_term {
+                IndexTerm::Binary(x) => vec![x],
+                IndexTerm::BinaryVec(x) => x,
+                _ => todo!(),
+            };
 
-fn encrypt_composite_indexes<E: EncryptedRecord, C: Credentials<Token = ViturToken>>(
-    parition_key: &str,
-    target: &E,
-    config: &TableConfig,
-    cipher: &Encryption<C>,
-    attributes: &HashMap<String, String>,
-    entries: &mut Vec<TableEntry>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let plaintext_attributes = target.protected_attributes();
-    let type_name = E::type_name();
-
-    unimplemented!();
-
-    // yikes this should probably be split up a little
-    /*for attribute in dbg!(target.encrypted_indexes()) {
-        match attribute {
-            CompoundAttribute::Exact(left, right) => {
-                let left_index_type = config
-                    .get_column(&left)?
-                    .and_then(get_exact_index_from_config)
-                    .expect("Expected {left} to have a valid exact config");
-
-                let right_index_type = config
-                    .get_column(&right)?
-                    .and_then(get_exact_index_from_config)
-                    .expect("Expected {right} to have a valid exact config");
-
-                let left_plaintext = plaintext_attributes.get(&left).unwrap();
-                let right_plaintext = plaintext_attributes.get(&right).unwrap();
-
-                let term = cipher.compound_index_exact(
-                    (left_plaintext, left_index_type),
-                    (right_plaintext, right_index_type),
-                )?;
-
-                let field = format!("{type_name}#{left}#{right}#exact");
-                let term = hex::encode(term);
-
+            for (i, term) in terms.into_iter().enumerate() {
                 entries.push(TableEntry {
                     pk: parition_key.to_string(),
-                    sk: field.clone(),
-                    // TODO: combine field when hmacing
-                    term: Some(format!("{field}#{term}")),
+                    sk: format!("{}#{}#{}", E::type_name(), index_name, i), // TODO: HMAC the sort key, too (users#index_name#pk)
+                    term: Some(hex::encode(term)),
                     attributes: attributes.clone(),
                 });
             }
-
-            CompoundAttribute::BeginsWith(left, right) => {
-                let left_index_type = config
-                    .get_column(&left)?
-                    .and_then(get_begins_with_index_from_config)
-                    .expect("Expected {left} to have a valid begins with config");
-
-                let right_index_type = config
-                    .get_column(&right)?
-                    .and_then(get_exact_index_from_config)
-                    .expect("Expected {left} to have a valid exact config");
-
-                let left_plaintext = plaintext_attributes.get(&left).unwrap();
-                let right_plaintext = plaintext_attributes.get(&right).unwrap();
-
-                // Where do all these go?
-                let terms = cipher.compound_index_match(
-                    (left_plaintext, left_index_type),
-                    (right_plaintext, right_index_type),
-                )?;
-
-                let field = format!("{type_name}#{left}#{right}#begins-with");
-
-                for (i, term) in terms.into_iter().enumerate() {
-                    let term = hex::encode(term);
-
-                    entries.push(TableEntry {
-                        pk: parition_key.to_string(),
-                        sk: format!("{field}#{i}"),
-                        // TODO: combine field when hmacing
-                        term: Some(format!("{field}#{term}")),
-                        attributes: attributes.clone(),
-                    });
-                }
-            }
         }
-    }*/
+    }
 
     Ok(())
 }
@@ -385,34 +125,8 @@ where
         12, // output term length
         &attributes,
         &mut table_entries,
-    )?;
-
-    /*encrypt_exact_indexes(
-        &partition_key,
-        target,
-        config,
         cipher,
-        &attributes,
-        &mut table_entries,
     )?;
-
-    encrypt_beings_with_indexes(
-        &partition_key,
-        target,
-        config,
-        cipher,
-        &attributes,
-        &mut table_entries,
-    )?;
-
-    encrypt_composite_indexes(
-        &partition_key,
-        target,
-        config,
-        cipher,
-        &attributes,
-        &mut table_entries,
-    )?;*/
 
     Ok(table_entries)
 }
