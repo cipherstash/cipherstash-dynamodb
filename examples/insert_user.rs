@@ -19,12 +19,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let client = aws_sdk_dynamodb::Client::new(&config);
 
-    let table = EncryptedTable::init(client, "users").await;
-    table.put(&User::new("dan@coderdan.co", "Dan Draper")).await;
-    table.put(&User::new("jane@smith.org", "Jane Smith")).await;
+    let table = EncryptedTable::init(client, "users").await?;
+    table
+        .put(&User::new("dan@coderdan.co", "Dan Draper"))
+        .await?;
+    table
+        .put(&User::new("jane@smith.org", "Jane Smith"))
+        .await?;
     table
         .put(&User::new("daniel@example.com", "Daniel Johnson"))
-        .await;
+        .await?;
 
     Ok(())
 }

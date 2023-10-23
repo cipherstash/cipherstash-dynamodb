@@ -905,6 +905,7 @@ dependencies = [
  "serde_dynamo",
  "serde_with",
  "sha2",
+ "thiserror",
  "tokio",
  "tracing",
  "tracing-subscriber",

@@ -6,17 +6,18 @@ use aws_sdk_dynamodb::{
     Client,
 };
 use cipherstash_client::{
-    config::{console_config::ConsoleConfig, vitur_config::ViturConfig},
+    config::{console_config::ConsoleConfig, errors::ConfigError, vitur_config::ViturConfig},
     credentials::{auto_refresh::AutoRefresh, vitur_credentials::ViturCredentials},
     encryption::{
         compound_indexer::{ComposableIndex, ComposablePlaintext, CompoundIndex},
-        Encryption, IndexTerm, Plaintext,
+        Encryption, EncryptionError, IndexTerm, Plaintext,
     },
-    vitur::{DatasetConfigWithIndexRootKey, Vitur},
+    vitur::{errors::LoadConfigError, DatasetConfigWithIndexRootKey, Vitur},
 };
 use itertools::Itertools;
 use log::info;
 use serde_dynamo::{aws_sdk_dynamodb_0_29::from_item, from_items, to_item};
+use thiserror::Error;
 
 pub struct EncryptedTable {
     db: Client,
@@ -28,6 +29,48 @@ pub struct EncryptedTable {
 pub struct Query<T> {
     parts: Vec<(String, Plaintext)>,
     __table: PhantomData<T>,
+}
+
+#[derive(Error, Debug)]
+pub enum QueryError {
+    #[error("InvaldQuery: {0}")]
+    InvalidQuery(String),
+    #[error("EncryptionError: {0}")]
+    EncryptionError(#[from] EncryptionError),
+    #[error("CryptoError: {0}")]
+    CryptoError(#[from] CryptoError),
+    #[error("SerdeError: {0}")]
+    SerdeError(#[from] serde_dynamo::Error),
+    #[error("AwsError: {0}")]
+    AwsError(String),
+    #[error("{0}")]
+    Other(String),
+}
+
+#[derive(Error, Debug)]
+pub enum PutError {
+    #[error("AwsError: {0}")]
+    AwsError(String),
+    #[error("SerdeError: {0}")]
+    SerdeError(#[from] serde_dynamo::Error),
+    #[error("CryptoError: {0}")]
+    CryptoError(#[from] CryptoError),
+}
+
+#[derive(Error, Debug)]
+pub enum GetError {
+    #[error("CryptoError: {0}")]
+    CryptoError(#[from] CryptoError),
+    #[error("AwsError: {0}")]
+    AwsError(String),
+}
+
+#[derive(Error, Debug)]
+pub enum InitError {
+    #[error("ConfigError: {0}")]
+    ConfigError(#[from] ConfigError),
+    #[error("LoadConfigError: {0}")]
+    LoadConfigError(#[from] LoadConfigError),
 }
 
 impl<T: EncryptedRecord> Query<T> {
@@ -43,7 +86,9 @@ impl<T: EncryptedRecord> Query<T> {
         self
     }
 
-    pub fn build(self) -> Option<(String, Box<dyn ComposableIndex>, ComposablePlaintext)> {
+    pub fn build(
+        self,
+    ) -> Result<(String, Box<dyn ComposableIndex>, ComposablePlaintext), QueryError> {
         let items_len = self.parts.len();
 
         // this is the simplest way to brute force the index names but relies on some gross
@@ -63,24 +108,30 @@ impl<T: EncryptedRecord> Query<T> {
                         .expect("Failed to compose");
                 }
 
-                return Some((name, index, plaintext));
+                return Ok((name, index, plaintext));
             }
         }
 
-        None
+        let fields = self.parts.iter().map(|x| &x.0).join(",");
+
+        Err(QueryError::InvalidQuery(format!(
+            "Could not build query for fields: {fields}"
+        )))
     }
 }
 
 impl EncryptedTable {
-    pub async fn init(db: Client, table_name: impl Into<String>) -> EncryptedTable {
+    pub async fn init(
+        db: Client,
+        table_name: impl Into<String>,
+    ) -> Result<EncryptedTable, InitError> {
         info!("Initializing...");
-        let console_config = ConsoleConfig::builder().with_env().build().unwrap();
+        let console_config = ConsoleConfig::builder().with_env().build()?;
         let vitur_config = ViturConfig::builder()
             .decryption_log(true)
             .with_env()
             .console_config(&console_config)
-            .build_with_client_key()
-            .unwrap();
+            .build_with_client_key()?;
 
         let vitur_client = Vitur::new_with_client_key(
             &vitur_config.base_url(),
@@ -90,43 +141,49 @@ impl EncryptedTable {
         );
 
         info!("Fetching dataset config...");
-        let dataset_config = vitur_client.load_dataset_config().await.unwrap();
+        let dataset_config = vitur_client.load_dataset_config().await?;
         let cipher = Box::new(Encryption::new(dataset_config.index_root_key, vitur_client));
 
         info!("Ready!");
 
-        Self {
+        Ok(Self {
             db,
             cipher,
             dataset_config,
             table_name: table_name.into(),
-        }
+        })
     }
 
-    pub async fn query<R, Q>(self, query: Query<Q>) -> Vec<R>
+    pub async fn query<R, Q>(self, query: Query<Q>) -> Result<Vec<R>, QueryError>
     where
         Q: EncryptedRecord,
         R: DecryptedRecord,
     {
-        let (index_name, index, plaintext) = query.build().expect("Invalid query");
+        let (index_name, index, plaintext) = query.build()?;
 
-        let index_term = self
-            .cipher
-            .compound_index(
-                &CompoundIndex::new(index),
-                plaintext,
-                Some(format!("{}#{}", R::type_name(), index_name)),
-                12,
-            )
-            .expect("Failed to index");
+        let index_term = self.cipher.compound_index(
+            &CompoundIndex::new(index),
+            plaintext,
+            Some(format!("{}#{}", R::type_name(), index_name)),
+            12,
+        )?;
 
         // FIXME: Using the last term is inefficient. We probably should have a compose_query method on composable index
         // It also assumes that the last term is the longest edgegram (i.e. most relevant) but it might
-        // not always be the most relevant term for future index types. Also no unwrap.
+        // not always be the most relevant term for future index types
         let term = match index_term {
             IndexTerm::Binary(x) => hex::encode(x),
-            IndexTerm::BinaryVec(x) => hex::encode(x.last().unwrap()),
-            _ => panic!("Invalid index term"),
+            IndexTerm::BinaryVec(x) => hex::encode(x.last().ok_or_else(|| {
+                QueryError::Other(
+                    "Returned IndexTerm::BinaryVec did not contain enough elements to get last"
+                        .into(),
+                )
+            })?),
+            x => {
+                return Err(QueryError::Other(format!(
+                    "Returned IndexTerm had invalid type: {x:?}"
+                )))
+            }
         };
 
         let query = self
@@ -137,25 +194,34 @@ impl EncryptedTable {
             .key_condition_expression("term = :term")
             .expression_attribute_values(":term", AttributeValue::S(term));
 
-        let result = query.send().await.unwrap();
-        let table_entries: Vec<TableEntry> = from_items(result.items.unwrap()).unwrap();
+        let result = query
+            .send()
+            .await
+            .map_err(|e| QueryError::AwsError(e.to_string()))?;
+
+        let items = result
+            .items
+            .ok_or_else(|| QueryError::AwsError("Expected items entry on aws response".into()))?;
+
+        let table_entries: Vec<TableEntry> = from_items(items)?;
+
         let mut results: Vec<R> = Vec::with_capacity(table_entries.len());
 
         // TODO: Bulk Decrypt
         for te in table_entries.into_iter() {
-            let attributes = decrypt(te.attributes, &self.cipher).await;
+            let attributes = decrypt(te.attributes, &self.cipher).await?;
             let record: R = R::from_attributes(attributes);
             results.push(record);
         }
 
-        results
+        Ok(results)
     }
 
-    pub async fn get<T>(&self, pk: &str) -> Option<T>
+    pub async fn get<T>(&self, pk: &str) -> Result<Option<T>, GetError>
     where
         T: EncryptedRecord + DecryptedRecord,
     {
-        let pk = encrypt_partition_key(pk, &self.cipher).unwrap();
+        let pk = encrypt_partition_key(pk, &self.cipher)?;
 
         let result = self
             .db
@@ -165,18 +231,22 @@ impl EncryptedTable {
             .key("sk", AttributeValue::S(T::type_name().to_string()))
             .send()
             .await
-            .unwrap();
-        let table_entry: Option<TableEntry> = result.item.and_then(|item| from_item(item).unwrap());
+            .map_err(|e| GetError::AwsError(e.to_string()))?;
+
+        let table_entry: Option<TableEntry> = result
+            .item
+            .map(|item| from_item(item).map_err(|e| GetError::AwsError(e.to_string())))
+            .transpose()?;
 
         if let Some(TableEntry { attributes, .. }) = table_entry {
-            let attributes = decrypt(attributes, &self.cipher).await;
-            Some(T::from_attributes(attributes))
+            let attributes = decrypt(attributes, &self.cipher).await?;
+            Ok(Some(T::from_attributes(attributes)))
         } else {
-            None
+            Ok(None)
         }
     }
 
-    pub async fn put<T>(&self, record: &T)
+    pub async fn put<T>(&self, record: &T) -> Result<(), PutError>
     where
         T: EncryptedRecord,
     {
@@ -187,10 +257,10 @@ impl EncryptedTable {
             .expect(&format!("No config found for type {:?}", record));
 
         // TODO: Use a combinator
-        let table_entries = encrypt(record, &self.cipher, table_config).await.unwrap();
+        let table_entries = encrypt(record, &self.cipher, table_config).await?;
         let mut items: Vec<TransactWriteItem> = Vec::with_capacity(table_entries.len());
         for entry in table_entries.into_iter() {
-            let item = Some(to_item(entry).unwrap());
+            let item = Some(to_item(entry)?);
 
             println!("ITEM: {item:#?}");
 
@@ -213,6 +283,8 @@ impl EncryptedTable {
             .set_transact_items(Some(items))
             .send()
             .await
-            .unwrap(); // FIXME
+            .map_err(|e| PutError::AwsError(e.to_string()))?;
+
+        Ok(())
     }
 }

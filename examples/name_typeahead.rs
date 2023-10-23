@@ -19,10 +19,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let client = aws_sdk_dynamodb::Client::new(&config);
 
-    let table = EncryptedTable::init(client, "users").await;
+    let table = EncryptedTable::init(client, "users").await?;
     // TODO: there is no fuzzy index for this just yet
     // not sure how that would be configured
-    let results: Vec<UserResultByName> = table.query(User::find_where("name", "Jane Smith")).await;
+    let results: Vec<UserResultByName> =
+        table.query(User::find_where("name", "Jane Smith")).await?;
 
     dbg!(results);
 
