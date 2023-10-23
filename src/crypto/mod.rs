@@ -36,7 +36,7 @@ fn encrypt_indexes<E: EncryptedRecord + DynamoTarget, C: Credentials<Token = Vit
     entries: &mut Vec<TableEntry>,
     cipher: &Encryption<C>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    for index_name in target.protected_indexes().iter() {
+    for index_name in E::protected_indexes().iter() {
         if let Some((attr, index)) = target
             .attribute_for_index(index_name)
             .and_then(|attr| E::index_by_name(index_name).and_then(|index| Some((attr, index))))

@@ -25,7 +25,7 @@ impl EncryptedRecord for User {
         self.email.to_string()
     }
 
-    fn protected_indexes(&self) -> Vec<&'static str> {
+    fn protected_indexes() -> Vec<&'static str> {
         vec!["name", "email#name"]
     }
 
