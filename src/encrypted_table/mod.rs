@@ -27,6 +27,8 @@ pub struct EncryptedTable {
 
 #[derive(Error, Debug)]
 pub enum PutError {
+    #[error("MissingConfigError: {0}")]
+    MissingConfigError(String),
     #[error("AwsError: {0}")]
     AwsError(String),
     #[error("SerdeError: {0}")]
@@ -169,7 +171,9 @@ impl EncryptedTable {
             .dataset_config
             .config
             .get_table(&T::type_name())
-            .expect(&format!("No config found for type {:?}", record));
+            .ok_or_else(|| {
+                PutError::MissingConfigError(format!("No config found for type {:?}", record))
+            })?;
 
         let mut seen_sk = HashSet::new();
 

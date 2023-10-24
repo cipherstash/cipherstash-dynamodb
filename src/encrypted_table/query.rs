@@ -131,9 +131,7 @@ where
                 let mut plaintext = ComposablePlaintext::new(plaintexts[0].clone());
 
                 for p in plaintexts[1..].into_iter() {
-                    plaintext = plaintext
-                        .try_compose((*p).clone())
-                        .expect("Failed to compose");
+                    plaintext = plaintext.try_compose((*p).clone())?;
                 }
 
                 return Ok((name, index, plaintext, self));
@@ -190,9 +188,7 @@ impl<T: EncryptedRecord> Query<T> {
                 let mut plaintext = ComposablePlaintext::new(plaintexts[0].clone());
 
                 for p in plaintexts[1..].into_iter() {
-                    plaintext = plaintext
-                        .try_compose((*p).clone())
-                        .expect("Failed to compose");
+                    plaintext = plaintext.try_compose((*p).clone())?;
                 }
 
                 return Ok((name, index, plaintext));
