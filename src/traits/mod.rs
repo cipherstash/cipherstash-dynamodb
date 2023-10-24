@@ -1,5 +1,5 @@
+use crate::{ComposableIndex, ComposablePlaintext, Plaintext};
 use std::{collections::HashMap, fmt::Debug};
-use crate::{Plaintext, ComposableIndex, ComposablePlaintext};
 
 pub trait Cryptonamo: Debug {
     // TODO: Add a function indicating that the root should be stored
@@ -10,7 +10,7 @@ pub trait Cryptonamo: Debug {
 // These are analogous to serde (rename to Encrypt and Decrypt)
 pub trait EncryptedRecord: Cryptonamo + Sized {
     fn protected_attributes(&self) -> HashMap<&'static str, Plaintext>;
-    
+
     fn plaintext_attributes(&self) -> HashMap<&'static str, Plaintext> {
         HashMap::default()
     }

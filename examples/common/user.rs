@@ -1,7 +1,10 @@
 use cipherstash_client::encryption::compound_indexer::{
     ComposableIndex, ComposablePlaintext, CompoundIndex, ExactIndex, PrefixIndex,
 };
-use cryptonamo::{Plaintext, Cryptonamo, EncryptedRecord, traits::{DecryptedRecord, SearchableRecord}};
+use cryptonamo::{
+    traits::{DecryptedRecord, SearchableRecord},
+    Cryptonamo, EncryptedRecord, Plaintext,
+};
 use std::collections::HashMap;
 
 #[derive(Debug, Cryptonamo, EncryptedRecord)]
