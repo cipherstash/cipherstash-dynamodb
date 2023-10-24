@@ -27,11 +27,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .send()
         .await?;
 
-    // TODO: there is no fuzzy index for this just yet
-    // not sure how that would be configured
-    //let results: Vec<User> =
-    //    table.query(User::starts_with("name", "Jane Smith")).await?;
-
     dbg!(results);
 
     Ok(())

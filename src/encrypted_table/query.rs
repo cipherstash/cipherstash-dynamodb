@@ -11,7 +11,7 @@ use thiserror::Error;
 use crate::{
     crypto::{decrypt, CryptoError},
     table_entry::TableEntry,
-    DecryptedRecord, EncryptedRecord,
+    DecryptedRecord, SearchableRecord,
 };
 use cipherstash_client::encryption::{compound_indexer::CompoundIndex, IndexTerm};
 
@@ -41,7 +41,7 @@ pub struct QueryBuilder<'t, T> {
 
 impl<'t, T> QueryBuilder<'t, T>
 where
-    T: EncryptedRecord + DecryptedRecord,
+    T: SearchableRecord + DecryptedRecord,
 {
     pub fn new(table: &'t EncryptedTable) -> Self {
         Self {
@@ -137,65 +137,6 @@ where
                 }
 
                 return Ok((name, index, plaintext, self));
-            }
-        }
-
-        let fields = self.parts.iter().map(|x| &x.0).join(",");
-
-        Err(QueryError::InvalidQuery(format!(
-            "Could not build query for fields: {fields}"
-        )))
-    }
-}
-
-pub struct Query<T> {
-    parts: Vec<(String, Plaintext, Operator)>,
-    __table: PhantomData<T>,
-}
-
-impl<T: EncryptedRecord> Query<T> {
-    pub fn new() -> Self {
-        Self {
-            parts: vec![],
-            __table: Default::default(),
-        }
-    }
-
-    pub fn eq(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        self.parts
-            .push((name.into(), plaintext.into(), Operator::Eq));
-        self
-    }
-
-    pub fn starts_with(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        self.parts
-            .push((name.into(), plaintext.into(), Operator::StartsWith));
-        self
-    }
-
-    pub fn build(
-        self,
-    ) -> Result<(String, Box<dyn ComposableIndex>, ComposablePlaintext), QueryError> {
-        let items_len = self.parts.len();
-
-        // this is the simplest way to brute force the index names but relies on some gross
-        // stringly typing which doesn't feel good
-        for perm in self.parts.iter().permutations(items_len) {
-            let (name, plaintexts): (Vec<&String>, Vec<&Plaintext>) =
-                perm.into_iter().map(|x| (&x.0, &x.1)).unzip();
-
-            let name = name.iter().join("#");
-
-            if let Some(index) = T::index_by_name(name.as_str()) {
-                let mut plaintext = ComposablePlaintext::new(plaintexts[0].clone());
-
-                for p in plaintexts[1..].into_iter() {
-                    plaintext = plaintext
-                        .try_compose((*p).clone())
-                        .expect("Failed to compose");
-                }
-
-                return Ok((name, index, plaintext));
             }
         }
 

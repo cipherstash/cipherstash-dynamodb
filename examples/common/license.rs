@@ -1,4 +1,4 @@
-use cryptonamo::{DecryptedRecord, DynamoTarget, EncryptedRecord, Plaintext};
+use cryptonamo::{DecryptedRecord, DynamoTarget, EncryptedRecord, Plaintext, SearchableRecord};
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -42,6 +42,8 @@ impl EncryptedRecord for License {
         ])
     }
 }
+
+impl SearchableRecord for License {}
 
 impl DynamoTarget for License {
     fn type_name() -> &'static str {

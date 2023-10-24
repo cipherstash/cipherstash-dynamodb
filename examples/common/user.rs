@@ -1,7 +1,7 @@
 use cipherstash_client::encryption::compound_indexer::{
     ComposableIndex, ComposablePlaintext, CompoundIndex, ExactIndex, PrefixIndex,
 };
-use cryptonamo::{DecryptedRecord, DynamoTarget, EncryptedRecord, Plaintext};
+use cryptonamo::{DecryptedRecord, DynamoTarget, EncryptedRecord, Plaintext, SearchableRecord};
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -25,6 +25,15 @@ impl EncryptedRecord for User {
         self.email.to_string()
     }
 
+       fn protected_attributes(&self) -> HashMap<String, Plaintext> {
+        HashMap::from([
+            ("name".to_string(), self.name.to_string().into()),
+            ("email".to_string(), self.email.to_string().into()),
+        ])
+    }
+}
+
+impl SearchableRecord for User {
     fn protected_indexes() -> Vec<&'static str> {
         vec!["name", "email#name"]
     }
@@ -52,13 +61,6 @@ impl EncryptedRecord for User {
                 .ok(),
             _ => None,
         }
-    }
-
-    fn protected_attributes(&self) -> HashMap<String, Plaintext> {
-        HashMap::from([
-            ("name".to_string(), self.name.to_string().into()),
-            ("email".to_string(), self.email.to_string().into()),
-        ])
     }
 }
 
