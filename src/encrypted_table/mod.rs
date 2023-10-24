@@ -1,8 +1,8 @@
-use std::{collections::HashMap, marker::PhantomData};
+use std::{collections::HashSet, marker::PhantomData};
 
 use crate::{crypto::*, table_entry::TableEntry, DecryptedRecord, EncryptedRecord};
 use aws_sdk_dynamodb::{
-    types::{AttributeValue, DeleteRequest, Put, TransactWriteItem, WriteRequest},
+    types::{AttributeValue, Delete, Put, TransactWriteItem},
     Client,
 };
 use cipherstash_client::{
@@ -14,7 +14,6 @@ use cipherstash_client::{
 use log::info;
 use serde_dynamo::{aws_sdk_dynamodb_0_29::from_item, to_item};
 use thiserror::Error;
-use tokio_stream::StreamExt;
 
 pub struct EncryptedTable {
     db: Client,
@@ -55,6 +54,72 @@ pub enum InitError {
     ConfigError(#[from] ConfigError),
     #[error("LoadConfigError: {0}")]
     LoadConfigError(#[from] LoadConfigError),
+}
+
+impl<T: EncryptedRecord> Query<T> {
+    pub fn eq(name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
+        Self::new(name.into(), plaintext.into(), Operator::Eq)
+    }
+
+    pub fn starts_with(name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
+        Self::new(name.into(), plaintext.into(), Operator::StartsWith)
+    }
+
+    pub fn new(name: String, plaintext: Plaintext, op: Operator) -> Self {
+        Self {
+            parts: vec![(name, plaintext, op)],
+            __table: Default::default(),
+        }
+    }
+
+    pub fn and_eq(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
+        self.parts
+            .push((name.into(), plaintext.into(), Operator::Eq));
+        self
+    }
+
+    pub fn and_starts_with(
+        mut self,
+        name: impl Into<String>,
+        plaintext: impl Into<Plaintext>,
+    ) -> Self {
+        self.parts
+            .push((name.into(), plaintext.into(), Operator::StartsWith));
+        self
+    }
+
+    pub fn build(
+        self,
+    ) -> Result<(String, Box<dyn ComposableIndex>, ComposablePlaintext), QueryError> {
+        let items_len = self.parts.len();
+
+        // this is the simplest way to brute force the index names but relies on some gross
+        // stringly typing which doesn't feel good
+        for perm in self.parts.iter().permutations(items_len) {
+            let (name, plaintexts): (Vec<&String>, Vec<&Plaintext>) =
+                perm.into_iter().map(|x| (&x.0, &x.1)).unzip();
+
+            let name = name.iter().join("#");
+
+            if let Some(index) = T::index_by_name(name.as_str()) {
+                let mut plaintext = ComposablePlaintext::new(plaintexts[0].clone());
+
+                for p in plaintexts[1..].into_iter() {
+                    plaintext = plaintext
+                        .try_compose((*p).clone())
+                        .expect("Failed to compose");
+                }
+
+                return Ok((name, index, plaintext));
+            }
+        }
+
+        let fields = self.parts.iter().map(|x| &x.0).join(",");
+
+        Err(QueryError::InvalidQuery(format!(
+            "Could not build query for fields: {fields}"
+        )))
+    }
 }
 
 impl EncryptedTable {
@@ -127,58 +192,30 @@ impl EncryptedTable {
         }
     }
 
-    pub async fn delete(&self, pk: &str) -> Result<(), DeleteError> {
-        let pk = encrypt_partition_key(pk, &self.cipher)?;
+    pub async fn delete<E: EncryptedRecord>(&self, pk: &str) -> Result<(), DeleteError> {
+        let pk = AttributeValue::S(encrypt_partition_key(pk, &self.cipher)?);
 
-        let paginator = self
-            .db
-            .query()
-            .table_name(&self.table_name)
-            .key_condition_expression("pk = :pk")
-            .expression_attribute_values(":pk", AttributeValue::S(pk))
-            .into_paginator();
+        let sk_to_delete = [E::type_name().to_string()]
+            .into_iter()
+            .chain(all_index_keys::<E>().into_iter());
 
-        let mut stream = paginator.send();
-
-        let mut items = vec![];
-
-        while let Some(output) = stream.next().await {
-            let output = output.map_err(|e| DeleteError::AwsError(e.to_string()))?;
-
-            let output_items = output.items.ok_or_else(|| {
-                DeleteError::AwsError("Expected paginated query response to have items".to_string())
-            })?;
-
-            for item in output_items {
-                let pk = item.get("pk").ok_or_else(|| {
-                    DeleteError::AwsError("Expected returned record to have pk field".to_string())
-                })?;
-
-                let sk = item.get("sk").ok_or_else(|| {
-                    DeleteError::AwsError("Expected returned record to have sk field".to_string())
-                })?;
-
-                items.push(
-                    WriteRequest::builder()
-                        .delete_request(
-                            DeleteRequest::builder()
-                                .key("pk", pk.clone())
-                                .key("sk", sk.clone())
-                                .build(),
-                        )
+        let transact_items = sk_to_delete.map(|sk| {
+            TransactWriteItem::builder()
+                .delete(
+                    Delete::builder()
+                        .table_name(&self.table_name)
+                        .key("pk", pk.clone())
+                        .key("sk", AttributeValue::S(sk))
                         .build(),
                 )
-            }
-        }
+                .build()
+        });
 
-        // Dynamo docs say there is a max number of 25 write items per request
-        for item in items.chunks(25).into_iter() {
-            let mut request_items = HashMap::new();
-            request_items.insert(self.table_name.clone(), item.to_vec());
-
+        // Dynamo has a limit of 100 items per transaction
+        for items in transact_items.chunks(100).into_iter() {
             self.db
-                .batch_write_item()
-                .set_request_items(Some(request_items))
+                .transact_write_items()
+                .set_transact_items(Some(items.collect()))
                 .send()
                 .await
                 .map_err(|e| DeleteError::AwsError(e.to_string()))?;
@@ -197,10 +234,15 @@ impl EncryptedTable {
             .get_table(&T::type_name())
             .expect(&format!("No config found for type {:?}", record));
 
+        let mut seen_sk = HashSet::new();
+
         // TODO: Use a combinator
-        let table_entries = encrypt(record, &self.cipher, table_config).await?;
+        let (pk, table_entries) = encrypt(record, &self.cipher, table_config).await?;
         let mut items: Vec<TransactWriteItem> = Vec::with_capacity(table_entries.len());
+
         for entry in table_entries.into_iter() {
+            seen_sk.insert(entry.sk.clone());
+
             let item = Some(to_item(entry)?);
 
             println!("ITEM: {item:#?}");
@@ -217,14 +259,33 @@ impl EncryptedTable {
             );
         }
 
-        dbg!(&items);
+        for index_sk in all_index_keys::<T>() {
+            if seen_sk.contains(&index_sk) {
+                continue;
+            }
 
-        self.db
-            .transact_write_items()
-            .set_transact_items(Some(items))
-            .send()
-            .await
-            .map_err(|e| PutError::AwsError(e.to_string()))?;
+            items.push(
+                TransactWriteItem::builder()
+                    .delete(
+                        Delete::builder()
+                            .table_name(&self.table_name)
+                            .key("pk", AttributeValue::S(pk.clone()))
+                            .key("sk", AttributeValue::S(index_sk))
+                            .build(),
+                    )
+                    .build(),
+            );
+        }
+
+        // Dynamo has a limit of 100 items per transaction
+        for items in items.chunks(100) {
+            self.db
+                .transact_write_items()
+                .set_transact_items(Some(items.to_vec()))
+                .send()
+                .await
+                .map_err(|e| PutError::AwsError(e.to_string()))?;
+        }
 
         Ok(())
     }
