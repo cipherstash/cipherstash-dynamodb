@@ -2,7 +2,9 @@ use std::collections::HashSet;
 pub mod query;
 pub use self::query::{QueryBuilder, QueryError};
 
-use crate::{crypto::*, table_entry::TableEntry, DecryptedRecord, EncryptedRecord, SearchableRecord};
+use crate::{
+    crypto::*, table_entry::TableEntry, DecryptedRecord, EncryptedRecord, SearchableRecord,
+};
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Delete, Put, TransactWriteItem},
     Client,

@@ -25,7 +25,7 @@ impl EncryptedRecord for User {
         self.email.to_string()
     }
 
-       fn protected_attributes(&self) -> HashMap<String, Plaintext> {
+    fn protected_attributes(&self) -> HashMap<String, Plaintext> {
         HashMap::from([
             ("name".to_string(), self.name.to_string().into()),
             ("email".to_string(), self.email.to_string().into()),
