@@ -1,8 +1,10 @@
+use std::collections::HashSet;
 pub mod query;
 pub use self::query::{Query, QueryBuilder, QueryError};
+
 use crate::{crypto::*, table_entry::TableEntry, DecryptedRecord, EncryptedRecord};
 use aws_sdk_dynamodb::{
-    types::{AttributeValue, Put, TransactWriteItem},
+    types::{AttributeValue, Delete, Put, TransactWriteItem},
     Client,
 };
 use cipherstash_client::{
@@ -11,6 +13,7 @@ use cipherstash_client::{
     encryption::Encryption,
     vitur::{errors::LoadConfigError, DatasetConfigWithIndexRootKey, Vitur},
 };
+use itertools::Itertools;
 use log::info;
 use serde_dynamo::{aws_sdk_dynamodb_0_29::from_item, to_item};
 use thiserror::Error;
@@ -34,6 +37,14 @@ pub enum PutError {
 
 #[derive(Error, Debug)]
 pub enum GetError {
+    #[error("CryptoError: {0}")]
+    CryptoError(#[from] CryptoError),
+    #[error("AwsError: {0}")]
+    AwsError(String),
+}
+
+#[derive(Error, Debug)]
+pub enum DeleteError {
     #[error("CryptoError: {0}")]
     CryptoError(#[from] CryptoError),
     #[error("AwsError: {0}")]
@@ -118,6 +129,38 @@ impl EncryptedTable {
         }
     }
 
+    pub async fn delete<E: EncryptedRecord>(&self, pk: &str) -> Result<(), DeleteError> {
+        let pk = AttributeValue::S(encrypt_partition_key(pk, &self.cipher)?);
+
+        let sk_to_delete = [E::type_name().to_string()]
+            .into_iter()
+            .chain(all_index_keys::<E>().into_iter());
+
+        let transact_items = sk_to_delete.map(|sk| {
+            TransactWriteItem::builder()
+                .delete(
+                    Delete::builder()
+                        .table_name(&self.table_name)
+                        .key("pk", pk.clone())
+                        .key("sk", AttributeValue::S(sk))
+                        .build(),
+                )
+                .build()
+        });
+
+        // Dynamo has a limit of 100 items per transaction
+        for items in transact_items.chunks(100).into_iter() {
+            self.db
+                .transact_write_items()
+                .set_transact_items(Some(items.collect()))
+                .send()
+                .await
+                .map_err(|e| DeleteError::AwsError(e.to_string()))?;
+        }
+
+        Ok(())
+    }
+
     pub async fn put<T>(&self, record: &T) -> Result<(), PutError>
     where
         T: EncryptedRecord,
@@ -128,10 +171,15 @@ impl EncryptedTable {
             .get_table(&T::type_name())
             .expect(&format!("No config found for type {:?}", record));
 
+        let mut seen_sk = HashSet::new();
+
         // TODO: Use a combinator
-        let table_entries = encrypt(record, &self.cipher, table_config).await?;
+        let (pk, table_entries) = encrypt(record, &self.cipher, table_config).await?;
         let mut items: Vec<TransactWriteItem> = Vec::with_capacity(table_entries.len());
+
         for entry in table_entries.into_iter() {
+            seen_sk.insert(entry.sk.clone());
+
             let item = Some(to_item(entry)?);
 
             println!("ITEM: {item:#?}");
@@ -148,14 +196,33 @@ impl EncryptedTable {
             );
         }
 
-        dbg!(&items);
+        for index_sk in all_index_keys::<T>() {
+            if seen_sk.contains(&index_sk) {
+                continue;
+            }
 
-        self.db
-            .transact_write_items()
-            .set_transact_items(Some(items))
-            .send()
-            .await
-            .map_err(|e| PutError::AwsError(e.to_string()))?;
+            items.push(
+                TransactWriteItem::builder()
+                    .delete(
+                        Delete::builder()
+                            .table_name(&self.table_name)
+                            .key("pk", AttributeValue::S(pk.clone()))
+                            .key("sk", AttributeValue::S(index_sk))
+                            .build(),
+                    )
+                    .build(),
+            );
+        }
+
+        // Dynamo has a limit of 100 items per transaction
+        for items in items.chunks(100) {
+            self.db
+                .transact_write_items()
+                .set_transact_items(Some(items.to_vec()))
+                .send()
+                .await
+                .map_err(|e| PutError::AwsError(e.to_string()))?;
+        }
 
         Ok(())
     }
