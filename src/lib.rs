@@ -9,4 +9,4 @@ pub use cipherstash_client::encryption::Plaintext;
 
 pub type Key = [u8; 32];
 
-pub use cryptonamo_derive::{Cryptonamo, EncryptedRecord};
+pub use cryptonamo_derive::Cryptonamo;
