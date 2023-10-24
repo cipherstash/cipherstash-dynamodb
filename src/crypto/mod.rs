@@ -1,13 +1,13 @@
 use crate::{
     encrypted_table::TableEntry,
-    traits::{Cryptonamo, EncryptedRecord, SearchableRecord},
+    traits::{Cryptonamo, SearchableRecord},
 };
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
     encryption::{
         compound_indexer::CompoundIndex, Encryption, EncryptionError, IndexTerm, Plaintext,
     },
-    schema::{column::Index, TableConfig},
+    schema::column::Index,
 };
 use std::collections::HashMap;
 use thiserror::Error;
@@ -20,23 +20,6 @@ pub enum CryptoError {
     EncryptionError(#[from] EncryptionError),
     #[error("{0}")]
     Other(String),
-}
-
-pub(crate) fn encrypted_targets<E: EncryptedRecord>(
-    target: &E,
-    config: &TableConfig,
-) -> HashMap<String, Plaintext> {
-    target
-        .protected_attributes()
-        .iter()
-        .filter_map(|(attr, plaintext)| {
-            config
-                .get_column(*attr)
-                .ok()
-                .flatten()
-                .and_then(|_| Some((attr.to_string(), plaintext.clone())))
-        })
-        .collect()
 }
 
 pub fn all_index_keys<E: SearchableRecord + Cryptonamo>() -> Vec<String> {
@@ -114,18 +97,17 @@ where
 pub(crate) async fn encrypt<E, C>(
     target: &E,
     cipher: &Encryption<C>,
-    config: &TableConfig,
 ) -> Result<(String, Vec<TableEntry>), CryptoError>
 where
     // TODO: Can we overload this to index if the record is searchable?
     E: SearchableRecord,
     C: Credentials<Token = ViturToken>,
 {
-    let plaintexts = encrypted_targets(target, config);
+    let protected_attributes = target.protected_attributes();
 
     // TODO: Maybe use a wrapper type?
     let mut attributes: HashMap<String, String> = Default::default();
-    for (name, plaintext) in plaintexts.iter() {
+    for (name, plaintext) in protected_attributes.iter() {
         // TODO: Use the bulk encrypt
         if let Some(ct) = cipher
             .encrypt_single(&plaintext, &format!("{}#{}", E::type_name(), name))
@@ -146,6 +128,8 @@ where
         term: None,
         attributes: attributes.clone(),
     });
+
+    // TODO: Handle the plaintext attributes
 
     encrypt_indexes(
         &partition_key,
