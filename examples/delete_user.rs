@@ -1,6 +1,6 @@
 mod common;
-use common::License;
-use cryptonamo::EncryptedTable;
+use crate::common::User;
+use cryptonamo::encrypted_table::EncryptedTable;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -20,9 +20,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = aws_sdk_dynamodb::Client::new(&config);
 
     let table = EncryptedTable::init(client, "users").await?;
-    table
-        .put(&License::new("dan@coderdan.co", "1234567", "2027-01-10"))
-        .await?;
+
+    table.delete::<User>("jane@smith.org").await?;
+    table.delete::<User>("dan@coderdan.co").await?;
+    table.delete::<User>("daniel@example.com").await?;
 
     Ok(())
 }

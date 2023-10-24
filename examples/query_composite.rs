@@ -1,5 +1,5 @@
 mod common;
-use crate::common::{User, UserResultByName};
+use crate::common::User;
 use cryptonamo::EncryptedTable;
 
 #[tokio::main]
@@ -18,19 +18,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await;
 
     let client = aws_sdk_dynamodb::Client::new(&config);
+
     let table = EncryptedTable::init(client, "users").await?;
 
     let results: Vec<User> = table
         .query()
-        .eq("email", "dan@coderdan.co")
-        .starts_with("name", "Dan")
+        .eq("email", "jane@smith.org")
+        .starts_with("name", "Jane")
         .send()
         .await?;
-
-    // TODO: there is no fuzzy index for this just yet
-    // not sure how that would be configured
-    //let results: Vec<User> =
-    //    table.query(User::starts_with("name", "Jane Smith")).await?;
 
     dbg!(results);
 

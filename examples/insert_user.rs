@@ -1,6 +1,6 @@
 mod common;
 use crate::common::User;
-use cryptonamo::encrypted_table::EncryptedTable;
+use cryptonamo::EncryptedTable;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,10 +19,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let client = aws_sdk_dynamodb::Client::new(&config);
 
-    let table = EncryptedTable::init(&client, "users").await;
-    table.put(&User::new("dan@coderdan.co", "Dan Draper")).await;
-    table.put(&User::new("jane@smith.org", "Jane Smith")).await;
-    table.put(&User::new("daniel@example.com", "Daniel Johnson")).await;
+    let table = EncryptedTable::init(client, "users").await?;
+    table
+        .put(&User::new("dan@coderdan.co", "Dan Draper"))
+        .await?;
+    table
+        .put(&User::new("jane@smith.org", "Jane Smith"))
+        .await?;
+    table
+        .put(&User::new("daniel@example.com", "Daniel Johnson"))
+        .await?;
 
     Ok(())
 }
