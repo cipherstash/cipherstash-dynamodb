@@ -1,20 +1,19 @@
-use std::marker::PhantomData;
 use aws_sdk_dynamodb::types::AttributeValue;
-use cipherstash_client::encryption::{EncryptionError, Plaintext, compound_indexer::{Operator, ComposableIndex, ComposablePlaintext}};
-use thiserror::Error;
-use itertools::Itertools;
-use serde_dynamo::{aws_sdk_dynamodb_0_29::from_item, from_items, to_item};
-
-use crate::{crypto::{CryptoError, decrypt}, EncryptedRecord, DecryptedRecord, table_entry::TableEntry};
-use cipherstash_client::{
-    config::{console_config::ConsoleConfig, errors::ConfigError, vitur_config::ViturConfig},
-    credentials::{auto_refresh::AutoRefresh, vitur_credentials::ViturCredentials},
-    encryption::{
-        compound_indexer::CompoundIndex,
-        Encryption, IndexTerm,
-    },
-    vitur::{errors::LoadConfigError, DatasetConfigWithIndexRootKey, Vitur},
+use cipherstash_client::encryption::{
+    compound_indexer::{ComposableIndex, ComposablePlaintext, Operator},
+    EncryptionError, Plaintext,
 };
+use itertools::Itertools;
+use serde_dynamo::from_items;
+use std::marker::PhantomData;
+use thiserror::Error;
+
+use crate::{
+    crypto::{decrypt, CryptoError},
+    table_entry::TableEntry,
+    DecryptedRecord, EncryptedRecord,
+};
+use cipherstash_client::encryption::{compound_indexer::CompoundIndex, IndexTerm};
 
 use super::EncryptedTable;
 
@@ -40,7 +39,10 @@ pub struct QueryBuilder<'t, T> {
     __table: PhantomData<T>,
 }
 
-impl<'t, T> QueryBuilder<'t, T> where T: EncryptedRecord + DecryptedRecord {
+impl<'t, T> QueryBuilder<'t, T>
+where
+    T: EncryptedRecord + DecryptedRecord,
+{
     pub fn new(table: &'t EncryptedTable) -> Self {
         Self {
             parts: vec![],
@@ -50,12 +52,14 @@ impl<'t, T> QueryBuilder<'t, T> where T: EncryptedRecord + DecryptedRecord {
     }
 
     pub fn eq(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        self.parts.push((name.into(), plaintext.into(), Operator::Eq));
+        self.parts
+            .push((name.into(), plaintext.into(), Operator::Eq));
         self
     }
 
     pub fn starts_with(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        self.parts.push((name.into(), plaintext.into(), Operator::StartsWith));
+        self.parts
+            .push((name.into(), plaintext.into(), Operator::StartsWith));
         self
     }
 
@@ -158,12 +162,14 @@ impl<T: EncryptedRecord> Query<T> {
     }
 
     pub fn eq(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        self.parts.push((name.into(), plaintext.into(), Operator::Eq));
+        self.parts
+            .push((name.into(), plaintext.into(), Operator::Eq));
         self
     }
 
     pub fn starts_with(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        self.parts.push((name.into(), plaintext.into(), Operator::StartsWith));
+        self.parts
+            .push((name.into(), plaintext.into(), Operator::StartsWith));
         self
     }
 

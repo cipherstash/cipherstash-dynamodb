@@ -1,6 +1,6 @@
 mod common;
 use crate::common::{User, UserResultByName};
-use cryptonamo::{EncryptedTable, Query, EncryptedRecord, QueryBuilder};
+use cryptonamo::EncryptedTable;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

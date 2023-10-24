@@ -1,4 +1,5 @@
 pub mod query;
+pub use self::query::{Query, QueryBuilder, QueryError};
 use crate::{crypto::*, table_entry::TableEntry, DecryptedRecord, EncryptedRecord};
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Put, TransactWriteItem},
@@ -7,15 +8,12 @@ use aws_sdk_dynamodb::{
 use cipherstash_client::{
     config::{console_config::ConsoleConfig, errors::ConfigError, vitur_config::ViturConfig},
     credentials::{auto_refresh::AutoRefresh, vitur_credentials::ViturCredentials},
-    encryption::{
-        Encryption,
-    },
+    encryption::Encryption,
     vitur::{errors::LoadConfigError, DatasetConfigWithIndexRootKey, Vitur},
 };
 use log::info;
 use serde_dynamo::{aws_sdk_dynamodb_0_29::from_item, to_item};
 use thiserror::Error;
-pub use self::query::{Query, QueryBuilder, QueryError};
 
 pub struct EncryptedTable {
     db: Client,
@@ -23,7 +21,6 @@ pub struct EncryptedTable {
     dataset_config: DatasetConfigWithIndexRootKey,
     table_name: String,
 }
-
 
 #[derive(Error, Debug)]
 pub enum PutError {
