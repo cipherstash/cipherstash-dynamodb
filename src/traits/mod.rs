@@ -2,14 +2,18 @@ use std::{collections::HashMap, fmt::Debug};
 use crate::{Plaintext, ComposableIndex, ComposablePlaintext};
 
 pub trait Cryptonamo: Debug {
-    // TODO: Add a function indicating that the root should be stored 
+    // TODO: Add a function indicating that the root should be stored
     fn type_name() -> &'static str;
     fn partition_key(&self) -> String;
 }
 
 // These are analogous to serde (rename to Encrypt and Decrypt)
 pub trait EncryptedRecord: Cryptonamo + Sized {
-    fn protected_attributes(&self) -> HashMap<String, Plaintext>;
+    fn protected_attributes(&self) -> HashMap<&'static str, Plaintext>;
+    
+    fn plaintext_attributes(&self) -> HashMap<&'static str, Plaintext> {
+        HashMap::default()
+    }
 }
 
 pub trait SearchableRecord: EncryptedRecord {

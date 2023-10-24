@@ -28,7 +28,7 @@ pub(crate) fn encrypted_targets<E: EncryptedRecord>(
         .iter()
         .filter_map(|(attr, plaintext)| {
             config
-                .get_column(attr)
+                .get_column(*attr)
                 .ok()
                 .flatten()
                 .and_then(|_| Some((attr.to_string(), plaintext.clone())))

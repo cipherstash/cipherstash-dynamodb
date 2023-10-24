@@ -1,15 +1,18 @@
 use cipherstash_client::encryption::compound_indexer::{
     ComposableIndex, ComposablePlaintext, CompoundIndex, ExactIndex, PrefixIndex,
 };
-use cryptonamo::{Plaintext, Cryptonamo, traits::{DecryptedRecord, EncryptedRecord, SearchableRecord}};
+use cryptonamo::{Plaintext, Cryptonamo, EncryptedRecord, traits::{DecryptedRecord, SearchableRecord}};
 use std::collections::HashMap;
 
-#[derive(Debug, Cryptonamo)]
+#[derive(Debug, Cryptonamo, EncryptedRecord)]
 #[cryptonamo(partition_key = "email")]
 #[cryptonamo(sort_key_prefix = "user")]
 pub struct User {
     pub email: String,
     pub name: String,
+
+    #[cryptonamo(plaintext)]
+    pub count: i32,
 }
 
 impl User {
@@ -18,16 +21,8 @@ impl User {
         Self {
             email: email.into(),
             name: name.into(),
+            count: 100,
         }
-    }
-}
-
-impl EncryptedRecord for User {
-    fn protected_attributes(&self) -> HashMap<String, Plaintext> {
-        HashMap::from([
-            ("name".to_string(), self.name.to_string().into()),
-            ("email".to_string(), self.email.to_string().into()),
-        ])
     }
 }
 
@@ -62,17 +57,12 @@ impl SearchableRecord for User {
     }
 }
 
-/*impl DynamoTarget for User {
-    fn type_name() -> &'static str {
-        "user"
-    }
-}*/
-
 impl DecryptedRecord for User {
     fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {
         Self {
             email: attributes.get("email").unwrap().try_into().unwrap(),
             name: attributes.get("name").unwrap().try_into().unwrap(),
+            count: 100,
         }
     }
 }
