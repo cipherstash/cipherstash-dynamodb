@@ -8,7 +8,7 @@ use cipherstash_client::{
     schema::{column::Index, TableConfig},
 };
 
-use crate::{table_entry::TableEntry, DynamoTarget, EncryptedRecord};
+use crate::{DynamoTarget, EncryptedRecord, SearchableRecord, encrypted_table::TableEntry};
 use thiserror::Error;
 
 const MAX_TERMS_PER_INDEX: usize = 25;
@@ -38,7 +38,7 @@ pub(crate) fn encrypted_targets<E: EncryptedRecord>(
         .collect()
 }
 
-pub fn all_index_keys<E: EncryptedRecord + DynamoTarget>() -> Vec<String> {
+pub fn all_index_keys<E: SearchableRecord + DynamoTarget>() -> Vec<String> {
     E::protected_indexes()
         .iter()
         .flat_map(|index_name| {
@@ -50,14 +50,19 @@ pub fn all_index_keys<E: EncryptedRecord + DynamoTarget>() -> Vec<String> {
         .collect()
 }
 
-fn encrypt_indexes<E: EncryptedRecord + DynamoTarget, C: Credentials<Token = ViturToken>>(
+fn encrypt_indexes<E, C>(
     parition_key: &str,
     target: &E,
     term_length: usize,
-    attributes: &HashMap<String, String>, // FIXME: Make a type for *encrypted attribute*
+    // FIXME: Make a type for *encrypted attribute*
+    attributes: &HashMap<String, String>,
     entries: &mut Vec<TableEntry>,
     cipher: &Encryption<C>,
-) -> Result<(), CryptoError> {
+) -> Result<(), CryptoError>
+where
+    E: SearchableRecord + DynamoTarget,
+    C: Credentials<Token = ViturToken>,
+{
     for index_name in E::protected_indexes().iter() {
         if let Some((attr, index)) = target
             .attribute_for_index(index_name)
@@ -111,7 +116,8 @@ pub(crate) async fn encrypt<E, C>(
     config: &TableConfig,
 ) -> Result<(String, Vec<TableEntry>), CryptoError>
 where
-    E: EncryptedRecord,
+    // TODO: Can we overload this to index if the record is searchable?
+    E: SearchableRecord,
     C: Credentials<Token = ViturToken>,
 {
     let plaintexts = encrypted_targets(target, config);

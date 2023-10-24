@@ -1,8 +1,7 @@
 use std::{collections::HashMap, fmt::Debug};
 mod crypto;
 mod encrypted_table;
-mod table_entry;
-pub use encrypted_table::{EncryptedTable, Query, QueryBuilder};
+pub use encrypted_table::{EncryptedTable, QueryBuilder};
 
 // Re-exports
 use cipherstash_client::encryption::compound_indexer::{ComposableIndex, ComposablePlaintext};
@@ -14,7 +13,9 @@ pub type Key = [u8; 32];
 pub trait EncryptedRecord: DynamoTarget + Sized {
     fn partition_key(&self) -> String;
     fn protected_attributes(&self) -> HashMap<String, Plaintext>;
+}
 
+pub trait SearchableRecord: EncryptedRecord {
     #[allow(unused_variables)]
     fn attribute_for_index(&self, index_name: &str) -> Option<ComposablePlaintext> {
         None
