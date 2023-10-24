@@ -1,8 +1,8 @@
-use std::marker::PhantomData;
+use std::{collections::HashMap, marker::PhantomData};
 
 use crate::{crypto::*, table_entry::TableEntry, DecryptedRecord, EncryptedRecord};
 use aws_sdk_dynamodb::{
-    types::{AttributeValue, Put, TransactWriteItem},
+    types::{AttributeValue, DeleteRequest, Put, TransactWriteItem, WriteRequest},
     Client,
 };
 use cipherstash_client::{
@@ -18,6 +18,7 @@ use itertools::Itertools;
 use log::info;
 use serde_dynamo::{aws_sdk_dynamodb_0_29::from_item, from_items, to_item};
 use thiserror::Error;
+use tokio_stream::StreamExt;
 
 pub struct EncryptedTable {
     db: Client,
@@ -59,6 +60,14 @@ pub enum PutError {
 
 #[derive(Error, Debug)]
 pub enum GetError {
+    #[error("CryptoError: {0}")]
+    CryptoError(#[from] CryptoError),
+    #[error("AwsError: {0}")]
+    AwsError(String),
+}
+
+#[derive(Error, Debug)]
+pub enum DeleteError {
     #[error("CryptoError: {0}")]
     CryptoError(#[from] CryptoError),
     #[error("AwsError: {0}")]
@@ -248,6 +257,66 @@ impl EncryptedTable {
         } else {
             Ok(None)
         }
+    }
+
+    pub async fn delete(&self, pk: &str) -> Result<(), DeleteError> {
+        let pk = encrypt_partition_key(pk, &self.cipher)?;
+
+        let paginator = self
+            .db
+            .query()
+            .table_name(&self.table_name)
+            .key_condition_expression("pk = :pk")
+            .expression_attribute_values(":pk", AttributeValue::S(pk))
+            .into_paginator();
+
+        let mut stream = paginator.send();
+
+        let mut items = vec![];
+
+        while let Some(output) = stream.next().await {
+            let output = output.map_err(|e| DeleteError::AwsError(e.to_string()))?;
+
+            let output_items = output.items.ok_or_else(|| {
+                DeleteError::AwsError("Expected paginated query response to have items".to_string())
+            })?;
+
+            for item in output_items {
+                let pk = item.get("pk").ok_or_else(|| {
+                    DeleteError::AwsError("Expected returned record to have pk field".to_string())
+                })?;
+
+                let sk = item.get("sk").ok_or_else(|| {
+                    DeleteError::AwsError("Expected returned record to have sk field".to_string())
+                })?;
+
+                items.push(
+                    WriteRequest::builder()
+                        .delete_request(
+                            DeleteRequest::builder()
+                                .key("pk", pk.clone())
+                                .key("sk", sk.clone())
+                                .build(),
+                        )
+                        .build(),
+                )
+            }
+        }
+
+        // Dynamo docs say there is a max number of 25 write items per request
+        for item in items.chunks(25).into_iter() {
+            let mut request_items = HashMap::new();
+            request_items.insert(self.table_name.clone(), item.to_vec());
+
+            self.db
+                .batch_write_item()
+                .set_request_items(Some(request_items))
+                .send()
+                .await
+                .map_err(|e| DeleteError::AwsError(e.to_string()))?;
+        }
+
+        Ok(())
     }
 
     pub async fn put<T>(&self, record: &T) -> Result<(), PutError>
