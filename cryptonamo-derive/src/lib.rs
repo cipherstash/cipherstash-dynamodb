@@ -4,20 +4,56 @@ extern crate syn;
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
 use quote::quote;
-use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Lit, Meta, DataStruct, FieldsNamed};
+use syn::{parse_macro_input, Attribute, Data, DeriveInput, Fields, Lit, Meta, DataStruct, FieldsNamed, Expr, LitStr};
 
-#[proc_macro_derive(DynamoTarget)] //, attributes(dynamo))]
+// TODO: Use .unwrap_or_else(syn::Error::into_compile_error) for error handling
+
+#[proc_macro_derive(Cryptonamo, attributes(cryptonamo))]
 pub fn derive_dynamo_target(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    let name = &input.ident;
-    let dynamo_name = name.to_string().to_lowercase();
+    let DeriveInput { ident, attrs, .. } = parse_macro_input!(input as DeriveInput);
+    let mut dynamo_name = ident.to_string().to_lowercase();
+
+    let mut partition_key: Option<String> = None;
+
+    for attr in attrs {
+        if attr.path().is_ident("cryptonamo") {
+            attr.parse_nested_meta(|meta| {
+                let ident = meta.path.get_ident().map(|i| i.to_string());
+                match ident.as_deref() {
+                    Some("sort_key_prefix") => {
+                        let value = meta.value()?;
+                        let t: LitStr = value.parse()?;
+                        dynamo_name = t.value();
+
+                        Ok(())
+                    },
+                    Some("partition_key") => {
+                        let value = meta.value()?;
+                        let t: LitStr = value.parse()?;
+                        partition_key = Some(t.value());
+
+                        Ok(())
+                    },
+                    _ => Err(meta.error("unsupported attribute")),
+                }
+            })
+            .unwrap();
+        }
+    }
+
+    // Validations
+    let partition_key = partition_key.unwrap_or_else(|| panic!("No partition key defined for {}", ident));
 
     let expanded = quote! {
-        use cryptonamo::target::DynamoTarget;
+        use cryptonamo::traits::Cryptonamo;
 
-        impl DynamoTarget for #name {
+        impl Cryptonamo for #ident {
             fn type_name() -> &'static str {
                 stringify!(#dynamo_name)
+            }
+
+            fn partition_key(&self) -> String {
+                stringify!(#partition_key).into()
             }
         }
     };

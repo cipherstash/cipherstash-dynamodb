@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use crate::{
     crypto::{decrypt, CryptoError},
-    DecryptedRecord, SearchableRecord,
+    traits::{DecryptedRecord, SearchableRecord},
 };
 use cipherstash_client::encryption::{compound_indexer::CompoundIndex, IndexTerm};
 

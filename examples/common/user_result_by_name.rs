@@ -1,15 +1,10 @@
-use cryptonamo::{DecryptedRecord, DynamoTarget, Plaintext};
+use cryptonamo::{Cryptonamo, Plaintext, traits::DecryptedRecord};
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Cryptonamo)]
+#[cryptonamo(partition_key = "name")]
 pub struct UserResultByName {
     pub name: String,
-}
-
-impl DynamoTarget for UserResultByName {
-    fn type_name() -> &'static str {
-        "user"
-    }
 }
 
 impl DecryptedRecord for UserResultByName {

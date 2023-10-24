@@ -1,9 +1,10 @@
-use cryptonamo::{DecryptedRecord, DynamoTarget, EncryptedRecord, Plaintext, SearchableRecord};
+use cryptonamo::{Cryptonamo, Plaintext, traits::{DecryptedRecord, EncryptedRecord, SearchableRecord}};
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Cryptonamo)]
+#[cryptonamo(partition_key = "email")]
 pub struct License {
-    email: Option<String>,
+    email: String,
     number: String,
     expires: String,
 }
@@ -16,7 +17,7 @@ impl License {
         expires: impl Into<String>,
     ) -> Self {
         Self {
-            email: Some(email.into()),
+            email: email.into(),
             number: number.into(),
             expires: expires.into(),
         }
@@ -24,11 +25,6 @@ impl License {
 }
 
 impl EncryptedRecord for License {
-    fn partition_key(&self) -> String {
-        // NOTE: Partition key for subtypes is required on insert
-        self.email.as_ref().unwrap().to_string()
-    }
-
     fn protected_attributes(&self) -> HashMap<String, Plaintext> {
         HashMap::from([
             (
@@ -45,18 +41,12 @@ impl EncryptedRecord for License {
 
 impl SearchableRecord for License {}
 
-impl DynamoTarget for License {
-    fn type_name() -> &'static str {
-        "license"
-    }
-}
-
 impl DecryptedRecord for License {
     fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {
         Self {
             number: attributes.get("number").unwrap().try_into().unwrap(),
             expires: attributes.get("expires").unwrap().try_into().unwrap(),
-            email: None,
+            email: attributes.get("email").unwrap().try_into().unwrap(),
         }
     }
 }

@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
     encryption::{
@@ -7,8 +6,7 @@ use cipherstash_client::{
     },
     schema::{column::Index, TableConfig},
 };
-
-use crate::{DynamoTarget, EncryptedRecord, SearchableRecord, encrypted_table::TableEntry};
+use crate::{traits::{Cryptonamo, EncryptedRecord, SearchableRecord}, encrypted_table::TableEntry};
 use thiserror::Error;
 
 const MAX_TERMS_PER_INDEX: usize = 25;
@@ -38,7 +36,7 @@ pub(crate) fn encrypted_targets<E: EncryptedRecord>(
         .collect()
 }
 
-pub fn all_index_keys<E: SearchableRecord + DynamoTarget>() -> Vec<String> {
+pub fn all_index_keys<E: SearchableRecord + Cryptonamo>() -> Vec<String> {
     E::protected_indexes()
         .iter()
         .flat_map(|index_name| {
@@ -60,7 +58,7 @@ fn encrypt_indexes<E, C>(
     cipher: &Encryption<C>,
 ) -> Result<(), CryptoError>
 where
-    E: SearchableRecord + DynamoTarget,
+    E: SearchableRecord + Cryptonamo,
     C: Credentials<Token = ViturToken>,
 {
     for index_name in E::protected_indexes().iter() {
