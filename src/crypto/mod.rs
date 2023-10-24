@@ -59,9 +59,10 @@ fn encrypt_indexes<E, C>(
     entries: &mut Vec<TableEntry>,
     cipher: &Encryption<C>,
 ) -> Result<(), CryptoError>
-where E: SearchableRecord + DynamoTarget,
-      C: Credentials<Token = ViturToken>,
-      {
+where
+    E: SearchableRecord + DynamoTarget,
+    C: Credentials<Token = ViturToken>,
+{
     for index_name in E::protected_indexes().iter() {
         if let Some((attr, index)) = target
             .attribute_for_index(index_name)

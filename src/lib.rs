@@ -1,4 +1,3 @@
-
 use std::{collections::HashMap, fmt::Debug};
 mod crypto;
 mod encrypted_table;
