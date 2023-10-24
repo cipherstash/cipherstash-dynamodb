@@ -3,7 +3,7 @@ extern crate quote;
 extern crate syn;
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
-use quote::{quote, format_ident};
+use quote::{format_ident, quote};
 use syn::{parse_macro_input, Data, DeriveInput, Fields, LitStr};
 
 // TODO: Use .unwrap_or_else(syn::Error::into_compile_error) for error handling
@@ -25,14 +25,14 @@ pub fn derive_dynamo_target(input: TokenStream) -> TokenStream {
                         dynamo_name = t.value();
 
                         Ok(())
-                    },
+                    }
                     Some("partition_key") => {
                         let value = meta.value()?;
                         let t: LitStr = value.parse()?;
                         partition_key = Some(t.value());
 
                         Ok(())
-                    },
+                    }
                     _ => Err(meta.error("unsupported attribute")),
                 }
             })
@@ -60,7 +60,6 @@ pub fn derive_dynamo_target(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-
 // TODO: Do this all in the Cryptonamo derive
 #[proc_macro_derive(EncryptedRecord, attributes(dynamo))]
 pub fn derive_encrypted_record(input: TokenStream) -> TokenStream {
@@ -68,7 +67,7 @@ pub fn derive_encrypted_record(input: TokenStream) -> TokenStream {
     let name = &input.ident;
 
     let mut record_attributes: Vec<(bool, &Ident)> = Vec::new();
-    
+
     // Extract field names and idents from the fields.
     if let Data::Struct(data_struct) = &input.data {
         if let Fields::Named(fields_named) = &data_struct.fields {
@@ -77,7 +76,6 @@ pub fn derive_encrypted_record(input: TokenStream) -> TokenStream {
 
                 // True indicates that the field will be encrypted
                 let mut attribute = (true, ident.as_ref().unwrap()); // TODO: Handle error
-
 
                 // Parse the meta for the field
                 for attr in &field.attrs {
@@ -90,17 +88,19 @@ pub fn derive_encrypted_record(input: TokenStream) -> TokenStream {
                             } else {
                                 Err(meta.error("unsupported field attribute"))
                             }
-                        }).unwrap() // TODO: Don't unwrap
+                        })
+                        .unwrap() // TODO: Don't unwrap
                     }
                 }
-                
+
                 record_attributes.push(attribute);
             }
         }
     }
 
-    let (encrypted_attributes, plaintext_attributes): (Vec<(bool, &Ident)>, Vec<(bool, &Ident)>) = record_attributes.into_iter().partition(|(enc, _)| *enc);
-    
+    let (encrypted_attributes, plaintext_attributes): (Vec<(bool, &Ident)>, Vec<(bool, &Ident)>) =
+        record_attributes.into_iter().partition(|(enc, _)| *enc);
+
     let protected_impl = encrypted_attributes.iter().map(|(_, name)| {
         quote! {
             attributes.insert(stringify!(#name), cryptonamo::Plaintext::from(self.#name.clone()));
@@ -112,7 +112,7 @@ pub fn derive_encrypted_record(input: TokenStream) -> TokenStream {
             attributes.insert(stringify!(#name), cryptonamo::Plaintext::from(self.#name.clone()));
         }
     });
-    
+
     let expanded = quote! {
         impl cryptonamo::traits::EncryptedRecord for #name {
             fn protected_attributes(&self) -> std::collections::HashMap<&'static str, cryptonamo::Plaintext> {
@@ -128,6 +128,6 @@ pub fn derive_encrypted_record(input: TokenStream) -> TokenStream {
             }
         }
     };
-    
+
     TokenStream::from(expanded)
 }
