@@ -1,6 +1,8 @@
-use std::{collections::HashSet, marker::PhantomData};
+use std::collections::HashSet;
+pub mod query;
+pub use self::query::{QueryBuilder, QueryError};
 
-use crate::{crypto::*, table_entry::TableEntry, DecryptedRecord, EncryptedRecord};
+use crate::{crypto::*, table_entry::TableEntry, DecryptedRecord, EncryptedRecord, SearchableRecord};
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Delete, Put, TransactWriteItem},
     Client,
@@ -158,7 +160,7 @@ impl EncryptedTable {
 
     pub fn query<R>(&self) -> QueryBuilder<R>
     where
-        R: EncryptedRecord + DecryptedRecord,
+        R: SearchableRecord + DecryptedRecord,
     {
         QueryBuilder::new(&self)
     }
@@ -192,7 +194,7 @@ impl EncryptedTable {
         }
     }
 
-    pub async fn delete<E: EncryptedRecord>(&self, pk: &str) -> Result<(), DeleteError> {
+    pub async fn delete<E: SearchableRecord>(&self, pk: &str) -> Result<(), DeleteError> {
         let pk = AttributeValue::S(encrypt_partition_key(pk, &self.cipher)?);
 
         let sk_to_delete = [E::type_name().to_string()]
@@ -226,7 +228,7 @@ impl EncryptedTable {
 
     pub async fn put<T>(&self, record: &T) -> Result<(), PutError>
     where
-        T: EncryptedRecord,
+        T: SearchableRecord,
     {
         let table_config = self
             .dataset_config
@@ -242,10 +244,7 @@ impl EncryptedTable {
 
         for entry in table_entries.into_iter() {
             seen_sk.insert(entry.sk.clone());
-
             let item = Some(to_item(entry)?);
-
-            println!("ITEM: {item:#?}");
 
             items.push(
                 TransactWriteItem::builder()

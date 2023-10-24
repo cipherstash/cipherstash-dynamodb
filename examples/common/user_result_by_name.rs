@@ -14,8 +14,6 @@ impl DynamoTarget for UserResultByName {
 
 impl DecryptedRecord for UserResultByName {
     fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {
-        println!("{attributes:#?}");
-
         // TODO: Don't unwrap, make try_from_attributes and return a Result
         Self {
             name: attributes.get("name").unwrap().try_into().unwrap(),
