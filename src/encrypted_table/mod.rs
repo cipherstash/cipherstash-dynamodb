@@ -233,6 +233,7 @@ impl EncryptedTable {
     where
         T: SearchableRecord,
     {
+
         let table_config = self
             .dataset_config
             .config

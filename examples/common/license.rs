@@ -25,14 +25,14 @@ impl License {
 }
 
 impl EncryptedRecord for License {
-    fn protected_attributes(&self) -> HashMap<String, Plaintext> {
+    fn protected_attributes(&self) -> HashMap<&'static str, Plaintext> {
         HashMap::from([
             (
-                "number".to_string(),
+                "number",
                 Plaintext::Utf8Str(Some(self.number.to_string())),
             ),
             (
-                "expires".to_string(),
+                "expires",
                 Plaintext::Utf8Str(Some(self.expires.to_string())),
             ),
         ])
