@@ -22,7 +22,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let table = EncryptedTable::init(client, "users").await?;
 
     let results: Vec<User> = table
-        .query(User::find_where("email", "jane@smith.org").and("name", "Jane"))
+        .query(
+            User::find_where("email", "jane@smith.org")
+            .and_starts_with("name", "Jane")
+        )
         .await?;
 
     dbg!(results);

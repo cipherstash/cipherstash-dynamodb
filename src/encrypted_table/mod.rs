@@ -9,7 +9,7 @@ use cipherstash_client::{
     config::{console_config::ConsoleConfig, errors::ConfigError, vitur_config::ViturConfig},
     credentials::{auto_refresh::AutoRefresh, vitur_credentials::ViturCredentials},
     encryption::{
-        compound_indexer::{ComposableIndex, ComposablePlaintext, CompoundIndex},
+        compound_indexer::{ComposableIndex, ComposablePlaintext, CompoundIndex, Operator},
         Encryption, EncryptionError, IndexTerm, Plaintext,
     },
     vitur::{errors::LoadConfigError, DatasetConfigWithIndexRootKey, Vitur},
@@ -27,7 +27,7 @@ pub struct EncryptedTable {
 }
 
 pub struct Query<T> {
-    parts: Vec<(String, Plaintext)>,
+    parts: Vec<(String, Plaintext, Operator)>,
     __table: PhantomData<T>,
 }
 
@@ -74,15 +74,28 @@ pub enum InitError {
 }
 
 impl<T: EncryptedRecord> Query<T> {
-    pub fn new(name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
+    pub fn eq(name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
+        Self::new(name.into(), plaintext.into(), Operator::Eq)
+    }
+
+    pub fn starts_with(name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
+        Self::new(name.into(), plaintext.into(), Operator::StartsWith)
+    }
+
+    pub fn new(name: String, plaintext: Plaintext, op: Operator) -> Self {
         Self {
-            parts: vec![(name.into(), plaintext.into())],
+            parts: vec![(name, plaintext, op)],
             __table: Default::default(),
         }
     }
 
-    pub fn and(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        self.parts.push((name.into(), plaintext.into()));
+    pub fn and_eq(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
+        self.parts.push((name.into(), plaintext.into(), Operator::Eq));
+        self
+    }
+
+    pub fn and_starts_with(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
+        self.parts.push((name.into(), plaintext.into(), Operator::StartsWith));
         self
     }
 
@@ -161,29 +174,20 @@ impl EncryptedTable {
     {
         let (index_name, index, plaintext) = query.build()?;
 
-        let index_term = self.cipher.compound_index(
+        let index_term = self.cipher.compound_query(
             &CompoundIndex::new(index),
             plaintext,
             Some(format!("{}#{}", R::type_name(), index_name)),
             12,
         )?;
 
-        // FIXME: Using the last term is inefficient. We probably should have a compose_query method on composable index
-        // It also assumes that the last term is the longest edgegram (i.e. most relevant) but it might
-        // not always be the most relevant term for future index types
-        let term = match index_term {
-            IndexTerm::Binary(x) => hex::encode(x),
-            IndexTerm::BinaryVec(x) => hex::encode(x.last().ok_or_else(|| {
-                QueryError::Other(
-                    "Returned IndexTerm::BinaryVec did not contain enough elements to get last"
-                        .into(),
-                )
-            })?),
-            x => {
-                return Err(QueryError::Other(format!(
-                    "Returned IndexTerm had invalid type: {x:?}"
-                )))
-            }
+        // With DynamoDB queries must always return a single term
+        let term = if let IndexTerm::Binary(x) = index_term {
+            hex::encode(x)
+        } else {
+            Err(QueryError::Other(format!(
+                "Returned IndexTerm had invalid type: {index_term:?}"
+            )))?
         };
 
         let query = self
