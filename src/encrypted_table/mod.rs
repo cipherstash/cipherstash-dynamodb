@@ -1,5 +1,4 @@
-use std::marker::PhantomData;
-
+pub mod query;
 use crate::{crypto::*, table_entry::TableEntry, DecryptedRecord, EncryptedRecord};
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Put, TransactWriteItem},
@@ -9,15 +8,14 @@ use cipherstash_client::{
     config::{console_config::ConsoleConfig, errors::ConfigError, vitur_config::ViturConfig},
     credentials::{auto_refresh::AutoRefresh, vitur_credentials::ViturCredentials},
     encryption::{
-        compound_indexer::{ComposableIndex, ComposablePlaintext, CompoundIndex, Operator},
-        Encryption, EncryptionError, IndexTerm, Plaintext,
+        Encryption,
     },
     vitur::{errors::LoadConfigError, DatasetConfigWithIndexRootKey, Vitur},
 };
-use itertools::Itertools;
 use log::info;
-use serde_dynamo::{aws_sdk_dynamodb_0_29::from_item, from_items, to_item};
+use serde_dynamo::{aws_sdk_dynamodb_0_29::from_item, to_item};
 use thiserror::Error;
+pub use self::query::{Query, QueryBuilder, QueryError};
 
 pub struct EncryptedTable {
     db: Client,
@@ -26,26 +24,6 @@ pub struct EncryptedTable {
     table_name: String,
 }
 
-pub struct Query<T> {
-    parts: Vec<(String, Plaintext, Operator)>,
-    __table: PhantomData<T>,
-}
-
-#[derive(Error, Debug)]
-pub enum QueryError {
-    #[error("InvaldQuery: {0}")]
-    InvalidQuery(String),
-    #[error("EncryptionError: {0}")]
-    EncryptionError(#[from] EncryptionError),
-    #[error("CryptoError: {0}")]
-    CryptoError(#[from] CryptoError),
-    #[error("SerdeError: {0}")]
-    SerdeError(#[from] serde_dynamo::Error),
-    #[error("AwsError: {0}")]
-    AwsError(String),
-    #[error("{0}")]
-    Other(String),
-}
 
 #[derive(Error, Debug)]
 pub enum PutError {
@@ -71,66 +49,6 @@ pub enum InitError {
     ConfigError(#[from] ConfigError),
     #[error("LoadConfigError: {0}")]
     LoadConfigError(#[from] LoadConfigError),
-}
-
-impl<T: EncryptedRecord> Query<T> {
-    pub fn eq(name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        Self::new(name.into(), plaintext.into(), Operator::Eq)
-    }
-
-    pub fn starts_with(name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        Self::new(name.into(), plaintext.into(), Operator::StartsWith)
-    }
-
-    pub fn new(name: String, plaintext: Plaintext, op: Operator) -> Self {
-        Self {
-            parts: vec![(name, plaintext, op)],
-            __table: Default::default(),
-        }
-    }
-
-    pub fn and_eq(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        self.parts.push((name.into(), plaintext.into(), Operator::Eq));
-        self
-    }
-
-    pub fn and_starts_with(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        self.parts.push((name.into(), plaintext.into(), Operator::StartsWith));
-        self
-    }
-
-    pub fn build(
-        self,
-    ) -> Result<(String, Box<dyn ComposableIndex>, ComposablePlaintext), QueryError> {
-        let items_len = self.parts.len();
-
-        // this is the simplest way to brute force the index names but relies on some gross
-        // stringly typing which doesn't feel good
-        for perm in self.parts.iter().permutations(items_len) {
-            let (name, plaintexts): (Vec<&String>, Vec<&Plaintext>) =
-                perm.into_iter().map(|x| (&x.0, &x.1)).unzip();
-
-            let name = name.iter().join("#");
-
-            if let Some(index) = T::index_by_name(name.as_str()) {
-                let mut plaintext = ComposablePlaintext::new(plaintexts[0].clone());
-
-                for p in plaintexts[1..].into_iter() {
-                    plaintext = plaintext
-                        .try_compose((*p).clone())
-                        .expect("Failed to compose");
-                }
-
-                return Ok((name, index, plaintext));
-            }
-        }
-
-        let fields = self.parts.iter().map(|x| &x.0).join(",");
-
-        Err(QueryError::InvalidQuery(format!(
-            "Could not build query for fields: {fields}"
-        )))
-    }
 }
 
 impl EncryptedTable {
@@ -167,58 +85,11 @@ impl EncryptedTable {
         })
     }
 
-    pub async fn query<R, Q>(self, query: Query<Q>) -> Result<Vec<R>, QueryError>
+    pub fn query<R>(&self) -> QueryBuilder<R>
     where
-        Q: EncryptedRecord,
-        R: DecryptedRecord,
+        R: EncryptedRecord + DecryptedRecord,
     {
-        let (index_name, index, plaintext) = query.build()?;
-
-        let index_term = self.cipher.compound_query(
-            &CompoundIndex::new(index),
-            plaintext,
-            Some(format!("{}#{}", R::type_name(), index_name)),
-            12,
-        )?;
-
-        // With DynamoDB queries must always return a single term
-        let term = if let IndexTerm::Binary(x) = index_term {
-            hex::encode(x)
-        } else {
-            Err(QueryError::Other(format!(
-                "Returned IndexTerm had invalid type: {index_term:?}"
-            )))?
-        };
-
-        let query = self
-            .db
-            .query()
-            .table_name(&self.table_name)
-            .index_name("TermIndex")
-            .key_condition_expression("term = :term")
-            .expression_attribute_values(":term", AttributeValue::S(term));
-
-        let result = query
-            .send()
-            .await
-            .map_err(|e| QueryError::AwsError(e.to_string()))?;
-
-        let items = result
-            .items
-            .ok_or_else(|| QueryError::AwsError("Expected items entry on aws response".into()))?;
-
-        let table_entries: Vec<TableEntry> = from_items(items)?;
-
-        let mut results: Vec<R> = Vec::with_capacity(table_entries.len());
-
-        // TODO: Bulk Decrypt
-        for te in table_entries.into_iter() {
-            let attributes = decrypt(te.attributes, &self.cipher).await?;
-            let record: R = R::from_attributes(attributes);
-            results.push(record);
-        }
-
-        Ok(results)
+        QueryBuilder::new(&self)
     }
 
     pub async fn get<T>(&self, pk: &str) -> Result<Option<T>, GetError>

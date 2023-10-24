@@ -1,6 +1,6 @@
 mod common;
 use common::License;
-use cryptonamo::encrypted_table::EncryptedTable;
+use cryptonamo::EncryptedTable;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

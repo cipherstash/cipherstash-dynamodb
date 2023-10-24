@@ -789,7 +789,7 @@ dependencies = [
 [[package]]
 name = "cipherstash-client"
 version = "0.6.0"
-source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#a928d4bc210f02c7b48a620b9e1c8ba543e1f15c"
+source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#2c7cbea128ea3dcb2913c0bc7cc0833124dd2e7c"
 dependencies = [
  "async-mutex",
  "async-once-cell",
@@ -827,7 +827,7 @@ dependencies = [
 [[package]]
 name = "cipherstash-core"
 version = "0.1.1"
-source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#a928d4bc210f02c7b48a620b9e1c8ba543e1f15c"
+source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#2c7cbea128ea3dcb2913c0bc7cc0833124dd2e7c"
 dependencies = [
  "hmac",
  "lazy_static",
