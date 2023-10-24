@@ -21,10 +21,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let table = EncryptedTable::init(client, "users").await?;
 
-    let y = table.delete("jane@smith.org").await?;
-
-    let res = table.get::<User>("jane@smith.org").await?;
-    println!("{res:#?}");
+    table.delete::<User>("jane@smith.org").await?;
+    table.delete::<User>("dan@coderdan.co").await?;
+    table.delete::<User>("daniel@example.com").await?;
 
     Ok(())
 }

@@ -11,6 +11,8 @@ use cipherstash_client::{
 use crate::{table_entry::TableEntry, DynamoTarget, EncryptedRecord};
 use thiserror::Error;
 
+const MAX_TERMS_PER_INDEX: usize = 25;
+
 #[derive(Error, Debug)]
 pub enum CryptoError {
     #[error("EncryptionError: {0}")]
@@ -32,6 +34,18 @@ pub(crate) fn encrypted_targets<E: EncryptedRecord>(
                 .ok()
                 .flatten()
                 .and_then(|_| Some((attr.to_string(), plaintext.clone())))
+        })
+        .collect()
+}
+
+pub fn all_index_keys<E: EncryptedRecord + DynamoTarget>() -> Vec<String> {
+    E::protected_indexes()
+        .iter()
+        .flat_map(|index_name| {
+            (0..)
+                .take(MAX_TERMS_PER_INDEX)
+                .map(|i| format!("{}#{}#{}", E::type_name(), index_name, i))
+                .collect::<Vec<String>>()
         })
         .collect()
 }
@@ -62,7 +76,7 @@ fn encrypt_indexes<E: EncryptedRecord + DynamoTarget, C: Credentials<Token = Vit
                 _ => todo!(),
             };
 
-            for (i, term) in terms.into_iter().enumerate() {
+            for (i, term) in terms.into_iter().enumerate().take(MAX_TERMS_PER_INDEX) {
                 entries.push(TableEntry {
                     pk: parition_key.to_string(),
                     sk: format!("{}#{}#{}", E::type_name(), index_name, i), // TODO: HMAC the sort key, too (users#index_name#pk)
@@ -95,7 +109,7 @@ pub(crate) async fn encrypt<E, C>(
     target: &E,
     cipher: &Encryption<C>,
     config: &TableConfig,
-) -> Result<Vec<TableEntry>, CryptoError>
+) -> Result<(String, Vec<TableEntry>), CryptoError>
 where
     E: EncryptedRecord,
     C: Credentials<Token = ViturToken>,
@@ -135,7 +149,7 @@ where
         cipher,
     )?;
 
-    Ok(table_entries)
+    Ok((partition_key, table_entries))
 }
 
 pub(crate) fn encrypt_partition_key<C>(
