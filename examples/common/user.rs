@@ -33,7 +33,12 @@ impl EncryptedRecord for User {
         match name {
             "name" => Some(Box::new(PrefixIndex::new("name", vec![], 3, 10))),
             "email#name" => Some(Box::new(
-                CompoundIndex::new(ExactIndex::new("email", vec![])).and(PrefixIndex::new("name", vec![], 3, 10)),
+                CompoundIndex::new(ExactIndex::new("email", vec![])).and(PrefixIndex::new(
+                    "name",
+                    vec![],
+                    3,
+                    10,
+                )),
             )),
             _ => None,
         }
