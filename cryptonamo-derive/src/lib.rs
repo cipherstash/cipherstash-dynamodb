@@ -1,63 +1,23 @@
 extern crate proc_macro2;
 extern crate quote;
 extern crate syn;
+
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
-use quote::{format_ident, quote};
-use syn::{parse_macro_input, Data, DeriveInput, Fields, LitStr};
+use quote::{quote};
+use syn::{parse_macro_input, Data, DeriveInput, Fields};
+
+mod cryptonamo;
+use cryptonamo::derive_cryptonamo;
 
 // TODO: Use .unwrap_or_else(syn::Error::into_compile_error) for error handling
 
 #[proc_macro_derive(Cryptonamo, attributes(cryptonamo))]
-pub fn derive_dynamo_target(input: TokenStream) -> TokenStream {
-    let DeriveInput { ident, attrs, .. } = parse_macro_input!(input as DeriveInput);
-    let mut dynamo_name = ident.to_string().to_lowercase();
-    let mut partition_key: Option<String> = None;
-
-    for attr in attrs {
-        if attr.path().is_ident("cryptonamo") {
-            attr.parse_nested_meta(|meta| {
-                let ident = meta.path.get_ident().map(|i| i.to_string());
-                match ident.as_deref() {
-                    Some("sort_key_prefix") => {
-                        let value = meta.value()?;
-                        let t: LitStr = value.parse()?;
-                        dynamo_name = t.value();
-
-                        Ok(())
-                    }
-                    Some("partition_key") => {
-                        let value = meta.value()?;
-                        let t: LitStr = value.parse()?;
-                        partition_key = Some(t.value());
-
-                        Ok(())
-                    }
-                    _ => Err(meta.error("unsupported attribute")),
-                }
-            })
-            .unwrap();
-        }
-    }
-
-    // Validations
-    let partition_key = partition_key
-        .map(|s| format_ident!("{}", s))
-        .unwrap_or_else(|| panic!("No partition key defined for {}", ident));
-
-    let expanded = quote! {
-        impl cryptonamo::traits::Cryptonamo for #ident {
-            fn type_name() -> &'static str {
-                #dynamo_name
-            }
-
-            fn partition_key(&self) -> String {
-                self.#partition_key.to_string()
-            }
-        }
-    };
-
-    TokenStream::from(expanded)
+pub fn derive_cryptonamo_target(input: TokenStream) -> TokenStream {
+    derive_cryptonamo(parse_macro_input!(input as DeriveInput))
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
+    
 }
 
 // TODO: Do this all in the Cryptonamo derive
