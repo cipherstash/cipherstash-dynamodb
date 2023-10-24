@@ -7,8 +7,31 @@ edition = "2021"
 proc-macro = true
 
 [dependencies]
-paste = "1.0.14"
-proc = "0.1.4"
-proc-macro2 = "1.0.66"
-quote = "1.0.33"
-syn = {version = "2.0.31", features = [ "parsing" ]}
+aws-sdk-dynamodb = "0.29.0"
+lambda_http = "0.8.1"
+lambda_runtime = "0.8.1"
+aws-config = "0.56.0"
+tokio = { version = "1", features = ["full"] }
+tracing = { version = "0.1", features = ["log"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
+hmac = "0.12.1"
+sha2 = "0.10.7"
+serde = "1.0.183"
+serde_dynamo = { version = "4.2.4", features = ["aws-sdk-dynamodb+0_29"] }
+serde_bytes = "0.11.9"
+aes = "0.8.3"
+hex = { version = "0.4.3", features = [ "serde" ] }
+
+cryptonamo-derive = { path = "cryptonamo-derive" }
+
+#cipherstash-client = { path = "../../cipherstash-suite/packages/cipherstash-client/", features = [ "tokio" ] }
+cipherstash-client = { git = "ssh://git@github.com/cipherstash/cipherstash-suite.git", branch = "feat/compound-spike", package = "cipherstash-client", features = [ "tokio" ] }
+
+async-trait = "0.1.73"
+serde_with = "3.3.0"
+log = "0.4.20"
+env_logger = "0.10.0"
+itertools = "0.11.0"
+thiserror = "1.0.50"
+tokio-stream = "0.1.14"
+

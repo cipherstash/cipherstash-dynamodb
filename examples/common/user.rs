@@ -1,10 +1,12 @@
 use cipherstash_client::encryption::compound_indexer::{
     ComposableIndex, ComposablePlaintext, CompoundIndex, ExactIndex, PrefixIndex,
 };
-use cryptonamo::{DecryptedRecord, DynamoTarget, EncryptedRecord, Plaintext, SearchableRecord};
+use cryptonamo::{Plaintext, Cryptonamo, traits::{DecryptedRecord, EncryptedRecord, SearchableRecord}};
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Cryptonamo)]
+#[cryptonamo(partition_key = "email")]
+#[cryptonamo(sort_key_prefix = "user")]
 pub struct User {
     pub email: String,
     pub name: String,
@@ -21,10 +23,6 @@ impl User {
 }
 
 impl EncryptedRecord for User {
-    fn partition_key(&self) -> String {
-        self.email.to_string()
-    }
-
     fn protected_attributes(&self) -> HashMap<String, Plaintext> {
         HashMap::from([
             ("name".to_string(), self.name.to_string().into()),
@@ -64,11 +62,11 @@ impl SearchableRecord for User {
     }
 }
 
-impl DynamoTarget for User {
+/*impl DynamoTarget for User {
     fn type_name() -> &'static str {
         "user"
     }
-}
+}*/
 
 impl DecryptedRecord for User {
     fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {

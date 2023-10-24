@@ -3,7 +3,8 @@ mod table_entry;
 use std::collections::HashSet;
 pub use self::{query::{QueryBuilder, QueryError}, table_entry::TableEntry};
 use crate::{
-    crypto::*, DecryptedRecord, EncryptedRecord, SearchableRecord,
+    crypto::*,
+    traits::{DecryptedRecord, EncryptedRecord, SearchableRecord},
 };
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Delete, Put, TransactWriteItem},
