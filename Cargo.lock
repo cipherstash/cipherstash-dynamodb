@@ -789,7 +789,7 @@ dependencies = [
 [[package]]
 name = "cipherstash-client"
 version = "0.6.0"
-source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#2c7cbea128ea3dcb2913c0bc7cc0833124dd2e7c"
+source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#c7bdbcbe1b612633917c17e19cf92ec7015601e7"
 dependencies = [
  "async-mutex",
  "async-once-cell",
@@ -827,7 +827,7 @@ dependencies = [
 [[package]]
 name = "cipherstash-core"
 version = "0.1.1"
-source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#2c7cbea128ea3dcb2913c0bc7cc0833124dd2e7c"
+source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#c7bdbcbe1b612633917c17e19cf92ec7015601e7"
 dependencies = [
  "hmac",
  "lazy_static",
@@ -2346,9 +2346,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest-middleware"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff44108c7925d082f2861e683a88618b68235ad9cdc60d64d9d1188efc951cdb"
+checksum = "88a3e86aa6053e59030e7ce2d2a3b258dd08fc2d337d52f73f6cb480f5858690"
 dependencies = [
  "anyhow",
  "async-trait",
