@@ -12,4 +12,4 @@ pub fn derive_dynamo_target(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         use cryptonamo::target::DynamoTarget;
 
-pub use cryptonamo_derive::{Cryptonamo, EncryptedRecord};
+pub use cryptonamo_derive::Cryptonamo;

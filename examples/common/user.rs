@@ -3,11 +3,11 @@ use cipherstash_client::encryption::compound_indexer::{
 };
 use cryptonamo::{
     traits::{DecryptedRecord, SearchableRecord},
-    Cryptonamo, EncryptedRecord, Plaintext,
+    Cryptonamo, Plaintext,
 };
 use std::collections::HashMap;
 
-#[derive(Debug, Cryptonamo, EncryptedRecord)]
+#[derive(Debug, Cryptonamo)]
 #[cryptonamo(partition_key = "email")]
 #[cryptonamo(sort_key_prefix = "user")]
 pub struct User {
@@ -67,5 +67,37 @@ impl DecryptedRecord for User {
             name: attributes.get("name").unwrap().try_into().unwrap(),
             count: 100,
         }
+    }
+}
+
+// TODO: Move all these into a proper tests module
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use super::User;
+    use cryptonamo::traits::*;
+    
+    #[test]
+    fn test_cryptonamo_typename() {
+        assert_eq!(User::type_name(), "user");
+    }
+
+    #[test]
+    fn test_cryptonamo_instance() {
+        let user = User::new("person@example.net", "Person Name");
+        assert_eq!(user.partition_key(), "person@example.net");
+        assert_eq!(
+            user.protected_attributes(),
+            HashMap::from([
+                ("email", "person@example.net".into()),
+                ("name", "Person Name".into()),
+            ])
+        );
+        assert_eq!(
+            user.plaintext_attributes(),
+            HashMap::from([
+                ("count", 100i32.into()),
+            ])
+        );
     }
 }
