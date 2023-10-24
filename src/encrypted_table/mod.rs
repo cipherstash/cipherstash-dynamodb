@@ -1,7 +1,9 @@
 pub mod query;
 mod table_entry;
-use std::collections::HashSet;
-pub use self::{query::{QueryBuilder, QueryError}, table_entry::TableEntry};
+pub use self::{
+    query::{QueryBuilder, QueryError},
+    table_entry::TableEntry,
+};
 use crate::{
     crypto::*,
     traits::{DecryptedRecord, EncryptedRecord, SearchableRecord},
@@ -19,6 +21,7 @@ use cipherstash_client::{
 use itertools::Itertools;
 use log::info;
 use serde_dynamo::{aws_sdk_dynamodb_0_29::from_item, to_item};
+use std::collections::HashSet;
 use thiserror::Error;
 
 pub struct EncryptedTable {
@@ -168,7 +171,6 @@ impl EncryptedTable {
     where
         T: SearchableRecord,
     {
-
         let table_config = self
             .dataset_config
             .config

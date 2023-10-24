@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use crate::{
+    encrypted_table::TableEntry,
+    traits::{Cryptonamo, EncryptedRecord, SearchableRecord},
+};
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
     encryption::{
@@ -6,7 +9,7 @@ use cipherstash_client::{
     },
     schema::{column::Index, TableConfig},
 };
-use crate::{traits::{Cryptonamo, EncryptedRecord, SearchableRecord}, encrypted_table::TableEntry};
+use std::collections::HashMap;
 use thiserror::Error;
 
 const MAX_TERMS_PER_INDEX: usize = 25;

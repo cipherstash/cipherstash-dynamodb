@@ -1,4 +1,4 @@
-use cryptonamo::{Cryptonamo, Plaintext, traits::DecryptedRecord};
+use cryptonamo::{traits::DecryptedRecord, Cryptonamo, Plaintext};
 use std::collections::HashMap;
 
 #[derive(Debug, Cryptonamo)]

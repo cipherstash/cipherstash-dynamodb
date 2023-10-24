@@ -1,4 +1,7 @@
-use cryptonamo::{Cryptonamo, Plaintext, traits::{DecryptedRecord, EncryptedRecord, SearchableRecord}};
+use cryptonamo::{
+    traits::{DecryptedRecord, EncryptedRecord, SearchableRecord},
+    Cryptonamo, Plaintext,
+};
 use std::collections::HashMap;
 
 #[derive(Debug, Cryptonamo)]
@@ -27,10 +30,7 @@ impl License {
 impl EncryptedRecord for License {
     fn protected_attributes(&self) -> HashMap<&'static str, Plaintext> {
         HashMap::from([
-            (
-                "number",
-                Plaintext::Utf8Str(Some(self.number.to_string())),
-            ),
+            ("number", Plaintext::Utf8Str(Some(self.number.to_string()))),
             (
                 "expires",
                 Plaintext::Utf8Str(Some(self.expires.to_string())),

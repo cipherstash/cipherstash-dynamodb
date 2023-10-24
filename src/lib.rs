@@ -1,7 +1,6 @@
-
 mod crypto;
-pub mod traits;
 mod encrypted_table;
+pub mod traits;
 pub use encrypted_table::{EncryptedTable, QueryBuilder};
 
 // Re-exports
