@@ -1,7 +1,6 @@
 use std::{collections::HashMap, fmt::Debug};
 mod crypto;
 mod encrypted_table;
-mod table_entry;
 pub use encrypted_table::{EncryptedTable, QueryBuilder};
 
 // Re-exports
