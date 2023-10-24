@@ -31,7 +31,7 @@ pub trait EncryptedRecord: DynamoTarget + Sized {
     }
 
     fn find_where(name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Query<Self> {
-        Query::new(name, plaintext)
+        Query::eq(name, plaintext)
     }
 }
 

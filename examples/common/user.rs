@@ -31,9 +31,9 @@ impl EncryptedRecord for User {
 
     fn index_by_name(name: &str) -> Option<Box<dyn ComposableIndex>> {
         match name {
-            "name" => Some(Box::new(ExactIndex::new(vec![]))),
+            "name" => Some(Box::new(ExactIndex::new("name", vec![]))),
             "email#name" => Some(Box::new(
-                CompoundIndex::new(ExactIndex::new(vec![])).and(PrefixIndex::new(vec![], 3, 10)),
+                CompoundIndex::new(ExactIndex::new("email", vec![])).and(PrefixIndex::new("name", vec![], 3, 10)),
             )),
             _ => None,
         }
