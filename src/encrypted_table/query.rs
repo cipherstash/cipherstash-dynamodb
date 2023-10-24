@@ -10,12 +10,11 @@ use thiserror::Error;
 
 use crate::{
     crypto::{decrypt, CryptoError},
-    table_entry::TableEntry,
     DecryptedRecord, SearchableRecord,
 };
 use cipherstash_client::encryption::{compound_indexer::CompoundIndex, IndexTerm};
 
-use super::EncryptedTable;
+use super::{EncryptedTable, TableEntry};
 
 #[derive(Error, Debug)]
 pub enum QueryError {

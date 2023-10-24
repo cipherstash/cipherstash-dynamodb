@@ -8,7 +8,7 @@ use cipherstash_client::{
     schema::{column::Index, TableConfig},
 };
 
-use crate::{table_entry::TableEntry, DynamoTarget, EncryptedRecord, SearchableRecord};
+use crate::{DynamoTarget, EncryptedRecord, SearchableRecord, encrypted_table::TableEntry};
 use thiserror::Error;
 
 const MAX_TERMS_PER_INDEX: usize = 25;
