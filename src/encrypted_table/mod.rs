@@ -26,7 +26,8 @@ use thiserror::Error;
 pub struct EncryptedTable {
     db: Client,
     cipher: Box<Encryption<AutoRefresh<ViturCredentials>>>,
-    dataset_config: DatasetConfigWithIndexRootKey,
+    // We may use this later but for now the config is in code
+    _dataset_config: DatasetConfigWithIndexRootKey,
     table_name: String,
 }
 
@@ -159,7 +160,7 @@ impl EncryptedTable {
         Ok(Self {
             db,
             cipher,
-            dataset_config,
+            _dataset_config: dataset_config,
             table_name: table_name.into(),
         })
     }
@@ -236,16 +237,10 @@ impl EncryptedTable {
     where
         T: SearchableRecord,
     {
-        let table_config = self
-            .dataset_config
-            .config
-            .get_table(&T::type_name())
-            .expect(&format!("No config found for type {:?}", record));
-
         let mut seen_sk = HashSet::new();
 
         // TODO: Use a combinator
-        let (pk, table_entries) = encrypt(record, &self.cipher, table_config).await?;
+        let (pk, table_entries) = encrypt(record, &self.cipher).await?;
         let mut items: Vec<TransactWriteItem> = Vec::with_capacity(table_entries.len());
 
         for entry in table_entries.into_iter() {
