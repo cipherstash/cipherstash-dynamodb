@@ -789,7 +789,7 @@ dependencies = [
 [[package]]
 name = "cipherstash-client"
 version = "0.6.0"
-source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#c7bdbcbe1b612633917c17e19cf92ec7015601e7"
+source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#4bd0ce2ccb3f6c2cda0ad9af35781fec8cb3093c"
 dependencies = [
  "async-mutex",
  "async-once-cell",
@@ -827,7 +827,7 @@ dependencies = [
 [[package]]
 name = "cipherstash-core"
 version = "0.1.1"
-source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#c7bdbcbe1b612633917c17e19cf92ec7015601e7"
+source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#4bd0ce2ccb3f6c2cda0ad9af35781fec8cb3093c"
 dependencies = [
  "hmac",
  "lazy_static",
@@ -894,6 +894,7 @@ dependencies = [
  "aws-config",
  "aws-sdk-dynamodb",
  "cipherstash-client",
+ "cryptonamo-derive",
  "env_logger",
  "hex",
  "hmac",
@@ -911,6 +912,18 @@ dependencies = [
  "tokio-stream",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "cryptonamo-derive"
+version = "0.1.0"
+dependencies = [
+ "cipherstash-client",
+ "paste",
+ "proc",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.38",
 ]
 
 [[package]]
@@ -2030,6 +2043,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "paste"
+version = "1.0.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c"
+
+[[package]]
 name = "pathdiff"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2102,6 +2121,12 @@ name = "ppv-lite86"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
+
+[[package]]
+name = "proc"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7374c47d163806e1e2f12b63e5f2a6d6093e351a91a088b00fc654a354a5a332"
 
 [[package]]
 name = "proc-macro-crate"

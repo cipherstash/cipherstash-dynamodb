@@ -1,9 +1,14 @@
-use cryptonamo::{DecryptedRecord, DynamoTarget, EncryptedRecord, Plaintext, SearchableRecord};
+use cryptonamo::{
+    traits::DecryptedRecord,
+    Cryptonamo, Plaintext,
+};
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Cryptonamo)]
+#[cryptonamo(partition_key = "email")]
 pub struct License {
-    email: Option<String>,
+    #[cryptonamo(skip)]
+    email: String,
     number: String,
     expires: String,
 }
@@ -16,38 +21,10 @@ impl License {
         expires: impl Into<String>,
     ) -> Self {
         Self {
-            email: Some(email.into()),
+            email: email.into(),
             number: number.into(),
             expires: expires.into(),
         }
-    }
-}
-
-impl EncryptedRecord for License {
-    fn partition_key(&self) -> String {
-        // NOTE: Partition key for subtypes is required on insert
-        self.email.as_ref().unwrap().to_string()
-    }
-
-    fn protected_attributes(&self) -> HashMap<String, Plaintext> {
-        HashMap::from([
-            (
-                "number".to_string(),
-                Plaintext::Utf8Str(Some(self.number.to_string())),
-            ),
-            (
-                "expires".to_string(),
-                Plaintext::Utf8Str(Some(self.expires.to_string())),
-            ),
-        ])
-    }
-}
-
-impl SearchableRecord for License {}
-
-impl DynamoTarget for License {
-    fn type_name() -> &'static str {
-        "license"
     }
 }
 
@@ -56,7 +33,33 @@ impl DecryptedRecord for License {
         Self {
             number: attributes.get("number").unwrap().try_into().unwrap(),
             expires: attributes.get("expires").unwrap().try_into().unwrap(),
-            email: None,
+            email: attributes.get("email").unwrap().try_into().unwrap(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use super::License;
+    use cryptonamo::traits::*;
+    
+    #[test]
+    fn test_cryptonamo_typename() {
+        assert_eq!(License::type_name(), "license");
+    }
+
+    #[test]
+    fn test_cryptonamo_instance() {
+        let license = License::new("person@example.net", "1234", "2020-01-01");
+        assert_eq!(license.partition_key(), "person@example.net");
+        assert_eq!(
+            license.protected_attributes(),
+            HashMap::from([
+                ("number", "1234".into()),
+                ("expires", "2020-01-01".into()),
+            ])
+        );
+        assert!(license.plaintext_attributes().is_empty());
     }
 }

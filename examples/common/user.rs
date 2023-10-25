@@ -1,13 +1,23 @@
-use cipherstash_client::encryption::compound_indexer::{
-    ComposableIndex, ComposablePlaintext, CompoundIndex, ExactIndex, PrefixIndex,
+use cryptonamo::{
+    traits::{DecryptedRecord},
+    Cryptonamo, Plaintext,
 };
-use cryptonamo::{DecryptedRecord, DynamoTarget, EncryptedRecord, Plaintext, SearchableRecord};
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Cryptonamo)]
+#[cryptonamo(partition_key = "email")]
+#[cryptonamo(sort_key_prefix = "user")]
 pub struct User {
+    #[cryptonamo(query = "exact", compound = "email#name")]
+    #[cryptonamo(query = "exact")]
     pub email: String,
+
+    #[cryptonamo(query = "prefix", compound = "email#name")]
+    #[cryptonamo(query = "prefix")]
     pub name: String,
+
+    #[cryptonamo(plaintext)]
+    pub count: i32,
 }
 
 impl User {
@@ -16,24 +26,12 @@ impl User {
         Self {
             email: email.into(),
             name: name.into(),
+            count: 100,
         }
     }
 }
 
-impl EncryptedRecord for User {
-    fn partition_key(&self) -> String {
-        self.email.to_string()
-    }
-
-    fn protected_attributes(&self) -> HashMap<String, Plaintext> {
-        HashMap::from([
-            ("name".to_string(), self.name.to_string().into()),
-            ("email".to_string(), self.email.to_string().into()),
-        ])
-    }
-}
-
-impl SearchableRecord for User {
+/*impl SearchableRecord for User {
     fn protected_indexes() -> Vec<&'static str> {
         vec!["name", "email#name"]
     }
@@ -55,26 +53,69 @@ impl SearchableRecord for User {
 
     fn attribute_for_index(&self, index_name: &str) -> Option<ComposablePlaintext> {
         match index_name {
-            "name" => Some(ComposablePlaintext::from(self.name.to_string())),
-            "email#name" => (self.email.to_string(), self.name.to_string())
+            "name" => self.name.clone().try_into().ok(),
+            "email#name" => (self.email.clone(), self.name.clone())
                 .try_into()
                 .ok(),
             _ => None,
         }
     }
-}
-
-impl DynamoTarget for User {
-    fn type_name() -> &'static str {
-        "user"
-    }
-}
+}*/
 
 impl DecryptedRecord for User {
     fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {
         Self {
             email: attributes.get("email").unwrap().try_into().unwrap(),
             name: attributes.get("name").unwrap().try_into().unwrap(),
+            count: 100,
         }
+    }
+}
+
+// TODO: Move all these into a proper tests module
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use super::User;
+    use cryptonamo::traits::*;
+    use std::any::Any;
+    
+    #[test]
+    fn test_cryptonamo_typename() {
+        assert_eq!(User::type_name(), "user");
+    }
+
+    #[test]
+    fn test_cryptonamo_instance() {
+        let user = User::new("person@example.net", "Person Name");
+        assert_eq!(user.partition_key(), "person@example.net");
+        assert_eq!(
+            user.protected_attributes(),
+            HashMap::from([
+                ("email", "person@example.net".into()),
+                ("name", "Person Name".into()),
+            ])
+        );
+        assert_eq!(
+            user.plaintext_attributes(),
+            HashMap::from([
+                ("count", 100i32.into()),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_cryptonamo_index_names() {
+        assert_eq!(
+            User::protected_indexes(),
+            vec!["email", "email#name"]
+        );
+    }
+
+    #[test]
+    fn test_cryptonamo_indexes() {
+        //let index = User::index_by_name("email").unwrap();
+        //let exact = index.downcast::<ExactIndex>().unwrap();
+        //assert_eq!(exact.name(), "email");
     }
 }

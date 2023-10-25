@@ -10,7 +10,7 @@ use thiserror::Error;
 
 use crate::{
     crypto::{decrypt, CryptoError},
-    DecryptedRecord, SearchableRecord,
+    traits::{DecryptedRecord, SearchableRecord},
 };
 use cipherstash_client::encryption::{compound_indexer::CompoundIndex, IndexTerm};
 
@@ -64,6 +64,8 @@ where
 
     pub async fn send(self) -> Result<Vec<T>, QueryError> {
         let (index_name, index, plaintext, builder) = self.build()?;
+
+        dbg!(&index_name, &index, &plaintext);
 
         let index_term = builder.table.cipher.compound_query(
             &CompoundIndex::new(index),
@@ -126,7 +128,7 @@ where
 
             let name = name.iter().join("#");
 
-            if let Some(index) = T::index_by_name(name.as_str()) {
+            if let Some(index) = dbg!(T::index_by_name(name.as_str())) {
                 let mut plaintext = ComposablePlaintext::new(plaintexts[0].clone());
 
                 for p in plaintexts[1..].into_iter() {
