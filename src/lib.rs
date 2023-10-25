@@ -396,7 +396,6 @@
 //! - [ ] Using the derive macros for compound macros is not working correctly (you can implement the traits directly)
 //! - [ ] Sort keys are not currently hashed (and should be)
 //!
-//! ```
 mod crypto;
 mod encrypted_table;
 pub mod traits;
