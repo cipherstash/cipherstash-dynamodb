@@ -105,17 +105,25 @@ where
 {
     let protected_attributes = target.protected_attributes();
 
-    // TODO: Maybe use a wrapper type?
-    let mut attributes: HashMap<String, String> = Default::default();
-    for (name, plaintext) in protected_attributes.iter() {
-        // TODO: Use the bulk encrypt
-        if let Some(ct) = cipher
-            .encrypt_single(&plaintext, &format!("{}#{}", E::type_name(), name))
-            .await?
-        {
-            attributes.insert(name.to_string(), ct);
-        }
-    }
+    let entries_to_encrypt = protected_attributes
+        .into_iter()
+        .map(|(name, plaintext)| (name, plaintext, format!("{}#{}", E::type_name(), name)))
+        .collect::<Vec<_>>();
+
+    let encrypted = cipher
+        .encrypt(
+            entries_to_encrypt
+                .iter()
+                .map(|(_, plaintext, descriptor)| (plaintext, descriptor.as_str())),
+        )
+        .await?;
+
+    let attributes: HashMap<String, String> = entries_to_encrypt
+        .into_iter()
+        .map(|(name, _, _)| name)
+        .zip(encrypted.into_iter())
+        .flat_map(|(name, ct)| ct.map(|ct| (name.to_string(), ct)))
+        .collect();
 
     let partition_key = encrypt_partition_key(&target.partition_key(), cipher)?;
 
