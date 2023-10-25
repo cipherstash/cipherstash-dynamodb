@@ -1,0 +1,8 @@
+[package]
+name = "proc"
+version = "0.1.4"
+authors = ["Dan Burkert <dan@danburkert.com>"]
+license = "MIT/Apache-2.0"
+repository = "https://github.com/danburkert/procinfo-rs"
+documentation = "https://danburkert.github.io/procinfo-rs/procinfo/index.html"
+description = "DEPRECATED: use the procinfo crate."

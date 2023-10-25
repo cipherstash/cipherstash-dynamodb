@@ -1,0 +1,8 @@
+allowed_external_types = [
+    "aws_credential_types::*",
+    "aws_smithy_http::*",
+    "aws_smithy_types::*",
+    "aws_types::*",
+    "bytes::bytes::Bytes",
+    "http_body::Body",
+]
