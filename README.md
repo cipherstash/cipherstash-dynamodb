@@ -5,7 +5,53 @@
 Based on the CipherStash SDK and ZeroKMS key service, Cryptonamo provides a simple interface for
 storing and retrieving encrypted data in DynamoDB.
 
-### Usage
+---
+
+### Prerequisites
+
+#### Install Stash CLI
+
+The `stash` CLI tool is required for creating an account and security credentials so that Cryptonamo can interact with the ZeroKMS key server.
+
+See [here](https://docs.cipherstash.com/reference/cli.html#install-the-cipherstash-cli) for instructions on how to download and install the `stash` CLI tool.
+
+#### Sign up to create an account
+
+Run `stash signup` and follow the on screen instructions.
+
+#### Login and create a Dataset
+
+*The pages linked to below contain information that is generally applicable even though it is framed within the context of a Rails application*
+
+1. [Ensure `stash` is logged in](https://docs.cipherstash.com/tutorials/rails-getting-started/define.html#1-log-in)
+
+2. [Create a Dataset](https://docs.cipherstash.com/tutorials/rails-getting-started/define.html#2-create-a-dataset)
+
+   In ZeroKMS, a Dataset contains a root key from which the cryptographic keys used to encrypt data and indexes are derived. Additionally, a Dataset describes the encryption settings for your data.
+
+   Since Cryptanamo manages the encryption & search settings itself using Rust traits and derive macros the ability to store encryption settings in a Dataset is not applicable.
+
+**IMPORTANT** : the following step will generate a secret that must be retained and will not be displayed again. Please ensure that the instructions are followed.
+
+3. [Create a Client](https://docs.cipherstash.com/tutorials/rails-getting-started/define.html#3-create-a-client)
+
+#### Upload a dataset config
+
+Cryptonamo fully manages the encrypted record and index settings.
+
+However, ZeroKMS currently only initializes the the root key material on upload of a Dataset configuration. This step should not be necessary and we are planning on changing ZeroKMS to initialize the key material on creation of a Dataset.
+
+For now, it is sufficient to upload an empty configuration.
+
+There is an empty `dataset.yml` in the root of the repository, ready to be uploaded.
+
+Upload it to ZeroKMS using the following command:
+
+`stash datasets config upload --file dataset.yml --client-id $CS_CLIENT_ID --client-key $CS_CLIENT_KEY`
+
+---
+
+### Setup DynamoDB
 
 To use Cryptonamo, you must first create a table in DynamoDB.
 The table must have a primary key and sort key, both of type String.
