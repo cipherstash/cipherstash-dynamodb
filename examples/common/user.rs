@@ -1,8 +1,5 @@
-use cipherstash_client::encryption::compound_indexer::{
-    ComposableIndex, ComposablePlaintext, CompoundIndex, ExactIndex, PrefixIndex,
-};
 use cryptonamo::{
-    traits::{DecryptedRecord, SearchableRecord},
+    traits::{DecryptedRecord},
     Cryptonamo, Plaintext,
 };
 use std::collections::HashMap;
@@ -11,7 +8,12 @@ use std::collections::HashMap;
 #[cryptonamo(partition_key = "email")]
 #[cryptonamo(sort_key_prefix = "user")]
 pub struct User {
+    #[cryptonamo(query = "exact", compound = "email#name")]
+    #[cryptonamo(query = "exact")]
     pub email: String,
+
+    #[cryptonamo(query = "prefix", compound = "email#name")]
+    #[cryptonamo(query = "prefix")]
     pub name: String,
 
     #[cryptonamo(plaintext)]
@@ -29,7 +31,7 @@ impl User {
     }
 }
 
-impl SearchableRecord for User {
+/*impl SearchableRecord for User {
     fn protected_indexes() -> Vec<&'static str> {
         vec!["name", "email#name"]
     }
@@ -51,14 +53,14 @@ impl SearchableRecord for User {
 
     fn attribute_for_index(&self, index_name: &str) -> Option<ComposablePlaintext> {
         match index_name {
-            "name" => Some(ComposablePlaintext::from(self.name.to_string())),
-            "email#name" => (self.email.to_string(), self.name.to_string())
+            "name" => self.name.clone().try_into().ok(),
+            "email#name" => (self.email.clone(), self.name.clone())
                 .try_into()
                 .ok(),
             _ => None,
         }
     }
-}
+}*/
 
 impl DecryptedRecord for User {
     fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {
@@ -76,6 +78,7 @@ mod tests {
     use std::collections::HashMap;
     use super::User;
     use cryptonamo::traits::*;
+    use std::any::Any;
     
     #[test]
     fn test_cryptonamo_typename() {
@@ -99,5 +102,20 @@ mod tests {
                 ("count", 100i32.into()),
             ])
         );
+    }
+
+    #[test]
+    fn test_cryptonamo_index_names() {
+        assert_eq!(
+            User::protected_indexes(),
+            vec!["email", "email#name"]
+        );
+    }
+
+    #[test]
+    fn test_cryptonamo_indexes() {
+        //let index = User::index_by_name("email").unwrap();
+        //let exact = index.downcast::<ExactIndex>().unwrap();
+        //assert_eq!(exact.name(), "email");
     }
 }

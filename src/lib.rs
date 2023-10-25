@@ -4,7 +4,7 @@ pub mod traits;
 pub use encrypted_table::{EncryptedTable, QueryBuilder};
 
 // Re-exports
-use cipherstash_client::encryption::compound_indexer::{ComposableIndex, ComposablePlaintext};
+pub use cipherstash_client::encryption::compound_indexer::{ComposableIndex, ComposablePlaintext};
 pub use cipherstash_client::encryption::Plaintext;
 
 pub type Key = [u8; 32];

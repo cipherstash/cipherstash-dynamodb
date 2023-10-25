@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let results: Vec<User> = table
         .query()
-        .eq("email", "dan@coderdan.co")
+        //.eq("email", "dan@coderdan.co")
         .starts_with("name", "Dan")
         .send()
         .await?;

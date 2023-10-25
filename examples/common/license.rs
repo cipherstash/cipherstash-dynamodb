@@ -1,5 +1,5 @@
 use cryptonamo::{
-    traits::{DecryptedRecord, SearchableRecord},
+    traits::DecryptedRecord,
     Cryptonamo, Plaintext,
 };
 use std::collections::HashMap;
@@ -27,8 +27,6 @@ impl License {
         }
     }
 }
-
-impl SearchableRecord for License {}
 
 impl DecryptedRecord for License {
     fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {

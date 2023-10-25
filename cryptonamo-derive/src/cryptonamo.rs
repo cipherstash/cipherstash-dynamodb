@@ -1,49 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{DeriveInput, LitStr, Data, Fields};
-
-struct Settings {
-    sort_key_prefix: String,
-    partition_key: Option<String>,
-    protected_attributes: Vec<String>,
-    unprotected_attributes: Vec<String>,
-}
-
-impl Settings {
-    fn new(sort_key_prefix: String) -> Self {
-        Self {
-            sort_key_prefix,
-            partition_key: None,
-            protected_attributes: Vec::new(),
-            unprotected_attributes: Vec::new(),
-        }
-    }
-
-    fn set_sort_key_prefix(&mut self, value: LitStr) -> Result<(), syn::Error> {
-        self.sort_key_prefix = value.value();
-        Ok(())
-    }
-
-    fn set_partition_key(&mut self, value: LitStr) -> Result<(), syn::Error> {
-        self.partition_key = Some(value.value());
-        Ok(())
-    }
-
-    fn get_partition_key(&self) -> Result<String, syn::Error> {
-        self.partition_key.clone().ok_or_else(|| syn::Error::new_spanned(
-            &self.sort_key_prefix,
-            "No partition key defined for this struct",
-        ))
-    }
-
-    fn add_attribute(&mut self, value: String, will_encrypt: bool) {
-        if will_encrypt {
-            self.protected_attributes.push(value);
-        } else {
-            self.unprotected_attributes.push(value);
-        }
-    }
-}
+use crate::settings::{Settings, IndexType};
 
 pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInput) -> Result<TokenStream, syn::Error> {
     let mut settings = Settings::new(ident.to_string().to_lowercase());
@@ -80,9 +38,12 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
                 // Parse the meta for the field
                 for attr in &field.attrs {
                     if attr.path().is_ident("cryptonamo") {
+                        let mut compound_index_name: Option<String> = None;
+                        let mut index: Option<(String, String)> = None;
+
                         attr.parse_nested_meta(|meta| {
-                            let ident = meta.path.get_ident().map(|i| i.to_string());
-                            match ident.as_deref() {
+                            let directive = meta.path.get_ident().map(|i| i.to_string());
+                            match directive.as_deref() {
                                 Some("plaintext") => {
                                     // Don't encrypt this field
                                     will_encrypt = false;
@@ -93,9 +54,25 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
                                     skip = true;
                                     Ok(())
                                 }
+                                Some("query") => {
+                                    let value = meta.value()?;
+                                    let index_type = value.parse::<LitStr>()?.value();
+                                    let index_name = ident.as_ref().ok_or(meta.error("no index type specified"))?.to_string();
+                                    index = Some((index_name, index_type));
+                                    Ok(())
+                                }
+                                Some("compound") => {
+                                    let value = meta.value()?;
+                                    compound_index_name = Some(value.parse::<LitStr>()?.value());
+                                    Ok(())
+                                }
                                 _ => Err(meta.error("unsupported field attribute")),
                             }
                         })?;
+
+                        if let Some(index) = index {
+                            settings.add_index(&index.0, &index.1, compound_index_name)?;
+                        }
                     }
                 }
 
@@ -131,6 +108,53 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
         }
     });
 
+    let protected_index_names = settings.indexes.keys();
+
+    let indexes_impl = settings.indexes.iter().map(|(_, index)| {
+        match index {
+            IndexType::Single(name, index_type) => {
+                let index_type = IndexType::type_to_ident(index_type).unwrap();
+
+                quote! {
+                    #name => Some(Box::new(cipherstash_client::encryption::compound_indexer::#index_type::new(#name, vec![])))
+                }
+            },
+            IndexType::Compound2 { name, index: ((a, b), (c, d)) } => {
+                quote! {
+                    #name => Some(((#a.to_string(), #b.to_string()), (#c.to_string(), #d.to_string())).into())
+                }
+            },
+            _ => todo!()
+        }
+    });
+
+    let attributes_for_index_impl = settings.indexes.iter().map(|(_, index)| {
+        match index {
+            IndexType::Single(name, _) => {
+                let field = format_ident!("{}", name);
+
+                quote! {
+                    #name => self.#field.clone().try_into().ok()
+                }
+            },
+            IndexType::Compound1 { name, index: (a, _) } => {
+                let field = format_ident!("{}", a);
+
+                quote! {
+                    #name => self.#field.clone().try_into().ok()
+                }
+            },
+            IndexType::Compound2 { name, index: ((a, _), (b, _)) } => {
+                let field_a = format_ident!("{}", a);
+                let field_b = format_ident!("{}", b);
+
+                quote! {
+                    #name => (self.#field_a.clone(), self.#field_b.clone()).try_into().ok()
+                }
+            },
+        }
+    });
+
     let expanded = quote! {
         impl cryptonamo::traits::Cryptonamo for #ident {
             fn type_name() -> &'static str {
@@ -153,6 +177,27 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
                 let mut attributes = HashMap::new();
                 #(#plaintext_impl)*
                 attributes
+            }
+        }
+
+        impl cryptonamo::traits::SearchableRecord for #ident {
+            fn protected_indexes() -> Vec<&'static str> {
+                vec![#(#protected_index_names,)*]
+            }
+
+            fn index_by_name(name: &str) -> Option<Box<dyn cryptonamo::ComposableIndex>> {
+                use cipherstash_client::encryption::compound_indexer::*;
+                match name {
+                    #(#indexes_impl,)*
+                    _ => None,
+                }    
+            }
+
+            fn attribute_for_index(&self, index_name: &str) -> Option<cryptonamo::ComposablePlaintext> {
+                match index_name {
+                    #(#attributes_for_index_impl,)*
+                    _ => None,
+                }
             }
         }
     };

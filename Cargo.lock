@@ -789,7 +789,6 @@ dependencies = [
 [[package]]
 name = "cipherstash-client"
 version = "0.6.0"
-source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#c7bdbcbe1b612633917c17e19cf92ec7015601e7"
 dependencies = [
  "async-mutex",
  "async-once-cell",
@@ -827,7 +826,6 @@ dependencies = [
 [[package]]
 name = "cipherstash-core"
 version = "0.1.1"
-source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#c7bdbcbe1b612633917c17e19cf92ec7015601e7"
 dependencies = [
  "hmac",
  "lazy_static",
@@ -918,6 +916,7 @@ dependencies = [
 name = "cryptonamo-derive"
 version = "0.1.0"
 dependencies = [
+ "cipherstash-client",
  "paste",
  "proc",
  "proc-macro2",
