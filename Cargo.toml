@@ -3,6 +3,10 @@ name = "cryptonamo"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+# Disable for now
+doctest = false
+
 # Starting in Rust 1.62 you can use `cargo add` to add dependencies 
 # to your project.
 #
@@ -29,7 +33,6 @@ serde_dynamo = { version = "4.2.4", features = ["aws-sdk-dynamodb+0_29"] }
 serde_bytes = "0.11.9"
 aes = "0.8.3"
 hex = { version = "0.4.3", features = [ "serde" ] }
-
 cryptonamo-derive = { path = "cryptonamo-derive" }
 
 #cipherstash-client = { path = "../../cipherstash-suite/packages/cipherstash-client/", features = [ "tokio" ] }
