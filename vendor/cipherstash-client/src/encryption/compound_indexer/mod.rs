@@ -2,6 +2,8 @@ mod accumulator;
 mod cons;
 mod prefix_indexer;
 
+use std::fmt::Debug;
+
 use self::prefix_indexer::PrefixIndexer;
 use super::{text::TokenFilter, unique_indexer::UniqueIndexer, EncryptionError, Plaintext};
 use hmac::Mac;
@@ -10,6 +12,7 @@ pub use accumulator::{Accumulator, AccumulatorError};
 pub use cons::{ConsArg2, ConsArg3, ConsArg4};
 
 // TODO: This should be in the index schema but avoiding making changes to Vitur for now
+#[derive(Debug)]
 pub enum Operator {
     Eq,
     StartsWith,
@@ -120,7 +123,7 @@ impl SupportedOperators {
 
 /// Trait to represent any index that can be composed with other indexes
 /// in a Structured Encryption scheme.
-pub trait ComposableIndex {
+pub trait ComposableIndex: Debug {
     // TODO: Also make a version that doesn't take an accumulator salt
     fn compose_index(
         &self,
@@ -165,6 +168,7 @@ impl ComposableIndex for Box<dyn ComposableIndex> {
     }
 }
 
+#[derive(Debug)]
 pub struct ExactIndex {
     field: String,
     token_filters: Vec<TokenFilter>,
@@ -214,6 +218,7 @@ impl ComposableIndex for ExactIndex {
     }
 }
 
+#[derive(Debug)]
 pub struct PrefixIndex {
     field: String,
     token_filters: Vec<TokenFilter>,
@@ -223,6 +228,13 @@ pub struct PrefixIndex {
 
 impl PrefixIndex {
     pub fn new(
+        field: impl Into<String>,
+        token_filters: Vec<TokenFilter>,
+    ) -> Self {
+        Self::new_with_opts(field, token_filters, 3, 10)
+    }
+
+    pub fn new_with_opts(
         field: impl Into<String>,
         token_filters: Vec<TokenFilter>,
         min_length: usize,
@@ -296,6 +308,7 @@ impl ComposableIndex for PrefixIndex {
     }
 }
 
+#[derive(Debug)]
 pub struct CompoundIndexOfTwo<A, B>
 where
     A: ComposableIndex,
@@ -365,6 +378,7 @@ impl<A: ComposableIndex, B: ComposableIndex> ComposableIndex for CompoundIndexOf
     }
 }
 
+#[derive(Debug)]
 pub struct CompoundIndex<I: ComposableIndex>(I);
 
 impl<I: ComposableIndex> CompoundIndex<I> {
@@ -374,6 +388,58 @@ impl<I: ComposableIndex> CompoundIndex<I> {
 
     pub fn and<J: ComposableIndex>(self, other: J) -> CompoundIndex<CompoundIndexOfTwo<J, I>> {
         CompoundIndex(CompoundIndexOfTwo::new(other, self.0))
+    }
+}
+
+// FIXME: This is a bit of a hack to get the derive traits working
+impl From<(String, String)> for Box<dyn ComposableIndex> {
+    fn from(value: (String, String)) -> Self {
+        let (name, index_type) = value;
+        match index_type.as_str() {
+            "exact" => Box::new(ExactIndex::new(name, vec![])),
+            "prefix" => Box::new(PrefixIndex::new(name, vec![])),
+            _ => panic!("Unknown index type"),
+        }
+    }
+}
+
+impl From<((String, String), (String, String))> for Box<dyn ComposableIndex> {
+    fn from(value: ((String, String), (String, String))) -> Self {
+        let (a, (name, index_type)) = value;
+        let start: Box<dyn ComposableIndex> = a.into();
+        match index_type.as_str() {
+            "exact" => Box::new(
+                CompoundIndex::new(
+                    ExactIndex::new(name, vec![])
+                ).and(start)
+            ),
+            "prefix" => Box::new(
+                CompoundIndex::new(
+                    PrefixIndex::new(name, vec![])
+                ).and(start)
+            ),
+            _ => panic!("Unknown index type"),
+        }
+    }
+}
+
+impl From<((String, String), (String, String), (String, String))> for Box<dyn ComposableIndex> {
+    fn from(value: ((String, String), (String, String), (String, String))) -> Self {
+        let (a, b, (name, index_type)) = value;
+        let start: Box<dyn ComposableIndex> = (a, b).into();
+        match index_type.as_str() {
+            "exact" => Box::new(
+                CompoundIndex::new(
+                    ExactIndex::new(name, vec![])
+                ).and(start)
+            ),
+            "prefix" => Box::new(
+                CompoundIndex::new(
+                    PrefixIndex::new(name, vec![])
+                ).and(start)
+            ),
+            _ => panic!("Unknown index type"),
+        }
     }
 }
 
@@ -455,8 +521,6 @@ mod tests {
         let index = CompoundIndex::new(ExactIndex::new("email", vec![])).and(PrefixIndex::new(
             "name",
             vec![],
-            3,
-            10,
         ));
 
         let result = index.compose_index(
@@ -488,7 +552,7 @@ mod tests {
     #[test]
     fn test_one_exact_one_prefix_one_exact() -> Result<(), Box<dyn std::error::Error>> {
         let index = CompoundIndex::new(ExactIndex::new("email", vec![]))
-            .and(PrefixIndex::new("name", vec![], 3, 10))
+            .and(PrefixIndex::new("name", vec![]))
             .and(ExactIndex::new("login-count", vec![]));
 
         let result = index.compose_index(
@@ -504,8 +568,8 @@ mod tests {
     #[test]
     fn test_one_exact_one_prefix_one_prefix() -> Result<(), Box<dyn std::error::Error>> {
         let index = CompoundIndex::new(ExactIndex::new("email", vec![]))
-            .and(PrefixIndex::new("first-name", vec![], 3, 10))
-            .and(PrefixIndex::new("last-name", vec![], 3, 10));
+            .and(PrefixIndex::new("first-name", vec![]))
+            .and(PrefixIndex::new("last-name", vec![]));
 
         let result = index.compose_index(
             [1; 32],
