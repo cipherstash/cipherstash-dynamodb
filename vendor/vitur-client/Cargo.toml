@@ -59,11 +59,11 @@ version = "1"
 features = ["full"]
 
 [dependencies.vitur-config]
-path = "../config/"
+path = "../vitur-config/"
 
 [dependencies.vitur-protocol]
 version = "0.1.0"
-path = "../protocol"
+path = "../vitur-protocol/"
 
 [dev-dependencies]
 serde_json = "1.0.89"
