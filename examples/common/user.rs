@@ -1,19 +1,15 @@
-use cipherstash_client::encryption::compound_indexer::{PrefixIndex, ExactIndex, CompoundIndex};
-use cryptonamo::{
-    traits::{Cryptonamo, EncryptedRecord, WriteConversionError, SearchableRecord},
-    Cryptonamo, Unsealed, ComposableIndex, ComposablePlaintext, Plaintext, TableAttribute,
-};
+use cryptonamo::{traits::DecryptedRecord, Plaintext};
+use cryptonamo_derive::Cryptonamo;
+use std::collections::HashMap;
 
 #[derive(Debug)] //, Cryptonamo)]
                  //#[cryptonamo(partition_key = "email")]
                  //#[cryptonamo(sort_key_prefix = "user")]
 pub struct User {
-    //#[cryptonamo(query = "exact", compound = "email#name")]
-    //#[cryptonamo(query = "exact")]
+    #[cryptonamo(query = "exact", compound = "email#name")]
     pub email: String,
 
-    //    #[cryptonamo(query = "prefix", compound = "email#name")]
-    //    #[cryptonamo(query = "prefix")]
+    #[cryptonamo(query = "prefix", compound = "email#name")]
     pub name: String,
 
     //    #[cryptonamo(plaintext)]

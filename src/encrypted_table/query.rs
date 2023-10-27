@@ -67,8 +67,6 @@ where
     pub async fn send(self) -> Result<Vec<T>, QueryError> {
         let (index_name, index, plaintext, builder) = self.build()?;
 
-        dbg!(&index_name, &index, &plaintext);
-
         let index_term = builder.table.cipher.compound_query(
             &CompoundIndex::new(index),
             plaintext,
@@ -84,6 +82,8 @@ where
                 "Returned IndexTerm had invalid type: {index_term:?}"
             )))?
         };
+
+        println!("{term}");
 
         let query = builder
             .table
@@ -128,9 +128,10 @@ where
             let (name, plaintexts): (Vec<&String>, Vec<&Plaintext>) =
                 perm.into_iter().map(|x| (&x.0, &x.1)).unzip();
 
+
             let name = name.iter().join("#");
 
-            if let Some(index) = dbg!(T::index_by_name(name.as_str())) {
+            if let Some(index) = T::index_by_name(name.as_str()) {
                 let mut plaintext = ComposablePlaintext::new(plaintexts[0].clone());
 
                 for p in plaintexts[1..].into_iter() {
@@ -138,6 +139,8 @@ where
                         .try_compose((*p).clone())
                         .expect("Failed to compose");
                 }
+
+                println!("-- {name} -- {index:?} -- {plaintext:?}");
 
                 return Ok((name, index, plaintext, self));
             }

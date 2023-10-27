@@ -250,9 +250,9 @@ impl EncryptedTable {
         //let (pk, table_entries) = encrypt(record, &self.cipher).await?;
         let mut items: Vec<TransactWriteItem> = Vec::with_capacity(sealed.len());
 
-        for entry in sealed.into_iter() {
-            seen_sk.insert(entry.inner().sk.clone());
-
+        for entry in table_entries.into_iter() {
+            seen_sk.insert(entry.sk.clone());
+            let item = Some(to_item(entry)?);
             items.push(
                 TransactWriteItem::builder()
                     .put(
