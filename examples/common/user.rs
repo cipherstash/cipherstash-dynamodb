@@ -1,7 +1,5 @@
-use cryptonamo::{
-    traits::{DecryptedRecord},
-    Cryptonamo, Plaintext,
-};
+use cryptonamo::{traits::DecryptedRecord, Plaintext};
+use cryptonamo_derive::Cryptonamo;
 use std::collections::HashMap;
 
 #[derive(Debug, Cryptonamo)]
@@ -9,11 +7,9 @@ use std::collections::HashMap;
 #[cryptonamo(sort_key_prefix = "user")]
 pub struct User {
     #[cryptonamo(query = "exact", compound = "email#name")]
-    #[cryptonamo(query = "exact")]
     pub email: String,
 
     #[cryptonamo(query = "prefix", compound = "email#name")]
-    #[cryptonamo(query = "prefix")]
     pub name: String,
 
     #[cryptonamo(plaintext)]
@@ -75,11 +71,11 @@ impl DecryptedRecord for User {
 // TODO: Move all these into a proper tests module
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use super::User;
     use cryptonamo::traits::*;
     use std::any::Any;
-    
+    use std::collections::HashMap;
+
     #[test]
     fn test_cryptonamo_typename() {
         assert_eq!(User::type_name(), "user");
@@ -98,18 +94,13 @@ mod tests {
         );
         assert_eq!(
             user.plaintext_attributes(),
-            HashMap::from([
-                ("count", 100i32.into()),
-            ])
+            HashMap::from([("count", 100i32.into()),])
         );
     }
 
     #[test]
     fn test_cryptonamo_index_names() {
-        assert_eq!(
-            User::protected_indexes(),
-            vec!["email", "email#name"]
-        );
+        assert_eq!(User::protected_indexes(), vec!["email", "email#name"]);
     }
 
     #[test]

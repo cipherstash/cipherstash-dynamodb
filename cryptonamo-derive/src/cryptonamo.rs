@@ -1,9 +1,15 @@
+use std::collections::HashSet;
+
+use crate::settings::{IndexType, Settings};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{DeriveInput, LitStr, Data, Fields};
-use crate::settings::{Settings, IndexType};
+use syn::{Data, DeriveInput, Fields, LitStr};
 
-pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInput) -> Result<TokenStream, syn::Error> {
+pub(crate) fn derive_cryptonamo(
+    DeriveInput {
+        ident, attrs, data, ..
+    }: DeriveInput,
+) -> Result<TokenStream, syn::Error> {
     let mut settings = Settings::new(ident.to_string().to_lowercase());
 
     for attr in attrs {
@@ -30,6 +36,14 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
     // Only support structs
     if let Data::Struct(data_struct) = &data {
         if let Fields::Named(fields_named) = &data_struct.fields {
+            let all_field_names: Vec<String> = fields_named
+                .named
+                .iter()
+                .flat_map(|x| x.ident.as_ref().map(|x| x.to_string()))
+                .collect();
+
+            let mut compound_indexes = HashSet::<String>::new();
+
             for field in &fields_named.named {
                 let ident = &field.ident;
                 let mut will_encrypt = true;
@@ -38,9 +52,6 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
                 // Parse the meta for the field
                 for attr in &field.attrs {
                     if attr.path().is_ident("cryptonamo") {
-                        let mut compound_index_name: Option<String> = None;
-                        let mut index: Option<(String, String)> = None;
-
                         attr.parse_nested_meta(|meta| {
                             let directive = meta.path.get_ident().map(|i| i.to_string());
                             match directive.as_deref() {
@@ -57,22 +68,47 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
                                 Some("query") => {
                                     let value = meta.value()?;
                                     let index_type = value.parse::<LitStr>()?.value();
-                                    let index_name = ident.as_ref().ok_or(meta.error("no index type specified"))?.to_string();
-                                    index = Some((index_name, index_type));
+                                    let index_name = ident
+                                        .as_ref()
+                                        .ok_or(meta.error("no index type specified"))?
+                                        .to_string();
+
+                                    settings.add_index(index_name, index_type.as_ref())?;
+
                                     Ok(())
                                 }
                                 Some("compound") => {
                                     let value = meta.value()?;
-                                    compound_index_name = Some(value.parse::<LitStr>()?.value());
+
+                                    let field_name = ident
+                                        .as_ref()
+                                        .ok_or(meta.error("no index type specified"))?
+                                        .to_string();
+
+                                    let index_name = value.parse::<LitStr>()?.value();
+
+                                    let is_valid_index = index_name
+                                        .split("#")
+                                        .all(|x| all_field_names.iter().any(|y| y == x));
+
+                                    if !is_valid_index {
+                                        return Err(meta.error(format!("Compound index '{index_name}' is not valid. It must be valid fields separated by a '#' character.")));
+                                    }
+
+                                    let is_field_mentioned = index_name.split("#")
+                                        .any(|x| x == &field_name);
+
+                                    if !is_field_mentioned {
+                                        return Err(meta.error(format!("Compound index '{index_name}' does not include current field '{field_name}'.")));
+                                    }
+
+                                    compound_indexes.insert(index_name);
+
                                     Ok(())
                                 }
                                 _ => Err(meta.error("unsupported field attribute")),
                             }
                         })?;
-
-                        if let Some(index) = index {
-                            settings.add_index(&index.0, &index.1, compound_index_name)?;
-                        }
                     }
                 }
 
@@ -80,11 +116,18 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
                     settings.add_attribute(
                         ident
                             .as_ref()
-                            .ok_or(syn::Error::new_spanned(&settings.sort_key_prefix, "missing field"))?
+                            .ok_or(syn::Error::new_spanned(
+                                &settings.sort_key_prefix,
+                                "missing field",
+                            ))?
                             .to_string(),
-                        will_encrypt
+                        will_encrypt,
                     );
                 }
+            }
+
+            for index in compound_indexes.into_iter() {
+                settings.add_compound_index(index)?;
             }
         }
     }
@@ -128,30 +171,36 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
         }
     });
 
-    let attributes_for_index_impl = settings.indexes.iter().map(|(_, index)| {
-        match index {
-            IndexType::Single(name, _) => {
-                let field = format_ident!("{}", name);
+    let attributes_for_index_impl = settings.indexes.iter().map(|(_, index)| match index {
+        IndexType::Single(name, _) => {
+            let field = format_ident!("{}", name);
 
-                quote! {
-                    #name => self.#field.clone().try_into().ok()
-                }
-            },
-            IndexType::Compound1 { name, index: (a, _) } => {
-                let field = format_ident!("{}", a);
+            quote! {
+                #name => self.#field.clone().try_into().ok()
+            }
+        }
+        IndexType::Compound1 {
+            name,
+            index: (a, _),
+        } => {
+            let field = format_ident!("{}", a);
 
-                quote! {
-                    #name => self.#field.clone().try_into().ok()
-                }
-            },
-            IndexType::Compound2 { name, index: ((a, _), (b, _)) } => {
-                let field_a = format_ident!("{}", a);
-                let field_b = format_ident!("{}", b);
+            quote! {
+                #name => self.#field.clone().try_into().ok()
+            }
+        }
+        IndexType::Compound2 {
+            name,
+            index: ((a, _), (b, _)),
+        } => {
+            let field_a = format_ident!("{}", a);
+            let field_b = format_ident!("{}", b);
 
-                quote! {
-                    #name => (self.#field_a.clone(), self.#field_b.clone()).try_into().ok()
+            quote! {
+                #name => {
+                    (self.#field_a.clone(), self.#field_b.clone()).try_into().ok()
                 }
-            },
+            }
         }
     });
 
@@ -168,13 +217,13 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
 
         impl cryptonamo::traits::EncryptedRecord for #ident {
             fn protected_attributes(&self) -> std::collections::HashMap<&'static str, cryptonamo::Plaintext> {
-                let mut attributes = HashMap::new();
+                let mut attributes = std::collections::HashMap::new();
                 #(#protected_impl)*
                 attributes
             }
 
             fn plaintext_attributes(&self) -> std::collections::HashMap<&'static str, cryptonamo::Plaintext> {
-                let mut attributes = HashMap::new();
+                let mut attributes = std::collections::HashMap::new();
                 #(#plaintext_impl)*
                 attributes
             }
@@ -190,7 +239,7 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
                 match name {
                     #(#indexes_impl,)*
                     _ => None,
-                }    
+                }
             }
 
             fn attribute_for_index(&self, index_name: &str) -> Option<cryptonamo::ComposablePlaintext> {
@@ -204,3 +253,4 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
 
     Ok(expanded)
 }
+

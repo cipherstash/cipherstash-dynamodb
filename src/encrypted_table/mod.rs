@@ -181,7 +181,6 @@ impl EncryptedTable {
         for entry in table_entries.into_iter() {
             seen_sk.insert(entry.sk.clone());
             let item = Some(to_item(entry)?);
-
             items.push(
                 TransactWriteItem::builder()
                     .put(

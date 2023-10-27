@@ -1,4 +1,5 @@
 mod common;
+mod derive_test;
 use crate::common::User;
 use cryptonamo::EncryptedTable;
 
