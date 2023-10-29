@@ -1,37 +1,30 @@
+use chrono::{NaiveDate, DateTime, Utc};
+use rust_decimal::Decimal;
 use super::Plaintext;
 
-impl From<String> for Plaintext {
-    fn from(value: String) -> Self {
-        Plaintext::Utf8Str(Some(value))
-    }
+macro_rules! impl_from {
+    ($ty:ty, $variant:ident) => {
+        impl From<$ty> for Plaintext {
+            fn from(value: $ty) -> Self {
+                Plaintext::$variant(Some(value))
+            }
+        }
+    };
 }
+
+impl_from!(String, Utf8Str);
+impl_from!(bool, Boolean);
+impl_from!(i64, BigInt);
+impl_from!(i32, Int);
+impl_from!(i16, SmallInt);
+impl_from!(f64, Float);
+impl_from!(Decimal, Decimal);
+impl_from!(NaiveDate, NaiveDate);
+impl_from!(DateTime<Utc>, Timestamp);
 
 impl From<&str> for Plaintext {
     fn from(value: &str) -> Self {
-        Plaintext::Utf8Str(Some(value.to_string()))
+        value.to_string().into()
     }
 }
 
-impl From<bool> for Plaintext {
-    fn from(value: bool) -> Self {
-        Plaintext::Boolean(Some(value))
-    }
-}
-
-impl From<i64> for Plaintext {
-    fn from(value: i64) -> Self {
-        Plaintext::BigInt(Some(value))
-    }
-}
-
-impl From<i32> for Plaintext {
-    fn from(value: i32) -> Self {
-        Plaintext::Int(Some(value))
-    }
-}
-
-impl From<i16> for Plaintext {
-    fn from(value: i16) -> Self {
-        Plaintext::SmallInt(Some(value))
-    }
-}

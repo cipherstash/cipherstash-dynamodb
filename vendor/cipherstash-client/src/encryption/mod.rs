@@ -25,7 +25,7 @@ use schema::{column::IndexType, operator::Operator, ColumnType};
 use vitur_client::{EncryptPayload, EncryptedRecord};
 
 // Re-exports
-pub use self::{errors::EncryptionError, plaintext::Plaintext};
+pub use self::{errors::{EncryptionError, TypeParseError}, plaintext::Plaintext};
 
 pub struct Encryption<C: Credentials<Token = ViturToken> = ViturCredentials> {
     // This field is public in order for the Driver to be able to cache
