@@ -204,6 +204,14 @@ impl Plaintext {
             _ => "unknown",
         }
     }
+
+    pub fn to_inner<T: TryFrom<Plaintext>>(self) -> Result<T, T::Error> {
+        T::try_from(self)
+    }
+
+    pub fn to_inner_from_ref<T: TryFrom<Plaintext>>(&self) -> Result<T, T::Error> {
+        self.clone().to_inner()
+    }
 }
 
 #[cfg(test)]
