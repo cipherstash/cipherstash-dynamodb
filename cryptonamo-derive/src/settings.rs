@@ -55,11 +55,21 @@ impl IndexType {
     }
 }
 
+pub(crate) enum AttributeMode {
+    Protected,
+    Plaintext,
+    Skipped,
+}
+
 pub(crate) struct Settings {
     pub(crate) sort_key_prefix: String,
     pub(crate) partition_key: Option<String>,
     pub(crate) protected_attributes: Vec<String>,
     pub(crate) unprotected_attributes: Vec<String>,
+
+    /// Skipped attributes are never encrypted by the `DecryptedRecord` trait will
+    /// use these to reconstruct the struct via `Default` (like serde).
+    pub(crate) skipped_attributes: Vec<String>,
     pub(crate) indexes: HashMap<String, IndexType>,
 }
 
@@ -70,6 +80,7 @@ impl Settings {
             partition_key: None,
             protected_attributes: Vec::new(),
             unprotected_attributes: Vec::new(),
+            skipped_attributes: Vec::new(),
             indexes: HashMap::new(),
         }
     }
@@ -91,12 +102,20 @@ impl Settings {
         ))
     }
 
-    pub(crate) fn add_attribute(&mut self, value: String, will_encrypt: bool) {
-        if will_encrypt {
-            self.protected_attributes.push(value);
-        } else {
-            self.unprotected_attributes.push(value);
+    pub(crate) fn add_attribute(&mut self, value: String, mode: AttributeMode) {
+        match mode {
+            AttributeMode::Protected => self.protected_attributes.push(value),
+            AttributeMode::Plaintext => self.unprotected_attributes.push(value),
+            AttributeMode::Skipped => self.skipped_attributes.push(value),
         }
+    }
+
+    pub(crate) fn non_skipped_attributes(&self) -> Vec<String> {
+        self.protected_attributes
+            .iter()
+            .chain(self.unprotected_attributes.iter())
+            .map(|s| s.to_string())
+            .collect()
     }
 
     // TODO: Add an IndexOptions enum so we can pass those through as well

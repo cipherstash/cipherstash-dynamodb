@@ -6,7 +6,7 @@ pub use self::{
 };
 use crate::{
     crypto::*,
-    traits::{DecryptedRecord, EncryptedRecord, SearchableRecord},
+    traits::{DecryptedRecord, EncryptedRecord, SearchableRecord, ReadConversionError},
 };
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Delete, Put, TransactWriteItem},
@@ -47,6 +47,8 @@ pub enum GetError {
     CryptoError(#[from] CryptoError),
     #[error("AwsError: {0}")]
     AwsError(String),
+    #[error("ReadConversionError: {0}")]
+    ReadConversionError(#[from] ReadConversionError)
 }
 
 #[derive(Error, Debug)]
@@ -190,12 +192,12 @@ impl EncryptedTable {
 
         let table_entry: Option<TableEntry> = result
             .item
-            .map(|item| from_item(item).map_err(|e| GetError::AwsError(e.to_string())))
-            .transpose()?;
+            .map(|item| TableEntry::from_item(item)); //.map_err(|e| GetError::AwsError(e.to_string())))
+            //.transpose()?;
 
         if let Some(TableEntry { attributes, .. }) = table_entry {
             let attributes = decrypt(attributes, &self.cipher).await?;
-            Ok(Some(T::from_attributes(attributes)))
+            Ok(Some(T::from_attributes(attributes)?))
         } else {
             Ok(None)
         }
@@ -245,14 +247,13 @@ impl EncryptedTable {
 
         for entry in table_entries.into_iter() {
             seen_sk.insert(entry.sk.clone());
-            let item = Some(to_item(entry)?);
 
             items.push(
                 TransactWriteItem::builder()
                     .put(
                         Put::builder()
                             .table_name(&self.table_name)
-                            .set_item(item)
+                            .set_item(Some(entry.to_item()))
                             .build(),
                     )
                     .build(),

@@ -1,8 +1,4 @@
-use cryptonamo::{
-    traits::{DecryptedRecord},
-    Cryptonamo, Plaintext,
-};
-use std::collections::HashMap;
+use cryptonamo::Cryptonamo;
 
 #[derive(Debug, Cryptonamo)]
 #[cryptonamo(partition_key = "email")]
@@ -62,7 +58,7 @@ impl User {
     }
 }*/
 
-impl DecryptedRecord for User {
+/*impl DecryptedRecord for User {
     fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {
         Self {
             email: attributes.get("email").unwrap().try_into().unwrap(),
@@ -70,7 +66,7 @@ impl DecryptedRecord for User {
             count: 100,
         }
     }
-}
+}*/
 
 // TODO: Move all these into a proper tests module
 #[cfg(test)]

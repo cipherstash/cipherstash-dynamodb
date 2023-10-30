@@ -1,8 +1,4 @@
-use cryptonamo::{
-    traits::DecryptedRecord,
-    Cryptonamo, Plaintext,
-};
-use std::collections::HashMap;
+use cryptonamo::Cryptonamo;
 
 #[derive(Debug, Cryptonamo)]
 #[cryptonamo(partition_key = "email")]
@@ -24,16 +20,6 @@ impl License {
             email: email.into(),
             number: number.into(),
             expires: expires.into(),
-        }
-    }
-}
-
-impl DecryptedRecord for License {
-    fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {
-        Self {
-            number: attributes.get("number").unwrap().try_into().unwrap(),
-            expires: attributes.get("expires").unwrap().try_into().unwrap(),
-            email: attributes.get("email").unwrap().try_into().unwrap(),
         }
     }
 }

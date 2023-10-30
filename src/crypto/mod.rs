@@ -1,11 +1,11 @@
 use crate::{
     encrypted_table::TableEntry,
-    traits::{Cryptonamo, SearchableRecord},
+    traits::{Cryptonamo, SearchableRecord, DecryptedRecord},
 };
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
     encryption::{
-        compound_indexer::CompoundIndex, Encryption, EncryptionError, IndexTerm, Plaintext,
+        compound_indexer::CompoundIndex, Encryption, EncryptionError, TypeParseError, IndexTerm, Plaintext,
     },
     schema::column::Index,
 };
@@ -18,11 +18,13 @@ const MAX_TERMS_PER_INDEX: usize = 25;
 pub enum CryptoError {
     #[error("EncryptionError: {0}")]
     EncryptionError(#[from] EncryptionError),
+    #[error("TypeParseError: {0}")]
+    TypeParseError(#[from] TypeParseError),
     #[error("{0}")]
     Other(String),
 }
 
-pub fn all_index_keys<E: SearchableRecord + Cryptonamo>() -> Vec<String> {
+pub(crate) fn all_index_keys<E: SearchableRecord + Cryptonamo>() -> Vec<String> {
     E::protected_indexes()
         .iter()
         .flat_map(|index_name| {
@@ -79,6 +81,18 @@ where
     Ok(())
 }
 
+pub(crate) async fn decrypt2<T, C>(
+    item: TableEntry,
+    cipher: &Encryption<C>,
+) -> Result<T, CryptoError>
+where
+    C: Credentials<Token = ViturToken>,
+    T: DecryptedRecord,
+{
+    T::protected_attributes();
+    unimplemented!()
+}
+
 pub(crate) async fn decrypt<C>(
     ciphertexts: HashMap<String, String>,
     cipher: &Encryption<C>,
@@ -104,6 +118,16 @@ where
     C: Credentials<Token = ViturToken>,
 {
     let protected_attributes = target.protected_attributes();
+    
+    // FIXME: Handle types other than string
+    let plaintext_attributes = target.plaintext_attributes().iter()
+        .map(|(field, plaintext)| {
+            let key = field.to_string();
+            // TODO: Use a Plaintext to DynamoType conversion trait
+            let value: String = plaintext.to_inner_from_ref()?;
+            Ok::<(String, String), TypeParseError>((key, value))
+        })
+        .collect::<Result<HashMap<String, String>, _>>()?;
 
     let entries_to_encrypt = protected_attributes
         .into_iter()
@@ -134,10 +158,13 @@ where
         pk: partition_key.to_string(),
         sk: E::type_name().to_string(),
         term: None,
-        attributes: attributes.clone(),
+        // Handle the plaintext attributes as well
+        attributes: attributes
+            .clone()
+            .into_iter()
+            .chain(plaintext_attributes.into_iter())
+            .collect(),
     });
-
-    // TODO: Handle the plaintext attributes
 
     encrypt_indexes(
         &partition_key,
