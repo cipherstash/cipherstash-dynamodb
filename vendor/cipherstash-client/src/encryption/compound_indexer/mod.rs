@@ -100,8 +100,6 @@ impl TryFrom<ComposablePlaintext> for Plaintext {
     type Error = EncryptionError;
 
     fn try_from(value: ComposablePlaintext) -> Result<Self, Self::Error> {
-        println!("VAL {value:?}");
-
         match value {
             ComposablePlaintext::Unit(plaintext) => Ok(plaintext),
             _ => Err(EncryptionError::TooManyArguments),

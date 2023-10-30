@@ -83,8 +83,6 @@ where
             )))?
         };
 
-        println!("{term}");
-
         let query = builder
             .table
             .db
@@ -139,8 +137,6 @@ where
                         .try_compose((*p).clone())
                         .expect("Failed to compose");
                 }
-
-                println!("-- {name} -- {index:?} -- {plaintext:?}");
 
                 return Ok((name, index, plaintext, self));
             }

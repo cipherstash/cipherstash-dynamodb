@@ -52,8 +52,6 @@ where
             .attribute_for_index(index_name)
             .and_then(|attr| E::index_by_name(index_name).and_then(|index| Some((attr, index))))
         {
-            println!("-- {index_name} -- {attr:?} -- {index:?}");
-
             let index_term = cipher.compound_index(
                 &CompoundIndex::new(index),
                 attr,
@@ -70,8 +68,6 @@ where
             for (i, term) in terms.into_iter().enumerate().take(MAX_TERMS_PER_INDEX) {
                 let sk = format!("{}#{}#{}", E::type_name(), index_name, i); // TODO: HMAC the sort key, too (users#index_name#pk)
                 let term = hex::encode(term);
-
-                println!("{sk} - {term}");
 
                 entries.push(TableEntry {
                     pk: parition_key.to_string(),
@@ -144,8 +140,6 @@ where
         .map(|(name, plaintext)| (name, plaintext, format!("{}#{}", E::type_name(), name)))
         .collect::<Vec<_>>();
 
-    println!("ENCRYPTING!!!");
-
     let encrypted = cipher
         .encrypt(
             entries_to_encrypt
@@ -153,8 +147,6 @@ where
                 .map(|(_, plaintext, descriptor)| (plaintext, descriptor.as_str())),
         )
         .await?;
-
-    println!("DONE!!!!");
 
     let attributes: HashMap<String, String> = entries_to_encrypt
         .into_iter()
