@@ -396,10 +396,12 @@
 //! - [ ] Using the derive macros for compound macros is not working correctly (you can implement the traits directly)
 //! - [ ] Sort keys are not currently hashed (and should be)
 //!
-mod crypto;
 mod encrypted_table;
+mod error;
+pub mod crypto;
 pub mod traits;
 pub use encrypted_table::{EncryptedTable, QueryBuilder};
+pub use error::Error;
 
 // Re-exports
 pub use cipherstash_client::encryption::compound_indexer::{ComposableIndex, ComposablePlaintext};

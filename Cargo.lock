@@ -789,7 +789,6 @@ dependencies = [
 [[package]]
 name = "cipherstash-client"
 version = "0.6.0"
-source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#4bd0ce2ccb3f6c2cda0ad9af35781fec8cb3093c"
 dependencies = [
  "async-mutex",
  "async-once-cell",
@@ -797,7 +796,7 @@ dependencies = [
  "base64 0.21.5",
  "cfg-if",
  "chrono",
- "cipherstash-core",
+ "cipherstash-core 0.1.1",
  "dirs",
  "futures",
  "hex",
@@ -822,6 +821,57 @@ dependencies = [
  "vitur-client",
  "vitur-config",
  "vitur-protocol",
+]
+
+[[package]]
+name = "cipherstash-client"
+version = "0.6.0"
+source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#4bd0ce2ccb3f6c2cda0ad9af35781fec8cb3093c"
+dependencies = [
+ "async-mutex",
+ "async-once-cell",
+ "async-trait",
+ "base64 0.21.5",
+ "cfg-if",
+ "chrono",
+ "cipherstash-core 0.1.1 (git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike)",
+ "dirs",
+ "futures",
+ "hex",
+ "hmac",
+ "log",
+ "miette",
+ "open",
+ "ore-rs",
+ "reqwest",
+ "reqwest-middleware",
+ "reqwest-retry",
+ "rust_decimal",
+ "serde",
+ "serde_cbor",
+ "serde_json",
+ "sha2",
+ "static_assertions",
+ "thiserror",
+ "tokio",
+ "unicode-normalization",
+ "url",
+ "vitur-client",
+ "vitur-config",
+ "vitur-protocol",
+]
+
+[[package]]
+name = "cipherstash-core"
+version = "0.1.1"
+dependencies = [
+ "hmac",
+ "lazy_static",
+ "num-bigint",
+ "rand",
+ "regex",
+ "sha2",
+ "thiserror",
 ]
 
 [[package]]
@@ -893,7 +943,7 @@ dependencies = [
  "async-trait",
  "aws-config",
  "aws-sdk-dynamodb",
- "cipherstash-client",
+ "cipherstash-client 0.6.0",
  "cryptonamo-derive",
  "env_logger",
  "hex",
@@ -918,7 +968,7 @@ dependencies = [
 name = "cryptonamo-derive"
 version = "0.1.0"
 dependencies = [
- "cipherstash-client",
+ "cipherstash-client 0.6.0 (git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike)",
  "paste",
  "proc",
  "proc-macro2",

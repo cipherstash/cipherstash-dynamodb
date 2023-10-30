@@ -28,6 +28,8 @@ pub enum QueryError {
     SerdeError(#[from] serde_dynamo::Error),
     #[error("AwsError: {0}")]
     AwsError(String),
+    #[error("ReadConversionError: {0}")]
+    ReadConversionError(#[from] crate::traits::ReadConversionError),
     #[error("{0}")]
     Other(String),
 }
@@ -108,7 +110,7 @@ where
         // TODO: Bulk Decrypt
         for te in table_entries.into_iter() {
             let attributes = decrypt(te.attributes, &builder.table.cipher).await?;
-            let record: T = T::from_attributes(attributes);
+            let record: T = T::from_attributes(attributes)?;
             results.push(record);
         }
 

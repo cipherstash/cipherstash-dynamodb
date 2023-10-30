@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{DeriveInput, LitStr, Data, Fields};
-use crate::settings::{Settings, IndexType};
+use crate::settings::{Settings, IndexType, AttributeMode};
 
 pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInput) -> Result<TokenStream, syn::Error> {
     let mut settings = Settings::new(ident.to_string().to_lowercase());
@@ -32,8 +32,7 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
         if let Fields::Named(fields_named) = &data_struct.fields {
             for field in &fields_named.named {
                 let ident = &field.ident;
-                let mut will_encrypt = true;
-                let mut skip = false;
+                let mut attr_mode = AttributeMode::Protected;
 
                 // Parse the meta for the field
                 for attr in &field.attrs {
@@ -46,12 +45,12 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
                             match directive.as_deref() {
                                 Some("plaintext") => {
                                     // Don't encrypt this field
-                                    will_encrypt = false;
+                                    attr_mode = AttributeMode::Plaintext;
                                     Ok(())
                                 }
                                 Some("skip") => {
                                     // Don't even store this field
-                                    skip = true;
+                                    attr_mode = AttributeMode::Skipped;
                                     Ok(())
                                 }
                                 Some("query") => {
@@ -76,21 +75,20 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
                     }
                 }
 
-                if !skip {
-                    settings.add_attribute(
-                        ident
-                            .as_ref()
-                            .ok_or(syn::Error::new_spanned(&settings.sort_key_prefix, "missing field"))?
-                            .to_string(),
-                        will_encrypt
-                    );
-                }
+                settings.add_attribute(
+                    ident
+                        .as_ref()
+                        .ok_or(syn::Error::new_spanned(&settings.sort_key_prefix, "missing field"))?
+                        .to_string(),
+                    attr_mode
+                );
             }
         }
     }
 
+    // TODO: This is getting a bit unwieldy - split it out into separate functions
     let partition_key = format_ident!("{}", settings.get_partition_key()?);
-    let type_name = settings.sort_key_prefix;
+    let type_name = settings.sort_key_prefix.to_string();
 
     let protected_impl = settings.protected_attributes.iter().map(|name| {
         let field = format_ident!("{}", name);
@@ -155,6 +153,28 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
         }
     });
 
+    let non_skipped_attributes = settings.non_skipped_attributes();
+    let decrypt_attributes_impl = non_skipped_attributes.iter().map(|name| {
+        let field = format_ident!("{}", name);
+
+        quote! {
+            #field: attributes
+                .get(#name)
+                .ok_or(cryptonamo::traits::ReadConversionError::NoSuchAttribute(#name.to_string()))?
+                .clone()
+                .try_into()
+                .map_err(|_| cryptonamo::traits::ReadConversionError::ConversionFailed(#name.to_string()))?
+        }
+    });
+
+    let skipped_attributes_impl = settings.skipped_attributes.iter().map(|name| {
+        let field = format_ident!("{}", name);
+
+        quote! {
+            #field: Default::default()
+        }
+    });
+
     let expanded = quote! {
         impl cryptonamo::traits::Cryptonamo for #ident {
             fn type_name() -> &'static str {
@@ -168,13 +188,13 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
 
         impl cryptonamo::traits::EncryptedRecord for #ident {
             fn protected_attributes(&self) -> std::collections::HashMap<&'static str, cryptonamo::Plaintext> {
-                let mut attributes = HashMap::new();
+                let mut attributes = std::collections::HashMap::new();
                 #(#protected_impl)*
                 attributes
             }
 
             fn plaintext_attributes(&self) -> std::collections::HashMap<&'static str, cryptonamo::Plaintext> {
-                let mut attributes = HashMap::new();
+                let mut attributes = std::collections::HashMap::new();
                 #(#plaintext_impl)*
                 attributes
             }
@@ -198,6 +218,15 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
                     #(#attributes_for_index_impl,)*
                     _ => None,
                 }
+            }
+        }
+
+        impl cryptonamo::traits::DecryptedRecord for #ident {
+            fn from_attributes(attributes: std::collections::HashMap<String, cryptonamo::Plaintext>) -> Result<Self, cryptonamo::traits::ReadConversionError> {
+                Ok(Self {
+                    #(#decrypt_attributes_impl,)*
+                    #(#skipped_attributes_impl,)*
+                })
             }
         }
     };
