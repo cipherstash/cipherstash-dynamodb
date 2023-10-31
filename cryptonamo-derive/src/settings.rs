@@ -197,13 +197,13 @@ impl Settings {
     }
 
     fn validate_index_type(index_type: &str, index_type_span: Span) -> Result<(), syn::Error> {
-        if !matches!(index_type.as_ref(), "exact" | "prefix") {
+        if matches!(index_type.as_ref(), "exact" | "prefix") {
+            Ok(())
+        } else {
             Err(syn::Error::new(
                 index_type_span,
                 format!("Unsupported index type: {}", index_type),
             ))
-        } else {
-            Ok(())
         }
     }
 
