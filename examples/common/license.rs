@@ -26,10 +26,10 @@ impl License {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use super::License;
     use cryptonamo::traits::*;
-    
+    use std::collections::HashMap;
+
     #[test]
     fn test_cryptonamo_typename() {
         assert_eq!(License::type_name(), "license");
@@ -41,10 +41,7 @@ mod tests {
         assert_eq!(license.partition_key(), "person@example.net");
         assert_eq!(
             license.protected_attributes(),
-            HashMap::from([
-                ("number", "1234".into()),
-                ("expires", "2020-01-01".into()),
-            ])
+            HashMap::from([("number", "1234".into()), ("expires", "2020-01-01".into()),])
         );
         assert!(license.plaintext_attributes().is_empty());
     }

@@ -2,11 +2,11 @@ pub mod query;
 mod table_entry;
 pub use self::{
     query::{QueryBuilder, QueryError},
-    table_entry::TableEntry,
+    table_entry::{Sealed, TableEntry, Unsealed},
 };
 use crate::{
     crypto::*,
-    traits::{DecryptedRecord, EncryptedRecord, SearchableRecord, ReadConversionError},
+    traits::{DecryptedRecord, EncryptedRecord, ReadConversionError, SearchableRecord, WriteConversionError},
 };
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Delete, Put, TransactWriteItem},
@@ -35,6 +35,8 @@ pub struct EncryptedTable {
 pub enum PutError {
     #[error("AwsError: {0}")]
     AwsError(String),
+    #[error("Write Conversion Error: {0}")]
+    WriteConversionError(#[from] WriteConversionError),
     #[error("SerdeError: {0}")]
     SerdeError(#[from] serde_dynamo::Error),
     #[error("CryptoError: {0}")]
@@ -48,7 +50,7 @@ pub enum GetError {
     #[error("AwsError: {0}")]
     AwsError(String),
     #[error("ReadConversionError: {0}")]
-    ReadConversionError(#[from] ReadConversionError)
+    ReadConversionError(#[from] ReadConversionError),
 }
 
 #[derive(Error, Debug)]
@@ -179,25 +181,26 @@ impl EncryptedTable {
         T: EncryptedRecord + DecryptedRecord,
     {
         let pk = encrypt_partition_key(pk, &self.cipher)?;
+        let sk = T::type_name().to_string();
 
         let result = self
             .db
             .get_item()
             .table_name(&self.table_name)
             .key("pk", AttributeValue::S(pk))
-            .key("sk", AttributeValue::S(T::type_name().to_string()))
+            .key("sk", AttributeValue::S(sk))
             .send()
             .await
             .map_err(|e| GetError::AwsError(e.to_string()))?;
 
-        let table_entry: Option<TableEntry> = result
+        let table_entry: Option<Sealed<TableEntry>> = result
             .item
-            .map(|item| TableEntry::from_item(item)); //.map_err(|e| GetError::AwsError(e.to_string())))
-            //.transpose()?;
+            .map(|item| Sealed::<TableEntry>::try_from(item))
+            .transpose()?;
 
-        if let Some(TableEntry { attributes, .. }) = table_entry {
-            let attributes = decrypt(attributes, &self.cipher).await?;
-            Ok(Some(T::from_attributes(attributes)?))
+        if let Some(sealed) = table_entry {
+            let unsealed = Unsealed::<T>::unseal(sealed, &self.cipher).await;
+            Ok(Some(T::from_unsealed(unsealed)?))
         } else {
             Ok(None)
         }
@@ -235,25 +238,28 @@ impl EncryptedTable {
         Ok(())
     }
 
-    pub async fn put<T>(&self, record: &T) -> Result<(), PutError>
+    pub async fn put<T>(&self, record: T) -> Result<(), PutError>
     where
         T: SearchableRecord,
     {
         let mut seen_sk = HashSet::new();
 
-        // TODO: Use a combinator
-        let (pk, table_entries) = encrypt(record, &self.cipher).await?;
-        let mut items: Vec<TransactWriteItem> = Vec::with_capacity(table_entries.len());
+        let unsealed: Unsealed<T> = record.into_unsealed();
+        let (pk, sealed) = unsealed.seal(&self.cipher, 12).await;
 
-        for entry in table_entries.into_iter() {
-            seen_sk.insert(entry.sk.clone());
+        // TODO: Use a combinator
+        //let (pk, table_entries) = encrypt(record, &self.cipher).await?;
+        let mut items: Vec<TransactWriteItem> = Vec::with_capacity(sealed.len());
+
+        for entry in sealed.into_iter() {
+            seen_sk.insert(entry.inner().sk.clone());
 
             items.push(
                 TransactWriteItem::builder()
                     .put(
                         Put::builder()
                             .table_name(&self.table_name)
-                            .set_item(Some(entry.to_item()))
+                            .set_item(Some(entry.try_into()?))
                             .build(),
                     )
                     .build(),

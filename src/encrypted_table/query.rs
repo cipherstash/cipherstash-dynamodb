@@ -4,12 +4,12 @@ use cipherstash_client::encryption::{
     EncryptionError, Plaintext,
 };
 use itertools::Itertools;
-use serde_dynamo::from_items;
 use std::marker::PhantomData;
 use thiserror::Error;
 
 use crate::{
-    crypto::{decrypt, CryptoError},
+    crypto::CryptoError,
+    encrypted_table::{Sealed, Unsealed},
     traits::{DecryptedRecord, SearchableRecord},
 };
 use cipherstash_client::encryption::{compound_indexer::CompoundIndex, IndexTerm};
@@ -103,15 +103,15 @@ where
             .items
             .ok_or_else(|| QueryError::AwsError("Expected items entry on aws response".into()))?;
 
-        let table_entries: Vec<TableEntry> = from_items(items)?;
+        let table_entries = Sealed::<TableEntry>::vec_from(items)?;
 
+        // TODO: Use a combinator for this
         let mut results: Vec<T> = Vec::with_capacity(table_entries.len());
 
         // TODO: Bulk Decrypt
-        for te in table_entries.into_iter() {
-            let attributes = decrypt(te.attributes, &builder.table.cipher).await?;
-            let record: T = T::from_attributes(attributes)?;
-            results.push(record);
+        for sealed in table_entries.into_iter() {
+            let unsealed = Unsealed::<T>::unseal(sealed, &builder.table.cipher).await;
+            results.push(T::from_unsealed(unsealed)?);
         }
 
         Ok(results)

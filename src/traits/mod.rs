@@ -1,4 +1,7 @@
-use crate::{ComposableIndex, ComposablePlaintext, Plaintext};
+use crate::{
+    encrypted_table::{Sealed, TableEntry, Unsealed},
+    ComposableIndex, ComposablePlaintext, Plaintext,
+};
 use std::{collections::HashMap, fmt::Debug};
 use thiserror::Error;
 
@@ -10,6 +13,12 @@ pub enum ReadConversionError {
     ConversionFailed(String),
 }
 
+#[derive(Debug, Error)]
+pub enum WriteConversionError {
+    #[error("Failed to convert attribute: '{0}' to Plaintext")]
+    ConversionFailed(String),
+}
+
 pub trait Cryptonamo: Debug + Sized {
     // TODO: Add a function indicating that the root should be stored
     fn type_name() -> &'static str;
@@ -18,14 +27,17 @@ pub trait Cryptonamo: Debug + Sized {
 
 // These are analogous to serde (rename to Encrypt and Decrypt)
 pub trait EncryptedRecord: Cryptonamo {
-    fn protected_attributes(&self) -> HashMap<&'static str, Plaintext>;
+    fn protected_attributes() -> Vec<&'static str>;
 
-    fn plaintext_attributes(&self) -> HashMap<&'static str, Plaintext> {
-        HashMap::default()
+    fn plaintext_attributes() -> Vec<&'static str> {
+        vec![]
     }
+
+    fn into_unsealed(self) -> Unsealed<Self>;
 }
 
 pub trait SearchableRecord: EncryptedRecord {
+    // FIXME: This would be cleaner with a DSL
     #[allow(unused_variables)]
     fn attribute_for_index(&self, index_name: &str) -> Option<ComposablePlaintext> {
         None
@@ -51,6 +63,8 @@ pub trait DecryptedRecord: EncryptedRecord {
     /// Returns the ciphertext values to be decrypted
     fn ciphertexts(&self) -> HashMap<&'static str, String>;
 
+    fn from_attributes(attributes: HashMap<String, Plaintext>)
+        -> Result<Self, ReadConversionError>;
 
-    fn from_attributes(attributes: HashMap<String, Plaintext>) -> Result<Self, ReadConversionError>;
+    fn from_unsealed(unsealed: Unsealed<Self>) -> Result<Self, ReadConversionError>;
 }
