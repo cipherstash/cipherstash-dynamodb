@@ -1,18 +1,21 @@
-use cryptonamo::Cryptonamo;
+use cryptonamo::{
+    traits::{Cryptonamo, EncryptedRecord},
+    Cryptonamo,
+};
 
-#[derive(Debug, Cryptonamo)]
-#[cryptonamo(partition_key = "email")]
-#[cryptonamo(sort_key_prefix = "user")]
+#[derive(Debug)] //, Cryptonamo)]
+                 //#[cryptonamo(partition_key = "email")]
+                 //#[cryptonamo(sort_key_prefix = "user")]
 pub struct User {
-    #[cryptonamo(query = "exact", compound = "email#name")]
-    #[cryptonamo(query = "exact")]
+    //#[cryptonamo(query = "exact", compound = "email#name")]
+    //#[cryptonamo(query = "exact")]
     pub email: String,
 
-    #[cryptonamo(query = "prefix", compound = "email#name")]
-    #[cryptonamo(query = "prefix")]
+    //    #[cryptonamo(query = "prefix", compound = "email#name")]
+    //    #[cryptonamo(query = "prefix")]
     pub name: String,
 
-    #[cryptonamo(plaintext)]
+    //    #[cryptonamo(plaintext)]
     pub count: i32,
 }
 
@@ -24,6 +27,33 @@ impl User {
             name: name.into(),
             count: 100,
         }
+    }
+}
+
+impl Cryptonamo for User {
+    fn partition_key(&self) -> String {
+        self.email.clone()
+    }
+
+    fn type_name() -> &'static str {
+        "user"
+    }
+}
+
+impl EncryptedRecord for User {
+    fn protected_attributes() -> Vec<&'static str> {
+        vec!["email", "name"]
+    }
+
+    fn plaintext_attributes() -> Vec<&'static str> {
+        vec!["count"]
+    }
+
+    fn into_unsealed(self) -> Unsealed<Self> {
+        let mut table_entry = TableEntry::new(self.partition_key(), self.type_name());
+        table_entry.add_attribute("email", self.email);
+        table_entry.add_attribute("name", self.name);
+        table_entry.add_attribute("count", self.count);
     }
 }
 
@@ -71,11 +101,11 @@ impl User {
 // TODO: Move all these into a proper tests module
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use super::User;
     use cryptonamo::traits::*;
     use std::any::Any;
-    
+    use std::collections::HashMap;
+
     #[test]
     fn test_cryptonamo_typename() {
         assert_eq!(User::type_name(), "user");
@@ -94,18 +124,13 @@ mod tests {
         );
         assert_eq!(
             user.plaintext_attributes(),
-            HashMap::from([
-                ("count", 100i32.into()),
-            ])
+            HashMap::from([("count", 100i32.into()),])
         );
     }
 
     #[test]
     fn test_cryptonamo_index_names() {
-        assert_eq!(
-            User::protected_indexes(),
-            vec!["email", "email#name"]
-        );
+        assert_eq!(User::protected_indexes(), vec!["email", "email#name"]);
     }
 
     #[test]

@@ -1,11 +1,12 @@
 use crate::{
-    encrypted_table::TableEntry,
-    traits::{Cryptonamo, SearchableRecord, DecryptedRecord},
+    encrypted_table::{Sealed, TableEntry},
+    traits::{Cryptonamo, DecryptedRecord, SearchableRecord},
 };
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
     encryption::{
-        compound_indexer::CompoundIndex, Encryption, EncryptionError, TypeParseError, IndexTerm, Plaintext,
+        compound_indexer::CompoundIndex, Encryption, EncryptionError, IndexTerm, Plaintext,
+        TypeParseError,
     },
     schema::column::Index,
 };
@@ -72,7 +73,7 @@ where
                     pk: parition_key.to_string(),
                     sk: format!("{}#{}#{}", E::type_name(), index_name, i), // TODO: HMAC the sort key, too (users#index_name#pk)
                     term: Some(hex::encode(term)),
-                    attributes: attributes.clone(),
+                    attributes: HashMap::new(), //attributes.clone(), // FIXME
                 });
             }
         }
@@ -81,19 +82,23 @@ where
     Ok(())
 }
 
-pub(crate) async fn decrypt2<T, C>(
-    item: TableEntry,
+/*pub(crate) async fn decrypt2<'a, T, C>(
+    item: Sealed<'a, TableEntry>,
     cipher: &Encryption<C>,
 ) -> Result<T, CryptoError>
 where
     C: Credentials<Token = ViturToken>,
     T: DecryptedRecord,
 {
-    T::protected_attributes();
-    unimplemented!()
-}
 
-pub(crate) async fn decrypt<C>(
+    //let unsealed: Unsealed<TableEntry> =
+    //T::from_unsealed(sealed)?;
+
+    unimplemented!()
+}*/
+
+/// FIXME: Remove
+/*pub(crate) async fn decrypt<C>(
     ciphertexts: HashMap<String, String>,
     cipher: &Encryption<C>,
 ) -> Result<HashMap<String, Plaintext>, CryptoError>
@@ -106,21 +111,22 @@ where
         .into_keys()
         .zip(plaintexts.into_iter())
         .collect())
-}
+}*/
 
-pub(crate) async fn encrypt<E, C>(
+/*pub(crate) async fn encrypt<E, C>(
     target: &E,
     cipher: &Encryption<C>,
 ) -> Result<(String, Vec<TableEntry>), CryptoError>
 where
-    // TODO: Can we overload this to index if the record is searchable?
     E: SearchableRecord,
     C: Credentials<Token = ViturToken>,
 {
     let protected_attributes = target.protected_attributes();
-    
+
     // FIXME: Handle types other than string
-    let plaintext_attributes = target.plaintext_attributes().iter()
+    let plaintext_attributes = target
+        .plaintext_attributes()
+        .iter()
         .map(|(field, plaintext)| {
             let key = field.to_string();
             // TODO: Use a Plaintext to DynamoType conversion trait
@@ -154,7 +160,7 @@ where
     let mut table_entries: Vec<TableEntry> = Vec::new();
 
     // TODO: Make a constructor on TableEntry so the elements don't have to be pub
-    table_entries.push(TableEntry {
+    /*table_entries.push(TableEntry {
         pk: partition_key.to_string(),
         sk: E::type_name().to_string(),
         term: None,
@@ -164,7 +170,7 @@ where
             .into_iter()
             .chain(plaintext_attributes.into_iter())
             .collect(),
-    });
+    });*/
 
     encrypt_indexes(
         &partition_key,
@@ -176,7 +182,7 @@ where
     )?;
 
     Ok((partition_key, table_entries))
-}
+}*/
 
 pub(crate) fn encrypt_partition_key<C>(
     value: &str,

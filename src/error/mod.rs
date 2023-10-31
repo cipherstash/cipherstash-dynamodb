@@ -1,5 +1,5 @@
+use crate::encrypted_table::{DeleteError, GetError, InitError, PutError};
 use thiserror::Error;
-use crate::encrypted_table::{InitError, PutError, GetError, DeleteError};
 
 #[derive(Error, Debug)]
 pub enum Error {
