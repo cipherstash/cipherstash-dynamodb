@@ -65,8 +65,6 @@ where
     pub async fn send(self) -> Result<Vec<T>, QueryError> {
         let (index_name, index, plaintext, builder) = self.build()?;
 
-        dbg!(&index_name, &index, &plaintext);
-
         let index_term = builder.table.cipher.compound_query(
             &CompoundIndex::new(index),
             plaintext,
@@ -128,10 +126,10 @@ where
 
             let name = name.iter().join("#");
 
-            if let Some(index) = dbg!(T::index_by_name(name.as_str())) {
+            if let Some(index) = T::index_by_name(name.as_str()) {
                 let mut plaintext = ComposablePlaintext::new(plaintexts[0].clone());
 
-                for p in plaintexts[1..].into_iter() {
+                for p in plaintexts[1..].iter() {
                     plaintext = plaintext
                         .try_compose((*p).clone())
                         .expect("Failed to compose");

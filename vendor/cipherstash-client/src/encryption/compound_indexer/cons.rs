@@ -77,6 +77,6 @@ mod tests {
         let x: (i32, &str, i16) = (1, "hey", 12);
         let y: ConsArg3 = x.into();
 
-        assert_eq!(y, ConsArg3::new(1, "hey".to_string(), 12));
+        assert_eq!(y, ConsArg3::new(1_i32, "hey".to_string(), 12_i16));
     }
 }

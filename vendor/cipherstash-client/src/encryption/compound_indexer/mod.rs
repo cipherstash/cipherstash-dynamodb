@@ -18,7 +18,7 @@ pub enum Operator {
     StartsWith,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ComposablePlaintext {
     Unit(Plaintext),
     ConsArg2(ConsArg2),
@@ -29,6 +29,13 @@ pub enum ComposablePlaintext {
 impl ComposablePlaintext {
     pub fn new(plaintext: impl Into<Plaintext>) -> Self {
         Self::Unit(plaintext.into())
+    }
+
+    pub fn to_unit(self) -> Option<Plaintext> {
+        match self {
+            ComposablePlaintext::Unit(inner) => Some(inner),
+            _ => None,
+        }
     }
 
     pub fn try_compose(self, plaintext: impl Into<Plaintext>) -> Result<Self, EncryptionError> {
@@ -227,10 +234,7 @@ pub struct PrefixIndex {
 }
 
 impl PrefixIndex {
-    pub fn new(
-        field: impl Into<String>,
-        token_filters: Vec<TokenFilter>,
-    ) -> Self {
+    pub fn new(field: impl Into<String>, token_filters: Vec<TokenFilter>) -> Self {
         Self::new_with_opts(field, token_filters, 3, 10)
     }
 
@@ -405,41 +409,24 @@ impl From<(String, String)> for Box<dyn ComposableIndex> {
 
 impl From<((String, String), (String, String))> for Box<dyn ComposableIndex> {
     fn from(value: ((String, String), (String, String))) -> Self {
-        let (a, (name, index_type)) = value;
-        let start: Box<dyn ComposableIndex> = a.into();
-        match index_type.as_str() {
-            "exact" => Box::new(
-                CompoundIndex::new(
-                    ExactIndex::new(name, vec![])
-                ).and(start)
-            ),
-            "prefix" => Box::new(
-                CompoundIndex::new(
-                    PrefixIndex::new(name, vec![])
-                ).and(start)
-            ),
-            _ => panic!("Unknown index type"),
-        }
+        let (first, second) = value;
+
+        let first: Box<dyn ComposableIndex> = first.into();
+        let second: Box<dyn ComposableIndex> = second.into();
+
+        Box::new(CompoundIndex::new(first).and(second))
     }
 }
 
 impl From<((String, String), (String, String), (String, String))> for Box<dyn ComposableIndex> {
     fn from(value: ((String, String), (String, String), (String, String))) -> Self {
-        let (a, b, (name, index_type)) = value;
-        let start: Box<dyn ComposableIndex> = (a, b).into();
-        match index_type.as_str() {
-            "exact" => Box::new(
-                CompoundIndex::new(
-                    ExactIndex::new(name, vec![])
-                ).and(start)
-            ),
-            "prefix" => Box::new(
-                CompoundIndex::new(
-                    PrefixIndex::new(name, vec![])
-                ).and(start)
-            ),
-            _ => panic!("Unknown index type"),
-        }
+        let (first, second, third) = value;
+
+        let first: Box<dyn ComposableIndex> = first.into();
+        let second: Box<dyn ComposableIndex> = second.into();
+        let third: Box<dyn ComposableIndex> = third.into();
+
+        Box::new(CompoundIndex::new(first).and(second).and(third))
     }
 }
 
@@ -518,10 +505,8 @@ mod tests {
 
     #[test]
     fn test_one_exact_one_prefix() -> Result<(), Box<dyn std::error::Error>> {
-        let index = CompoundIndex::new(ExactIndex::new("email", vec![])).and(PrefixIndex::new(
-            "name",
-            vec![],
-        ));
+        let index = CompoundIndex::new(ExactIndex::new("email", vec![]))
+            .and(PrefixIndex::new("name", vec![]));
 
         let result = index.compose_index(
             [1; 32],
@@ -576,7 +561,100 @@ mod tests {
             ("foo@bar.com", "Daniel", "Draper").try_into()?,
             Accumulator::from_salt("user#email/first-name/last-name"),
         )?;
-        assert_eq!(result.terms().len(), 16);
+
+        let acc = Accumulator::from_salt("user#email/first-name/last-name");
+
+        let acc = ExactIndex::new("email", vec![]).compose_index(
+            [1; 32],
+            Plaintext::from("foo@bar.com").into(),
+            acc,
+        )?;
+
+        let acc = PrefixIndex::new("first-name", vec![]).compose_index(
+            [1; 32],
+            Plaintext::from("Daniel").into(),
+            acc,
+        )?;
+
+        let acc = PrefixIndex::new("last-name", vec![]).compose_index(
+            [1; 32],
+            Plaintext::from("Draper").into(),
+            acc,
+        )?;
+
+        let terms = result.terms();
+        let acc_terms = acc.terms();
+
+        assert_eq!(terms.len(), 16);
+        assert_eq!(acc_terms.len(), 16);
+
+        assert_eq!(terms, acc_terms);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_using_conversion_traits() -> Result<(), Box<dyn std::error::Error>> {
+        let index: Box<dyn ComposableIndex> = (
+            ("email".to_string(), "exact".to_string()),
+            ("first-name".to_string(), "prefix".to_string()),
+            ("last-name".to_string(), "prefix".to_string()),
+        )
+            .try_into()?;
+
+        let result = index.compose_index(
+            [1; 32],
+            ("foo@bar.com", "Daniel", "Draper").try_into()?,
+            Accumulator::from_salt("user#email/first-name/last-name"),
+        )?;
+
+        println!("BLAH");
+
+        let acc = Accumulator::from_salt("user#email/first-name/last-name");
+
+        let acc = ExactIndex::new("email", vec![]).compose_index(
+            [1; 32],
+            Plaintext::from("foo@bar.com").into(),
+            acc,
+        )?;
+
+        let acc = PrefixIndex::new("first-name", vec![]).compose_index(
+            [1; 32],
+            Plaintext::from("Daniel").into(),
+            acc,
+        )?;
+
+        let acc = PrefixIndex::new("last-name", vec![]).compose_index(
+            [1; 32],
+            Plaintext::from("Draper").into(),
+            acc,
+        )?;
+
+        let terms = result.terms();
+        let acc_terms = acc.terms();
+
+        assert_eq!(terms.len(), 16);
+        assert_eq!(acc_terms.len(), 16);
+
+        assert_eq!(terms, acc_terms);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_pops_in_reverse_insert_order() -> Result<(), Box<dyn std::error::Error>> {
+        let output = ComposablePlaintext::new("First")
+            .try_compose("Second")?
+            .try_compose("Third")?;
+
+        let (head, output) = output.pop();
+        assert_eq!(head, ComposablePlaintext::new("Third"));
+
+        let (head, output) = output.unwrap().pop();
+        assert_eq!(head, ComposablePlaintext::new("Second"));
+
+        let (head, _) = output.unwrap().pop();
+        assert_eq!(head, ComposablePlaintext::new("First"));
 
         Ok(())
     }

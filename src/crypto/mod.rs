@@ -50,7 +50,7 @@ where
     for index_name in E::protected_indexes().iter() {
         if let Some((attr, index)) = target
             .attribute_for_index(index_name)
-            .and_then(|attr| E::index_by_name(index_name).and_then(|index| Some((attr, index))))
+            .and_then(|attr| E::index_by_name(index_name).map(|index| (attr, index)))
         {
             let index_term = cipher.compound_index(
                 &CompoundIndex::new(index),
@@ -66,10 +66,13 @@ where
             };
 
             for (i, term) in terms.into_iter().enumerate().take(MAX_TERMS_PER_INDEX) {
+                let sk = format!("{}#{}#{}", E::type_name(), index_name, i); // TODO: HMAC the sort key, too (users#index_name#pk)
+                let term = hex::encode(term);
+
                 entries.push(TableEntry {
                     pk: parition_key.to_string(),
-                    sk: format!("{}#{}#{}", E::type_name(), index_name, i), // TODO: HMAC the sort key, too (users#index_name#pk)
-                    term: Some(hex::encode(term)),
+                    sk,
+                    term: Some(term),
                     attributes: attributes.clone(),
                 });
             }
