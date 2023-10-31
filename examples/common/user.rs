@@ -1,5 +1,4 @@
-use cryptonamo::{traits::DecryptedRecord, Plaintext};
-use cryptonamo_derive::Cryptonamo;
+use cryptonamo::{traits::DecryptedRecord, Cryptonamo, Plaintext};
 use std::collections::HashMap;
 
 #[derive(Debug, Cryptonamo)]
@@ -28,37 +27,6 @@ impl User {
         }
     }
 }
-
-/*impl SearchableRecord for User {
-    fn protected_indexes() -> Vec<&'static str> {
-        vec!["name", "email#name"]
-    }
-
-    fn index_by_name(name: &str) -> Option<Box<dyn ComposableIndex>> {
-        match name {
-            "name" => Some(Box::new(PrefixIndex::new("name", vec![], 3, 10))),
-            "email#name" => Some(Box::new(
-                CompoundIndex::new(ExactIndex::new("email", vec![])).and(PrefixIndex::new(
-                    "name",
-                    vec![],
-                    3,
-                    10,
-                )),
-            )),
-            _ => None,
-        }
-    }
-
-    fn attribute_for_index(&self, index_name: &str) -> Option<ComposablePlaintext> {
-        match index_name {
-            "name" => self.name.clone().try_into().ok(),
-            "email#name" => (self.email.clone(), self.name.clone())
-                .try_into()
-                .ok(),
-            _ => None,
-        }
-    }
-}*/
 
 impl DecryptedRecord for User {
     fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {
