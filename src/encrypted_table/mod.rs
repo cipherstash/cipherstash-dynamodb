@@ -2,7 +2,7 @@ pub mod query;
 mod table_entry;
 pub use self::{
     query::{QueryBuilder, QueryError},
-    table_entry::{Sealed, TableEntry, Unsealed},
+    table_entry::{Sealed, TableEntry, TableAttribute, Unsealed},
 };
 use crate::{
     crypto::*,
@@ -20,7 +20,6 @@ use cipherstash_client::{
 };
 use itertools::Itertools;
 use log::info;
-use serde_dynamo::{aws_sdk_dynamodb_0_29::from_item, to_item};
 use std::collections::HashSet;
 use thiserror::Error;
 
@@ -179,7 +178,7 @@ impl EncryptedTable {
     {
         let mut seen_sk = HashSet::new();
 
-        let unsealed: Unsealed<T> = record.into_unsealed();
+        let unsealed: Unsealed<T> = record.into_unsealed()?;
         let (pk, sealed) = unsealed.seal(&self.cipher, 12).await;
 
         // TODO: Use a combinator

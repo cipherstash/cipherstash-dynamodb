@@ -5,6 +5,7 @@ use cipherstash_client::{
     encryption::{Encryption, Plaintext, compound_indexer::CompoundIndex, IndexTerm},
 };
 use std::{collections::HashMap, iter::once};
+use paste::paste;
 
 const MAX_TERMS_PER_INDEX: usize = 25;
 
@@ -27,28 +28,33 @@ impl<T> Unsealed<T>
         }
     }
 
-    pub fn protected<P: TryInto<Plaintext>>(
+    pub fn protected<F>(
         mut self,
         name: impl Into<String>,
-        plaintext: P,
-    ) -> Result<Self, WriteConversionError> {
+        f: F,
+    ) -> Result<Self, WriteConversionError>
+        where
+            F: FnOnce(&T) -> Plaintext,
+    {
         let name: String = name.into();
 
         self.protected.insert(
             name.to_string(),
-            plaintext
-                .try_into()
-                .map_err(|_| WriteConversionError::ConversionFailed(name))?,
+            f(&self.inner)
         );
         Ok(self)
     }
 
-    pub fn plaintext<P: Into<TableAttribute>>(
+    pub fn plaintext<F>(
         mut self,
         name: impl Into<String>,
-        value: P,
-    ) -> Result<Self, WriteConversionError> {
-        self.unprotected.insert(name.into(), value.into());
+        f: F,
+    ) -> Result<Self, WriteConversionError>
+        where
+            F: FnOnce(&T) -> TableAttribute,
+    {
+        let name: String = name.into();
+        self.unprotected.insert(name.into(), f(&self.inner));
         Ok(self)
     }
 
@@ -227,17 +233,26 @@ pub enum TableAttribute {
     Null,
 }
 
-impl From<String> for TableAttribute {
-    fn from(value: String) -> Self {
-        Self::String(value)
-    }
+macro_rules! impl_from_table_attribute {
+    ($type:ident) => {
+        paste! {
+        impl From<$type> for TableAttribute {
+            fn from(value: $type) -> Self {
+                Self::[<$type:camel>](value)
+            }
+        }
+
+        impl From<&$type> for TableAttribute {
+            fn from(value: &$type) -> Self {
+                Self::[<$type:camel>](value.clone())
+            }
+        }
+        }
+    };
 }
 
-impl From<i32> for TableAttribute {
-    fn from(value: i32) -> Self {
-        Self::I32(value)
-    }
-}
+impl_from_table_attribute!(String);
+impl_from_table_attribute!(i32);
 
 impl TryFrom<Sealed<TableEntry>> for HashMap<String, AttributeValue> {
     type Error = WriteConversionError;

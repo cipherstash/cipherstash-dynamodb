@@ -400,7 +400,7 @@ pub mod crypto;
 mod encrypted_table;
 mod error;
 pub mod traits;
-pub use encrypted_table::{EncryptedTable, QueryBuilder};
+pub use encrypted_table::{EncryptedTable, QueryBuilder, Unsealed, TableAttribute};
 pub use error::Error;
 
 // Re-exports

@@ -6,7 +6,6 @@ use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
     encryption::{
         compound_indexer::CompoundIndex, Encryption, EncryptionError, IndexTerm, Plaintext,
-        TypeParseError,
     },
     schema::column::Index,
 };
@@ -19,8 +18,6 @@ const MAX_TERMS_PER_INDEX: usize = 25;
 pub enum CryptoError {
     #[error("EncryptionError: {0}")]
     EncryptionError(#[from] EncryptionError),
-    #[error("TypeParseError: {0}")]
-    TypeParseError(#[from] TypeParseError),
     #[error("{0}")]
     Other(String),
 }
