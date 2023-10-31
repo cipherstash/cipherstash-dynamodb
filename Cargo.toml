@@ -45,4 +45,5 @@ env_logger = "0.10.0"
 itertools = "0.11.0"
 thiserror = "1.0.50"
 tokio-stream = "0.1.14"
+paste = "1.0.14"
 

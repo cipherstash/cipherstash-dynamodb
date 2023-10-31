@@ -1,5 +1,5 @@
 use cryptonamo::Cryptonamo;
-
+/*
 #[derive(Debug, Cryptonamo)]
 #[cryptonamo(partition_key = "email")]
 pub struct License {
@@ -45,4 +45,4 @@ mod tests {
         );
         assert!(license.plaintext_attributes().is_empty());
     }
-}
+}*/

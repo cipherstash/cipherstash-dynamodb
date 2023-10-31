@@ -952,6 +952,7 @@ dependencies = [
  "lambda_http",
  "lambda_runtime",
  "log",
+ "paste",
  "serde",
  "serde_bytes",
  "serde_dynamo",

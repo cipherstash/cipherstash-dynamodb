@@ -1,6 +1,7 @@
+use cipherstash_client::encryption::compound_indexer::{PrefixIndex, ExactIndex, CompoundIndex};
 use cryptonamo::{
-    traits::{Cryptonamo, EncryptedRecord},
-    Cryptonamo,
+    traits::{Cryptonamo, EncryptedRecord, WriteConversionError, SearchableRecord},
+    Cryptonamo, Unsealed, ComposableIndex, ComposablePlaintext, Plaintext, TableAttribute,
 };
 
 #[derive(Debug)] //, Cryptonamo)]
@@ -49,28 +50,26 @@ impl EncryptedRecord for User {
         vec!["count"]
     }
 
-    fn into_unsealed(self) -> Unsealed<Self> {
-        let mut table_entry = TableEntry::new(self.partition_key(), self.type_name());
-        table_entry.add_attribute("email", self.email);
-        table_entry.add_attribute("name", self.name);
-        table_entry.add_attribute("count", self.count);
+    fn into_unsealed(self) -> Result<Unsealed<Self>, WriteConversionError> {
+        Unsealed::new(self)
+            .protected("name", |user| Plaintext::from(&user.name))?
+            .protected("email", |user| Plaintext::from(&user.email))?
+            .plaintext("count", |user| TableAttribute::from(user.count))
     }
 }
 
-/*impl SearchableRecord for User {
+impl SearchableRecord for User {
     fn protected_indexes() -> Vec<&'static str> {
         vec!["name", "email#name"]
     }
 
     fn index_by_name(name: &str) -> Option<Box<dyn ComposableIndex>> {
         match name {
-            "name" => Some(Box::new(PrefixIndex::new("name", vec![], 3, 10))),
+            "name" => Some(Box::new(PrefixIndex::new("name", vec![]))),
             "email#name" => Some(Box::new(
                 CompoundIndex::new(ExactIndex::new("email", vec![])).and(PrefixIndex::new(
                     "name",
                     vec![],
-                    3,
-                    10,
                 )),
             )),
             _ => None,
@@ -86,7 +85,7 @@ impl EncryptedRecord for User {
             _ => None,
         }
     }
-}*/
+}
 
 /*impl DecryptedRecord for User {
     fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {

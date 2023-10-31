@@ -1,5 +1,5 @@
 use crate::{
-    encrypted_table::{Sealed, TableEntry, Unsealed},
+    encrypted_table::Unsealed,
     ComposableIndex, ComposablePlaintext, Plaintext,
 };
 use std::{collections::HashMap, fmt::Debug};
@@ -33,7 +33,7 @@ pub trait EncryptedRecord: Cryptonamo {
         vec![]
     }
 
-    fn into_unsealed(self) -> Unsealed<Self>;
+    fn into_unsealed(self) -> Result<Unsealed<Self>, WriteConversionError>;
 }
 
 pub trait SearchableRecord: EncryptedRecord {
