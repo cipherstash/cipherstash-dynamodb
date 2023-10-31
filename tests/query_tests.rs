@@ -2,7 +2,6 @@ use cryptonamo::{traits::DecryptedRecord, Cryptonamo, EncryptedTable, Plaintext}
 use serial_test::serial;
 use std::{collections::HashMap, future::Future};
 
-
 #[derive(Debug, PartialEq, Cryptonamo)]
 #[cryptonamo(partition_key = "email")]
 #[cryptonamo(sort_key_prefix = "user")]
