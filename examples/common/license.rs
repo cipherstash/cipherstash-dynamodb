@@ -1,5 +1,6 @@
-use cryptonamo::Cryptonamo;
-/*
+use cryptonamo::{traits::DecryptedRecord, Cryptonamo, Plaintext};
+use std::collections::HashMap;
+
 #[derive(Debug, Cryptonamo)]
 #[cryptonamo(partition_key = "email")]
 pub struct License {

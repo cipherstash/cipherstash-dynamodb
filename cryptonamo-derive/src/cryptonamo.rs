@@ -1,7 +1,7 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use crate::settings::{IndexType, Settings};
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::{Data, DeriveInput, Fields, LitStr};
 
@@ -42,7 +42,7 @@ pub(crate) fn derive_cryptonamo(
                 .flat_map(|x| x.ident.as_ref().map(|x| x.to_string()))
                 .collect();
 
-            let mut compound_indexes = HashSet::<String>::new();
+            let mut compound_indexes: HashMap<String, Vec<(String, String)>> = Default::default();
 
             for field in &fields_named.named {
                 let ident = &field.ident;
@@ -50,6 +50,9 @@ pub(crate) fn derive_cryptonamo(
 
                 // Parse the meta for the field
                 for attr in &field.attrs {
+                    let mut query: Option<(String, String)> = None;
+                    let mut compound_index_name: Option<(String, Span)> = None;
+
                     if attr.path().is_ident("cryptonamo") {
                         attr.parse_nested_meta(|meta| {
                             let directive = meta.path.get_ident().map(|i| i.to_string());
@@ -72,7 +75,7 @@ pub(crate) fn derive_cryptonamo(
                                         .ok_or(meta.error("no index type specified"))?
                                         .to_string();
 
-                                    settings.add_index(index_name, index_type.as_ref())?;
+                                    query = Some(( index_name, index_type ));
 
                                     Ok(())
                                 }
@@ -101,7 +104,7 @@ pub(crate) fn derive_cryptonamo(
                                         return Err(meta.error(format!("Compound index '{index_name}' does not include current field '{field_name}'.")));
                                     }
 
-                                    compound_indexes.insert(index_name);
+                                    compound_index_name = Some(( index_name, meta.input.span() ));
 
                                     Ok(())
                                 }
@@ -109,6 +112,25 @@ pub(crate) fn derive_cryptonamo(
                             }
                         })?;
                     }
+
+                    match (query, compound_index_name) {
+                        (Some((index_name, index_type)), Some((compound_index_name, _))) => {
+                            compound_indexes
+                                .entry(compound_index_name)
+                                .or_default()
+                                .push((index_name, index_type));
+                        }
+
+                        (Some((index_name, index_type)), None) => {
+                            settings.add_index(index_name, index_type.as_ref())?;
+                        }
+
+                        (None, Some((compound_index_name, span))) => {
+                            return Err(syn::Error::new(span,  format!("Compound attribute was specified but no query options were. Specify how this field should be queried with the attribute #[cryptonamo(query = <option>, compound = \"{compound_index_name}\")]")));
+                        }
+
+                        (None, None) => {}
+                    };
                 }
 
                 if !skip {
@@ -125,8 +147,8 @@ pub(crate) fn derive_cryptonamo(
                 }
             }
 
-            for index in compound_indexes.into_iter() {
-                settings.add_compound_index(index)?;
+            for (name, parts) in compound_indexes.into_iter() {
+                settings.add_compound_index(name, parts)?;
             }
         }
     }
@@ -284,4 +306,3 @@ pub(crate) fn derive_cryptonamo(
 
     Ok(expanded)
 }
-

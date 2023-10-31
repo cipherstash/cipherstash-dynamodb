@@ -126,7 +126,6 @@ where
             let (name, plaintexts): (Vec<&String>, Vec<&Plaintext>) =
                 perm.into_iter().map(|x| (&x.0, &x.1)).unzip();
 
-
             let name = name.iter().join("#");
 
             if let Some(index) = T::index_by_name(name.as_str()) {

@@ -21,20 +21,6 @@ impl IndexType {
         IndexType::Single(name, index_type)
     }
 
-    fn to_single(self) -> Option<(String, String)> {
-        match self {
-            IndexType::Single(a, b) => Some((a, b)),
-            _ => None,
-        }
-    }
-
-    fn compound(compound_name: String, field_name: String, index_type: String) -> Self {
-        IndexType::Compound1 {
-            name: compound_name,
-            index: (field_name, index_type),
-        }
-    }
-
     fn and(self, field: String, index_type: String) -> Result<Self, syn::Error> {
         match self {
             IndexType::Single(_, _) => unimplemented!(),
@@ -125,46 +111,85 @@ impl Settings {
         }
     }
 
-    pub(crate) fn add_compound_index(&mut self, name: String) -> Result<(), syn::Error> {
-        let mut parts = name.split("#");
+    fn create_index(name: String, index_type: &str) -> Result<IndexType, syn::Error> {
+        match index_type {
+            "exact" | "prefix" => Ok(IndexType::single(name, index_type.to_string())),
+            _ => Err(syn::Error::new_spanned(
+                index_type,
+                format!("Unsupported index type: {}", index_type),
+            )),
+        }
+    }
 
-        let first = parts.next().ok_or_else(|| {
-            syn::Error::new_spanned("", format!("Expected compound index name to have parts"))
-        })?;
+    pub(crate) fn add_compound_index(
+        &mut self,
+        name: String,
+        parts: Vec<(String, String)>,
+    ) -> Result<(), syn::Error> {
+        let name_parts = name.split("#").collect::<Vec<_>>();
+
+        if name_parts.len() > parts.len() {
+            let missing_fields = name_parts
+                .iter()
+                .filter(|x| !parts.iter().find(|(y, _)| x == &y).is_some())
+                .cloned()
+                .collect::<Vec<_>>();
+
+            return Err(syn::Error::new_spanned(
+                    "",
+                    format!(
+                        "Not all fields were annotated with the #[cryptonamo(compound)] attribute. Missing fields: {}",
+                        missing_fields.join(",")
+                    ),
+                ));
+        }
+
+        if parts.len() > name_parts.len() {
+            let extra_fields = parts
+                .iter()
+                .map(|(x, _)| x)
+                .filter(|x| !name_parts.iter().find(|y| x == y).is_some())
+                .cloned()
+                .collect::<Vec<_>>();
+
+            return Err(syn::Error::new_spanned(
+                    "",
+                    format!(
+                        "Too many fields were annotated with the #[cryptonamo(compound)] attribute. Extra fields: {}",
+                        extra_fields.join(",")
+                    ),
+                ));
+        }
+
+        let mut name_parts_iter = name_parts.into_iter();
+
+        let field = name_parts_iter.next().unwrap();
 
         let mut index = IndexType::Compound1 {
             name: name.clone(),
-            index: self
-                .indexes
-                .get(first)
-                .ok_or_else(|| {
-                    syn::Error::new_spanned("", format!("Expected index {first} to exist"))
-                })?
-                .clone()
-                .to_single()
+            index: parts
+                .iter()
+                .find(|x| x.0 == field)
                 .ok_or_else(|| {
                     syn::Error::new_spanned(
                         "",
-                        format!("Expected index {first} to not be compound index"),
+                        format!("Internal error: index was not specified for field \"{field}\""),
                     )
-                })?,
+                })?
+                .clone(),
         };
 
-        while let Some(part) = parts.next() {
-            let (field, index_type) = self
-                .indexes
-                .get(part)
-                .ok_or_else(|| {
-                    syn::Error::new_spanned("", format!("Expected index {part} to exist"))
-                })?
-                .clone()
-                .to_single()
+        while let Some(field) = name_parts_iter.next() {
+            let (field, index_type) = parts
+                .iter()
+                .find(|x| x.0 == field)
                 .ok_or_else(|| {
                     syn::Error::new_spanned(
                         "",
-                        format!("Expected index {first} to not be compound index"),
+                        format!("Internal error: index was not specified for field \"{field}\""),
                     )
-                })?;
+                })?
+                .clone();
 
             index = index.and(field, index_type)?;
         }
@@ -180,19 +205,10 @@ impl Settings {
         name: impl Into<String>,
         index_type: &str,
     ) -> Result<(), syn::Error> {
-        let name: String = name.into();
-        match index_type {
-            "exact" | "prefix" => self.indexes.insert(
-                name.to_string(),
-                IndexType::single(name, index_type.to_string()),
-            ),
-            _ => Err(syn::Error::new_spanned(
-                index_type,
-                format!("Unsupported index type: {}", index_type),
-            ))?,
-        };
+        let name = name.into();
+        self.indexes
+            .insert(name.clone(), Self::create_index(name, index_type)?);
 
         Ok(())
     }
 }
-
