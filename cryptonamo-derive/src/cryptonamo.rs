@@ -42,7 +42,7 @@ pub(crate) fn derive_cryptonamo(
                 .flat_map(|x| x.ident.as_ref().map(|x| x.to_string()))
                 .collect();
 
-            let mut compound_indexes: HashMap<String, Vec<(String, String)>> = Default::default();
+            let mut compound_indexes: HashMap<String, Vec<(String, String, Span)>> = Default::default();
 
             for field in &fields_named.named {
                 let ident = &field.ident;
@@ -50,10 +50,10 @@ pub(crate) fn derive_cryptonamo(
 
                 // Parse the meta for the field
                 for attr in &field.attrs {
-                    let mut query: Option<(String, String)> = None;
-                    let mut compound_index_name: Option<(String, Span)> = None;
-
                     if attr.path().is_ident("cryptonamo") {
+                        let mut query: Option<(String, String, Span)> = None;
+                        let mut compound_index_name: Option<(String, Span)> = None;
+
                         attr.parse_nested_meta(|meta| {
                             let directive = meta.path.get_ident().map(|i| i.to_string());
                             match directive.as_deref() {
@@ -69,13 +69,14 @@ pub(crate) fn derive_cryptonamo(
                                 }
                                 Some("query") => {
                                     let value = meta.value()?;
+                                    let index_type_span = value.span();
                                     let index_type = value.parse::<LitStr>()?.value();
                                     let index_name = ident
                                         .as_ref()
                                         .ok_or(meta.error("no index type specified"))?
                                         .to_string();
 
-                                    query = Some(( index_name, index_type ));
+                                    query = Some(( index_name, index_type, index_type_span ));
 
                                     Ok(())
                                 }
@@ -111,26 +112,26 @@ pub(crate) fn derive_cryptonamo(
                                 _ => Err(meta.error("unsupported field attribute")),
                             }
                         })?;
+
+                        match (query, compound_index_name) {
+                            (Some((index_name, index_type, span)), Some((compound_index_name, _))) => {
+                                compound_indexes
+                                    .entry(compound_index_name)
+                                    .or_default()
+                                    .push((index_name, index_type, span));
+                            }
+
+                            (Some((index_name, index_type, span)), None) => {
+                                settings.add_index(index_name, index_type.as_ref(), span)?;
+                            }
+
+                            (None, Some((compound_index_name, span))) => {
+                                return Err(syn::Error::new(span,  format!("Compound attribute was specified but no query options were. Specify how this field should be queried with the attribute #[cryptonamo(query = <option>, compound = \"{compound_index_name}\")]")));
+                            }
+
+                            (None, None) => {}
+                        };
                     }
-
-                    match (query, compound_index_name) {
-                        (Some((index_name, index_type)), Some((compound_index_name, _))) => {
-                            compound_indexes
-                                .entry(compound_index_name)
-                                .or_default()
-                                .push((index_name, index_type));
-                        }
-
-                        (Some((index_name, index_type)), None) => {
-                            settings.add_index(index_name, index_type.as_ref())?;
-                        }
-
-                        (None, Some((compound_index_name, span))) => {
-                            return Err(syn::Error::new(span,  format!("Compound attribute was specified but no query options were. Specify how this field should be queried with the attribute #[cryptonamo(query = <option>, compound = \"{compound_index_name}\")]")));
-                        }
-
-                        (None, None) => {}
-                    };
                 }
 
                 if !skip {

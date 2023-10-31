@@ -1,5 +1,5 @@
 error: Compound attribute was specified but no query options were. Specify how this field should be queried with the attribute #[cryptonamo(query = <option>, compound = "email#name")]
- --> tests/ui/compound-index-missing-config.rs:5:41
+ --> tests/ui/compound-index-missing-config.rs:6:41
   |
-5 |     #[cryptonamo(compound = "email#name")]
+6 |     #[cryptonamo(compound = "email#name")]
   |                                         ^
