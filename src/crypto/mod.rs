@@ -50,7 +50,7 @@ where
     for index_name in E::protected_indexes().iter() {
         if let Some((attr, index)) = target
             .attribute_for_index(index_name)
-            .and_then(|attr| E::index_by_name(index_name).and_then(|index| Some((attr, index))))
+            .and_then(|attr| E::index_by_name(index_name).map(|index| (attr, index)))
         {
             let index_term = cipher.compound_index(
                 &CompoundIndex::new(index),
