@@ -107,7 +107,7 @@ impl EncryptedTable {
     where
         R: SearchableRecord + DecryptedRecord,
     {
-        QueryBuilder::new(&self)
+        QueryBuilder::new(self)
     }
 
     pub async fn get<T>(&self, pk: &str) -> Result<Option<T>, GetError>

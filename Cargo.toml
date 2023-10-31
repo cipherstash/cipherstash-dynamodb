@@ -35,8 +35,9 @@ aes = "0.8.3"
 hex = { version = "0.4.3", features = [ "serde" ] }
 cryptonamo-derive = { path = "cryptonamo-derive" }
 
-cipherstash-client = { path = "../../cipherstash-suite/packages/cipherstash-client/", features = [ "tokio" ] }
-#cipherstash-client = { git = "ssh://git@github.com/cipherstash/cipherstash-suite.git", branch = "feat/compound-spike", package = "cipherstash-client", features = [ "tokio" ] }
+# cipherstash-client = { path = "../../cipherstash-suite/packages/cipherstash-client/", features = [ "tokio" ] }
+cipherstash-client = { path = "./vendor/cipherstash-client/", features = [ "tokio" ] }
+# cipherstash-client = { git = "ssh://git@github.com/cipherstash/cipherstash-suite.git", branch = "feat/compound-spike", package = "cipherstash-client", features = [ "tokio" ] }
 
 async-trait = "0.1.73"
 serde_with = "3.3.0"
@@ -47,3 +48,6 @@ thiserror = "1.0.50"
 tokio-stream = "0.1.14"
 paste = "1.0.14"
 
+[dev-dependencies]
+serial_test = "2.0.0"
+trybuild = "1.0.85"

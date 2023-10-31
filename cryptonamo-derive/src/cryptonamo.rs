@@ -1,9 +1,14 @@
-use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{DeriveInput, LitStr, Data, Fields};
 use crate::settings::{Settings, IndexType, AttributeMode};
+use std::collections::HashMap;
+use proc_macro2::{Span, TokenStream};
 
-pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInput) -> Result<TokenStream, syn::Error> {
+pub(crate) fn derive_cryptonamo(
+    DeriveInput {
+        ident, attrs, data, ..
+    }: DeriveInput,
+) -> Result<TokenStream, syn::Error> {
     let mut settings = Settings::new(ident.to_string().to_lowercase());
 
     for attr in attrs {
@@ -30,6 +35,14 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
     // Only support structs
     if let Data::Struct(data_struct) = &data {
         if let Fields::Named(fields_named) = &data_struct.fields {
+            let all_field_names: Vec<String> = fields_named
+                .named
+                .iter()
+                .flat_map(|x| x.ident.as_ref().map(|x| x.to_string()))
+                .collect();
+
+            let mut compound_indexes: HashMap<String, Vec<(String, String, Span)>> = Default::default();
+
             for field in &fields_named.named {
                 let ident = &field.ident;
                 let mut attr_mode = AttributeMode::Protected;
@@ -37,8 +50,8 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
                 // Parse the meta for the field
                 for attr in &field.attrs {
                     if attr.path().is_ident("cryptonamo") {
-                        let mut compound_index_name: Option<String> = None;
-                        let mut index: Option<(String, String)> = None;
+                        let mut query: Option<(String, String, Span)> = None;
+                        let mut compound_index_name: Option<(String, Span)> = None;
 
                         attr.parse_nested_meta(|meta| {
                             let directive = meta.path.get_ident().map(|i| i.to_string());
@@ -55,23 +68,68 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
                                 }
                                 Some("query") => {
                                     let value = meta.value()?;
+                                    let index_type_span = value.span();
                                     let index_type = value.parse::<LitStr>()?.value();
-                                    let index_name = ident.as_ref().ok_or(meta.error("no index type specified"))?.to_string();
-                                    index = Some((index_name, index_type));
+                                    let index_name = ident
+                                        .as_ref()
+                                        .ok_or(meta.error("no index type specified"))?
+                                        .to_string();
+
+                                    query = Some(( index_name, index_type, index_type_span ));
+
                                     Ok(())
                                 }
                                 Some("compound") => {
                                     let value = meta.value()?;
-                                    compound_index_name = Some(value.parse::<LitStr>()?.value());
+
+                                    let field_name = ident
+                                        .as_ref()
+                                        .ok_or(meta.error("no index type specified"))?
+                                        .to_string();
+
+                                    let index_name = value.parse::<LitStr>()?.value();
+
+                                    let is_valid_index = index_name
+                                        .split("#")
+                                        .all(|x| all_field_names.iter().any(|y| y == x));
+
+                                    if !is_valid_index {
+                                        return Err(meta.error(format!("Compound index '{index_name}' is not valid. It must be valid fields separated by a '#' character.")));
+                                    }
+
+                                    let is_field_mentioned = index_name.split("#")
+                                        .any(|x| x == &field_name);
+
+                                    if !is_field_mentioned {
+                                        return Err(meta.error(format!("Compound index '{index_name}' does not include current field '{field_name}'.")));
+                                    }
+
+                                    compound_index_name = Some(( index_name, meta.input.span() ));
+
                                     Ok(())
                                 }
                                 _ => Err(meta.error("unsupported field attribute")),
                             }
                         })?;
 
-                        if let Some(index) = index {
-                            settings.add_index(&index.0, &index.1, compound_index_name)?;
-                        }
+                        match (query, compound_index_name) {
+                            (Some((index_name, index_type, span)), Some((compound_index_name, _))) => {
+                                compound_indexes
+                                    .entry(compound_index_name)
+                                    .or_default()
+                                    .push((index_name, index_type, span));
+                            }
+
+                            (Some((index_name, index_type, span)), None) => {
+                                settings.add_index(index_name, index_type.as_ref(), span)?;
+                            }
+
+                            (None, Some((compound_index_name, span))) => {
+                                return Err(syn::Error::new(span,  format!("Compound attribute was specified but no query options were. Specify how this field should be queried with the attribute #[cryptonamo(query = <option>, compound = \"{compound_index_name}\")]")));
+                            }
+
+                            (None, None) => {}
+                        };
                     }
                 }
 
@@ -82,6 +140,10 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
                         .to_string(),
                     attr_mode
                 );
+            }
+
+            for (name, parts) in compound_indexes.into_iter() {
+                settings.add_compound_index(name, parts)?;
             }
         }
     }
@@ -126,30 +188,36 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
         }
     });
 
-    let attributes_for_index_impl = settings.indexes.iter().map(|(_, index)| {
-        match index {
-            IndexType::Single(name, _) => {
-                let field = format_ident!("{}", name);
+    let attributes_for_index_impl = settings.indexes.iter().map(|(_, index)| match index {
+        IndexType::Single(name, _) => {
+            let field = format_ident!("{}", name);
 
-                quote! {
-                    #name => self.#field.clone().try_into().ok()
-                }
-            },
-            IndexType::Compound1 { name, index: (a, _) } => {
-                let field = format_ident!("{}", a);
+            quote! {
+                #name => self.#field.clone().try_into().ok()
+            }
+        }
+        IndexType::Compound1 {
+            name,
+            index: (a, _),
+        } => {
+            let field = format_ident!("{}", a);
 
-                quote! {
-                    #name => self.#field.clone().try_into().ok()
-                }
-            },
-            IndexType::Compound2 { name, index: ((a, _), (b, _)) } => {
-                let field_a = format_ident!("{}", a);
-                let field_b = format_ident!("{}", b);
+            quote! {
+                #name => self.#field.clone().try_into().ok()
+            }
+        }
+        IndexType::Compound2 {
+            name,
+            index: ((a, _), (b, _)),
+        } => {
+            let field_a = format_ident!("{}", a);
+            let field_b = format_ident!("{}", b);
 
-                quote! {
-                    #name => (self.#field_a.clone(), self.#field_b.clone()).try_into().ok()
+            quote! {
+                #name => {
+                    (self.#field_a.clone(), self.#field_b.clone()).try_into().ok()
                 }
-            },
+            }
         }
     });
 
@@ -210,7 +278,7 @@ pub(crate) fn derive_cryptonamo(DeriveInput { ident, attrs, data, ..}: DeriveInp
                 match name {
                     #(#indexes_impl,)*
                     _ => None,
-                }    
+                }
             }
 
             fn attribute_for_index(&self, index_name: &str) -> Option<cryptonamo::ComposablePlaintext> {
