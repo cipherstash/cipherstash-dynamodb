@@ -7,9 +7,11 @@ use std::collections::HashMap;
 #[cryptonamo(sort_key_prefix = "user")]
 pub struct User {
     #[cryptonamo(query = "exact", compound = "email#name")]
+    #[cryptonamo(query = "exact")]
     pub email: String,
 
     #[cryptonamo(query = "prefix", compound = "email#name")]
+    #[cryptonamo(query = "prefix")]
     pub name: String,
 
     #[cryptonamo(plaintext)]

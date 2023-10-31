@@ -1,0 +1,5 @@
+error: Compound index 'email#name' does not include current field 'age'.
+ --> tests/ui/compound-index-too-many-fields.rs:9:35
+  |
+9 |     #[cryptonamo(query = "exact", compound = "email#name")]
+  |                                   ^^^^^^^^^^^^^^^^^^^^^^^
