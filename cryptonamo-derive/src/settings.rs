@@ -1,3 +1,4 @@
+use proc_macro2::Span;
 use quote::format_ident;
 use std::collections::HashMap;
 use syn::LitStr;
@@ -100,32 +101,22 @@ impl Settings {
         }
     }
 
-    fn create_index(name: String, index_type: &str) -> Result<IndexType, syn::Error> {
-        match index_type {
-            "exact" | "prefix" => Ok(IndexType::single(name, index_type.to_string())),
-            _ => Err(syn::Error::new_spanned(
-                index_type,
-                format!("Unsupported index type: {}", index_type),
-            )),
-        }
-    }
-
     pub(crate) fn add_compound_index(
         &mut self,
         name: String,
-        parts: Vec<(String, String)>,
+        parts: Vec<(String, String, Span)>,
     ) -> Result<(), syn::Error> {
         let name_parts = name.split("#").collect::<Vec<_>>();
 
         if name_parts.len() > parts.len() {
             let missing_fields = name_parts
                 .iter()
-                .filter(|x| !parts.iter().find(|(y, _)| x == &y).is_some())
+                .filter(|x| !parts.iter().find(|(y, _, _)| x == &y).is_some())
                 .cloned()
                 .collect::<Vec<_>>();
 
-            return Err(syn::Error::new_spanned(
-                    "",
+            return Err(syn::Error::new(
+                    Span::call_site(),
                     format!(
                         "Not all fields were annotated with the #[cryptonamo(compound)] attribute. Missing fields: {}",
                         missing_fields.join(",")
@@ -136,13 +127,13 @@ impl Settings {
         if parts.len() > name_parts.len() {
             let extra_fields = parts
                 .iter()
-                .map(|(x, _)| x)
+                .map(|(x, _, _)| x)
                 .filter(|x| !name_parts.iter().find(|y| x == y).is_some())
                 .cloned()
                 .collect::<Vec<_>>();
 
-            return Err(syn::Error::new_spanned(
-                    "",
+            return Err(syn::Error::new(
+                    Span::call_site(),
                     format!(
                         "Too many fields were annotated with the #[cryptonamo(compound)] attribute. Extra fields: {}",
                         extra_fields.join(",")
@@ -154,31 +145,37 @@ impl Settings {
 
         let field = name_parts_iter.next().unwrap();
 
+        let (field, index_type, index_type_span) = parts
+            .iter()
+            .find(|x| x.0 == field)
+            .ok_or_else(|| {
+                syn::Error::new(
+                    Span::call_site(),
+                    format!("Internal error: index was not specified for field \"{field}\""),
+                )
+            })?
+            .clone();
+
+        Self::validate_index_type(index_type.as_str(), index_type_span)?;
+
         let mut index = IndexType::Compound1 {
             name: name.clone(),
-            index: parts
-                .iter()
-                .find(|x| x.0 == field)
-                .ok_or_else(|| {
-                    syn::Error::new_spanned(
-                        "",
-                        format!("Internal error: index was not specified for field \"{field}\""),
-                    )
-                })?
-                .clone(),
+            index: (field, index_type),
         };
 
         while let Some(field) = name_parts_iter.next() {
-            let (field, index_type) = parts
+            let (field, index_type, index_type_span) = parts
                 .iter()
                 .find(|x| x.0 == field)
                 .ok_or_else(|| {
-                    syn::Error::new_spanned(
-                        "",
+                    syn::Error::new(
+                        Span::call_site(),
                         format!("Internal error: index was not specified for field \"{field}\""),
                     )
                 })?
                 .clone();
+
+            Self::validate_index_type(index_type.as_str(), index_type_span)?;
 
             index = index.and(field, index_type)?;
         }
@@ -188,15 +185,32 @@ impl Settings {
         Ok(())
     }
 
+    fn validate_index_type(index_type: &str, index_type_span: Span) -> Result<(), syn::Error> {
+        if !matches!(index_type.as_ref(), "exact" | "prefix") {
+            Err(syn::Error::new(
+                index_type_span,
+                format!("Unsupported index type: {}", index_type),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
     // TODO: Add an IndexOptions enum so we can pass those through as well
     pub(crate) fn add_index(
         &mut self,
         name: impl Into<String>,
         index_type: &str,
+        index_type_span: Span,
     ) -> Result<(), syn::Error> {
         let name = name.into();
-        self.indexes
-            .insert(name.clone(), Self::create_index(name, index_type)?);
+
+        Self::validate_index_type(index_type, index_type_span)?;
+
+        self.indexes.insert(
+            name.clone(),
+            IndexType::single(name, index_type.to_string()),
+        );
 
         Ok(())
     }
