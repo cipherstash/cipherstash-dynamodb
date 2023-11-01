@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-
-use crate::settings::{IndexType, Settings};
+use crate::settings::{AttributeMode, IndexType, Settings};
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
+use std::collections::HashMap;
 use syn::{Data, DeriveInput, Fields, LitStr};
 
 pub(crate) fn derive_cryptonamo(
@@ -42,7 +41,8 @@ pub(crate) fn derive_cryptonamo(
                 .flat_map(|x| x.ident.as_ref().map(|x| x.to_string()))
                 .collect();
 
-            let mut compound_indexes: HashMap<String, Vec<(String, String, Span)>> = Default::default();
+            let mut compound_indexes: HashMap<String, Vec<(String, String, Span)>> =
+                Default::default();
 
             for field in &fields_named.named {
                 let ident = &field.ident;
@@ -114,7 +114,10 @@ pub(crate) fn derive_cryptonamo(
                         })?;
 
                         match (query, compound_index_name) {
-                            (Some((index_name, index_type, span)), Some((compound_index_name, _))) => {
+                            (
+                                Some((index_name, index_type, span)),
+                                Some((compound_index_name, _)),
+                            ) => {
                                 compound_indexes
                                     .entry(compound_index_name)
                                     .or_default()
@@ -134,18 +137,16 @@ pub(crate) fn derive_cryptonamo(
                     }
                 }
 
-                if !skip {
-                    settings.add_attribute(
-                        ident
-                            .as_ref()
-                            .ok_or(syn::Error::new_spanned(
-                                &settings.sort_key_prefix,
-                                "missing field",
-                            ))?
-                            .to_string(),
-                        will_encrypt,
-                    );
-                }
+                settings.add_attribute(
+                    ident
+                        .as_ref()
+                        .ok_or(syn::Error::new_spanned(
+                            &settings.sort_key_prefix,
+                            "missing field",
+                        ))?
+                        .to_string(),
+                    attr_mode,
+                );
             }
 
             for (name, parts) in compound_indexes.into_iter() {
@@ -158,23 +159,9 @@ pub(crate) fn derive_cryptonamo(
     let partition_key = format_ident!("{}", settings.get_partition_key()?);
     let type_name = settings.sort_key_prefix.to_string();
 
-    let protected_impl = settings.protected_attributes.iter().map(|name| {
-        let field = format_ident!("{}", name);
-
-        quote! {
-            attributes.insert(#name, cryptonamo::Plaintext::from(self.#field.clone()));
-        }
-    });
-
-    let plaintext_impl = settings.unprotected_attributes.iter().map(|name| {
-        let field = format_ident!("{}", name);
-
-        quote! {
-            attributes.insert(#name, cryptonamo::Plaintext::from(self.#field.clone()));
-        }
-    });
-
     let protected_index_names = settings.indexes.keys();
+    let protected_attributes = &settings.protected_attributes;
+    let plaintext_attributes = &settings.unprotected_attributes;
 
     let indexes_impl = settings.indexes.iter().map(|(_, index)| {
         match index {
@@ -228,6 +215,7 @@ pub(crate) fn derive_cryptonamo(
     });
 
     let non_skipped_attributes = settings.non_skipped_attributes();
+
     let decrypt_attributes_impl = non_skipped_attributes.iter().map(|name| {
         let field = format_ident!("{}", name);
 
@@ -249,6 +237,40 @@ pub(crate) fn derive_cryptonamo(
         }
     });
 
+    let into_unsealed_impl = [quote! { Unsealed::new(self) }]
+        .into_iter()
+        .chain(protected_attributes.iter().map(|attr| {
+            let attr_ident = format_ident!("{attr}");
+
+            quote! {
+                .protected(#attr, |x| cryptonamo::Plaintext::from(&x.#attr_ident))?
+            }
+        }))
+        .chain(plaintext_attributes.iter().map(|attr| {
+            let attr_ident = format_ident!("{attr}");
+
+            quote! {
+                .plaintext(#attr, |x| cryptonamo::TableAttribute::from(&x.#attr_ident))
+            }
+        }));
+
+    let from_unsealed_impl = []
+        .into_iter()
+        .chain(protected_attributes.iter().map(|attr| {
+            let attr_ident = format_ident!("{attr}");
+
+            quote! {
+                attr_ident: unsealed.protected(#attr, |x| cryptonamo::Plaintext::from(&x.#attr_ident))?
+            }
+        }))
+        .chain(plaintext_attributes.iter().map(|attr| {
+            let attr_ident = format_ident!("{attr}");
+
+            quote! {
+                .plaintext(#attr, |x| cryptonamo::TableAttribute::from(&x.#attr_ident))
+            }
+        }));
+
     let expanded = quote! {
         impl cryptonamo::traits::Cryptonamo for #ident {
             fn type_name() -> &'static str {
@@ -261,16 +283,16 @@ pub(crate) fn derive_cryptonamo(
         }
 
         impl cryptonamo::traits::EncryptedRecord for #ident {
-            fn protected_attributes(&self) -> std::collections::HashMap<&'static str, cryptonamo::Plaintext> {
-                let mut attributes = std::collections::HashMap::new();
-                #(#protected_impl)*
-                attributes
+            fn protected_attributes() -> Vec<&'static str> {
+                vec![#(#protected_attributes,)*]
             }
 
-            fn plaintext_attributes(&self) -> std::collections::HashMap<&'static str, cryptonamo::Plaintext> {
-                let mut attributes = std::collections::HashMap::new();
-                #(#plaintext_impl)*
-                attributes
+            fn plaintext_attributes() -> Vec<&'static str> {
+                vec![#(#plaintext_attributes,)*]
+            }
+
+            fn into_unsealed(self) -> Result<Unsealed<Self>, WriteConversionError> {
+                #(#into_unsealed_impl)*
             }
         }
 
@@ -301,6 +323,14 @@ pub(crate) fn derive_cryptonamo(
                     #(#decrypt_attributes_impl,)*
                     #(#skipped_attributes_impl,)*
                 })
+            }
+
+            fn ciphertexts(&self) -> std::collections::HashMap<&'static str, String> {
+                todo!()
+            }
+
+            fn from_unsealed(unsealed: Unsealed<Self>) -> Result<Self, cryptonamo::traits::ReadConversionError> {
+                todo!()
             }
         }
     };
