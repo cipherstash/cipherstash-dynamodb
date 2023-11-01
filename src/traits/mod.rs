@@ -1,7 +1,4 @@
-use crate::{
-    encrypted_table::Unsealed,
-    ComposableIndex, ComposablePlaintext, Plaintext,
-};
+use crate::{encrypted_table::Unsealed, ComposableIndex, ComposablePlaintext, Plaintext};
 use std::{collections::HashMap, fmt::Debug};
 use thiserror::Error;
 

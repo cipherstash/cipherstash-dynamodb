@@ -2,11 +2,14 @@ pub mod query;
 mod table_entry;
 pub use self::{
     query::{QueryBuilder, QueryError},
-    table_entry::{Sealed, TableEntry, TableAttribute, Unsealed},
+    table_entry::{Sealed, TableAttribute, TableEntry, Unsealed},
 };
 use crate::{
     crypto::*,
-    traits::{DecryptedRecord, EncryptedRecord, ReadConversionError, SearchableRecord, WriteConversionError},
+    traits::{
+        DecryptedRecord, EncryptedRecord, ReadConversionError, SearchableRecord,
+        WriteConversionError,
+    },
 };
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Delete, Put, TransactWriteItem},

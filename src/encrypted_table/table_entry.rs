@@ -1,11 +1,14 @@
-use crate::traits::{ReadConversionError, WriteConversionError, SearchableRecord};
+use crate::{
+    crypto::encrypt_partition_key,
+    traits::{ReadConversionError, SearchableRecord, WriteConversionError},
+};
 use aws_sdk_dynamodb::types::AttributeValue;
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
-    encryption::{Encryption, Plaintext, compound_indexer::CompoundIndex, IndexTerm},
+    encryption::{compound_indexer::CompoundIndex, Encryption, IndexTerm, Plaintext},
 };
-use std::{collections::HashMap, iter::once};
 use paste::paste;
+use std::{collections::HashMap, iter::once};
 
 const MAX_TERMS_PER_INDEX: usize = 25;
 
@@ -18,8 +21,7 @@ pub struct Unsealed<T> {
     unprotected: HashMap<String, TableAttribute>,
 }
 
-impl<T> Unsealed<T>
-{
+impl<T> Unsealed<T> {
     pub fn new(inner: T) -> Self {
         Self {
             inner,
@@ -33,15 +35,12 @@ impl<T> Unsealed<T>
         name: impl Into<String>,
         f: F,
     ) -> Result<Self, WriteConversionError>
-        where
-            F: FnOnce(&T) -> Plaintext,
+    where
+        F: FnOnce(&T) -> Plaintext,
     {
         let name: String = name.into();
 
-        self.protected.insert(
-            name.to_string(),
-            f(&self.inner)
-        );
+        self.protected.insert(name.to_string(), f(&self.inner));
         Ok(self)
     }
 
@@ -50,8 +49,8 @@ impl<T> Unsealed<T>
         name: impl Into<String>,
         f: F,
     ) -> Result<Self, WriteConversionError>
-        where
-            F: FnOnce(&T) -> TableAttribute,
+    where
+        F: FnOnce(&T) -> TableAttribute,
     {
         let name: String = name.into();
         self.unprotected.insert(name.into(), f(&self.inner));
@@ -61,16 +60,16 @@ impl<T> Unsealed<T>
     pub(crate) async fn seal<C>(
         self,
         cipher: &Encryption<C>,
-        term_length: usize
-    // TODO: SealError
+        term_length: usize, // TODO: SealError
     ) -> (String, Vec<Sealed<TableEntry>>)
     where
         C: Credentials<Token = ViturToken>,
         T: SearchableRecord,
     {
+        let pk = encrypt_partition_key(&self.inner.partition_key(), cipher).unwrap(); // FIXME
+
         let mut table_entry = TableEntry::new_with_attributes(
-            // TODO: Encrypt partition key? Make it optional?
-            self.inner.partition_key(),
+            pk.clone(),
             T::type_name().to_string(),
             None,
             self.unprotected,
@@ -100,42 +99,51 @@ impl<T> Unsealed<T>
                 }
             });
 
-        // Indexes
-        (
-            self.inner.partition_key(),
-            once(Sealed(table_entry.clone()))
-            .chain(
-            T::protected_indexes().iter().flat_map(|index_name| {
-            let (attr, index) = self.inner
-                .attribute_for_index(*index_name)
-                .and_then(|attr| T::index_by_name(*index_name)
-                .and_then(|index| Some((attr, index))))
-                .unwrap();
+        let table_entries = T::protected_indexes()
+            .iter()
+            .flat_map(|index_name| {
+                let (attr, index) = self
+                    .inner
+                    .attribute_for_index(*index_name)
+                    .and_then(|attr| {
+                        T::index_by_name(*index_name).and_then(|index| Some((attr, index)))
+                    })
+                    .unwrap();
 
-            let index_term = cipher.compound_index(
-                &CompoundIndex::new(index),
-                attr,
-                Some(format!("{}#{}", T::type_name(), index_name)),
-                term_length,
-            ).unwrap(); // FIXME: Error
+                let index_term = cipher
+                    .compound_index(
+                        &CompoundIndex::new(index),
+                        attr,
+                        Some(format!("{}#{}", T::type_name(), index_name)),
+                        term_length,
+                    )
+                    .unwrap(); // FIXME: Error
 
-            let terms = match index_term {
-                IndexTerm::Binary(x) => vec![x],
-                IndexTerm::BinaryVec(x) => x,
-                _ => todo!(),
-            };
+                let terms = match index_term {
+                    IndexTerm::Binary(x) => vec![x],
+                    IndexTerm::BinaryVec(x) => x,
+                    _ => todo!(),
+                };
 
-            terms.iter().enumerate().take(MAX_TERMS_PER_INDEX).map(|(i, term)| {
-                Sealed(TableEntry::new_with_attributes(
-                    self.inner.partition_key(),
-                    format!("{}#{}#{}", T::type_name(), index_name, i), // TODO: HMAC the sort key, too (users#index_name#pk)
-                    Some(hex::encode(term)),
-                    table_entry.attributes.clone(),
-                ))
-            }).collect::<Vec<Sealed<TableEntry>>>()
-        })).collect())
+                terms
+                    .iter()
+                    .enumerate()
+                    .take(MAX_TERMS_PER_INDEX)
+                    .map(|(i, term)| {
+                        Sealed(
+                            table_entry
+                                .clone()
+                                .set_term(hex::encode(term))
+                                // TODO: HMAC the sort key, too (users#index_name#pk)
+                                .set_sk(format!("{}#{}#{}", T::type_name(), index_name, i)),
+                        )
+                    })
+                    .collect::<Vec<Sealed<TableEntry>>>()
+            })
+            .chain(once(Sealed(table_entry.clone())))
+            .collect();
 
-        
+        (pk, table_entries)
     }
 
     pub(crate) async fn unseal<C>(sealed: Sealed<TableEntry>, cipher: &Encryption<C>) -> Self
@@ -157,18 +165,22 @@ impl<T> Unsealed<T>
 pub struct Sealed<T>(T);
 
 impl<T> Sealed<T> {
-    pub fn vec_from<O: TryInto<Self>>(items: Vec<O>) -> Result<Vec<Self>, <O as TryInto<Self>>::Error> {
+    pub fn vec_from<O: TryInto<Self>>(
+        items: Vec<O>,
+    ) -> Result<Vec<Self>, <O as TryInto<Self>>::Error> {
         items.into_iter().map(Self::from_inner).collect()
     }
 
-    pub(super) fn from_inner<O: TryInto<Self>>(item: O) -> Result<Self, <O as TryInto<Self>>::Error> {
+    pub(super) fn from_inner<O: TryInto<Self>>(
+        item: O,
+    ) -> Result<Self, <O as TryInto<Self>>::Error> {
         item.try_into()
     }
 
     pub(super) fn into_inner(self) -> T {
         self.0
     }
-    
+
     pub(super) fn inner(&self) -> &T {
         &self.0
     }
@@ -202,14 +214,6 @@ impl TableEntry {
         }
     }
 
-    pub fn add_attribute(&mut self, k: impl Into<String>, v: TableAttribute) {
-        self.attributes.insert(k.into(), v);
-    }
-
-    pub fn set_term(&mut self, term: String) {
-        self.term = Some(term);
-    }
-
     pub fn new_with_attributes(
         pk: String,
         sk: String,
@@ -222,6 +226,20 @@ impl TableEntry {
             term,
             attributes,
         }
+    }
+
+    pub fn add_attribute(&mut self, k: impl Into<String>, v: TableAttribute) {
+        self.attributes.insert(k.into(), v);
+    }
+
+    pub(crate) fn set_term(mut self, term: impl Into<String>) -> Self {
+        self.term = Some(term.into());
+        self
+    }
+
+    pub(crate) fn set_sk(mut self, sk: impl Into<String>) -> Self {
+        self.sk = sk.into();
+        self
     }
 }
 
