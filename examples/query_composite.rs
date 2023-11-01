@@ -21,14 +21,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let table = EncryptedTable::init(client, "users").await?;
 
-    /*let results: Vec<User> = table
+    let results: Vec<User> = table
         .query()
         .eq("email", "jane@smith.org")
         .starts_with("name", "Jane")
         .send()
         .await?;
 
-    dbg!(results);*/
+    dbg!(results);
 
     Ok(())
 }

@@ -214,60 +214,33 @@ pub(crate) fn derive_cryptonamo(
         }
     });
 
-    let non_skipped_attributes = settings.non_skipped_attributes();
-
-    let decrypt_attributes_impl = non_skipped_attributes.iter().map(|name| {
-        let field = format_ident!("{}", name);
-
-        quote! {
-            #field: attributes
-                .get(#name)
-                .ok_or(cryptonamo::traits::ReadConversionError::NoSuchAttribute(#name.to_string()))?
-                .clone()
-                .try_into()
-                .map_err(|_| cryptonamo::traits::ReadConversionError::ConversionFailed(#name.to_string()))?
-        }
-    });
-
-    let skipped_attributes_impl = settings.skipped_attributes.iter().map(|name| {
-        let field = format_ident!("{}", name);
-
-        quote! {
-            #field: Default::default()
-        }
-    });
-
-    let into_unsealed_impl = [quote! { Unsealed::new(self) }]
-        .into_iter()
-        .chain(protected_attributes.iter().map(|attr| {
+    let into_unsealed_impl = protected_attributes.iter().map(|attr| {
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                .protected(#attr, |x| cryptonamo::Plaintext::from(&x.#attr_ident))?
+                .protected(#attr, |x| cryptonamo::traits::Plaintext::from(&x.#attr_ident))
             }
-        }))
+        })
         .chain(plaintext_attributes.iter().map(|attr| {
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                .plaintext(#attr, |x| cryptonamo::TableAttribute::from(&x.#attr_ident))
+                .plaintext(#attr, |x| cryptonamo::traits::TableAttribute::from(&x.#attr_ident))
             }
         }));
 
-    let from_unsealed_impl = []
-        .into_iter()
-        .chain(protected_attributes.iter().map(|attr| {
+    let from_unsealed_impl = protected_attributes.iter().map(|attr| {
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                attr_ident: unsealed.protected(#attr, |x| cryptonamo::Plaintext::from(&x.#attr_ident))?
+                #attr_ident: unsealed.from_protected(#attr)?.try_into()?
             }
-        }))
+        })
         .chain(plaintext_attributes.iter().map(|attr| {
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                .plaintext(#attr, |x| cryptonamo::TableAttribute::from(&x.#attr_ident))
+                #attr_ident: unsealed.from_plaintext(#attr)?.try_into()?
             }
         }));
 
@@ -291,8 +264,9 @@ pub(crate) fn derive_cryptonamo(
                 vec![#(#plaintext_attributes,)*]
             }
 
-            fn into_unsealed(self) -> Result<Unsealed<Self>, WriteConversionError> {
-                #(#into_unsealed_impl)*
+            fn into_sealer(self) -> Result<cryptonamo::traits::Sealer<Self>, cryptonamo::traits::SealError> {
+                Ok(cryptonamo::traits::Sealer::new(self)
+                    #(#into_unsealed_impl?)*)
             }
         }
 
@@ -301,7 +275,7 @@ pub(crate) fn derive_cryptonamo(
                 vec![#(#protected_index_names,)*]
             }
 
-            fn index_by_name(name: &str) -> Option<Box<dyn cryptonamo::ComposableIndex>> {
+            fn index_by_name(name: &str) -> Option<Box<dyn cryptonamo::traits::ComposableIndex>> {
                 use cipherstash_client::encryption::compound_indexer::*;
                 match name {
                     #(#indexes_impl,)*
@@ -309,7 +283,7 @@ pub(crate) fn derive_cryptonamo(
                 }
             }
 
-            fn attribute_for_index(&self, index_name: &str) -> Option<cryptonamo::ComposablePlaintext> {
+            fn attribute_for_index(&self, index_name: &str) -> Option<cryptonamo::traits::ComposablePlaintext> {
                 match index_name {
                     #(#attributes_for_index_impl,)*
                     _ => None,
@@ -318,19 +292,10 @@ pub(crate) fn derive_cryptonamo(
         }
 
         impl cryptonamo::traits::DecryptedRecord for #ident {
-            fn from_attributes(attributes: std::collections::HashMap<String, cryptonamo::Plaintext>) -> Result<Self, cryptonamo::traits::ReadConversionError> {
+            fn from_unsealed(unsealed: cryptonamo::traits::Unsealed) -> Result<Self, cryptonamo::traits::SealError> {
                 Ok(Self {
-                    #(#decrypt_attributes_impl,)*
-                    #(#skipped_attributes_impl,)*
+                    #(#from_unsealed_impl,)*
                 })
-            }
-
-            fn ciphertexts(&self) -> std::collections::HashMap<&'static str, String> {
-                todo!()
-            }
-
-            fn from_unsealed(unsealed: Unsealed<Self>) -> Result<Self, cryptonamo::traits::ReadConversionError> {
-                todo!()
             }
         }
     };

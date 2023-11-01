@@ -1,4 +1,5 @@
-use crate::{encrypted_table::Unsealed, ComposableIndex, ComposablePlaintext, Plaintext};
+pub use crate::encrypted_table::{Sealer, SealError, Unsealed, TableAttribute};
+pub use cipherstash_client::encryption::{compound_indexer::{ComposablePlaintext, ComposableIndex, PrefixIndex, ExactIndex, CompoundIndex}, Plaintext};
 use std::{collections::HashMap, fmt::Debug};
 use thiserror::Error;
 
@@ -30,7 +31,7 @@ pub trait EncryptedRecord: Cryptonamo {
         vec![]
     }
 
-    fn into_unsealed(self) -> Result<Unsealed<Self>, WriteConversionError>;
+    fn into_sealer(self) -> Result<Sealer<Self>, SealError>;
 }
 
 pub trait SearchableRecord: EncryptedRecord {
@@ -57,11 +58,13 @@ Conversion would take the that were decrypted and a subset of the TableAttribute
 */
 
 pub trait DecryptedRecord: EncryptedRecord {
-    /// Returns the ciphertext values to be decrypted
-    fn ciphertexts(&self) -> HashMap<&'static str, String>;
+    /// Convert an `Unsealed` into a `Self`.
+    fn from_unsealed(unsealed: Unsealed) -> Result<Self, SealError>;
 
-    fn from_attributes(attributes: HashMap<String, Plaintext>)
-        -> Result<Self, ReadConversionError>;
-
-    fn from_unsealed(unsealed: Unsealed<Self>) -> Result<Self, ReadConversionError>;
+    /// Defines which attributes are decryptable for this type.
+    /// Must be equal to or a subset of protected_attributes().
+    /// By default, this is the same as protected_attributes().
+    fn decryptable_attributes() -> Vec<&'static str> {
+        Self::protected_attributes()
+    }
 }

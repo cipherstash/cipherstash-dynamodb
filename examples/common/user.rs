@@ -1,4 +1,4 @@
-use cryptonamo::{traits::WriteConversionError, Cryptonamo, Unsealed};
+use cryptonamo::Cryptonamo;
 
 #[derive(Debug, Cryptonamo)]
 #[cryptonamo(partition_key = "email")]
@@ -26,72 +26,6 @@ impl User {
         }
     }
 }
-
-// impl Cryptonamo for User {
-//     fn partition_key(&self) -> String {
-//         self.email.clone()
-//     }
-//
-//     fn type_name() -> &'static str {
-//         "user"
-//     }
-// }
-
-// impl EncryptedRecord for User {
-//     fn protected_attributes() -> Vec<&'static str> {
-//         vec!["email", "name"]
-//     }
-//
-//     fn plaintext_attributes() -> Vec<&'static str> {
-//         vec!["count"]
-//     }
-//
-//     fn into_unsealed(self) -> Result<Unsealed<Self>, WriteConversionError> {
-//         Unsealed::new(self)
-//             .protected("name", |user| Plaintext::from(&user.name))?
-//             .protected("email", |user| Plaintext::from(&user.email))?
-//             .plaintext("count", |user| TableAttribute::from(user.count))
-//     }
-// }
-//
-// impl SearchableRecord for User {
-//     fn protected_indexes() -> Vec<&'static str> {
-//         vec!["name", "email#name"]
-//     }
-//
-//     fn index_by_name(name: &str) -> Option<Box<dyn ComposableIndex>> {
-//         match name {
-//             "name" => Some(Box::new(PrefixIndex::new("name", vec![]))),
-//             "email#name" => Some(Box::new(
-//                 CompoundIndex::new(ExactIndex::new("email", vec![])).and(PrefixIndex::new(
-//                     "name",
-//                     vec![],
-//                 )),
-//             )),
-//             _ => None,
-//         }
-//     }
-//
-//     fn attribute_for_index(&self, index_name: &str) -> Option<ComposablePlaintext> {
-//         match index_name {
-//             "name" => self.name.clone().try_into().ok(),
-//             "email#name" => (self.email.clone(), self.name.clone())
-//                 .try_into()
-//                 .ok(),
-//             _ => None,
-//         }
-//     }
-// }
-
-/*impl DecryptedRecord for User {
-    fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {
-        Self {
-            email: attributes.get("email").unwrap().try_into().unwrap(),
-            name: attributes.get("name").unwrap().try_into().unwrap(),
-            count: 100,
-        }
-    }
-}*/
 
 // TODO: Move all these into a proper tests module
 #[cfg(test)]
