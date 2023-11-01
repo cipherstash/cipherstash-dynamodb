@@ -400,14 +400,10 @@ pub mod crypto;
 mod encrypted_table;
 mod error;
 pub mod traits;
-pub use encrypted_table::{EncryptedTable, QueryBuilder, TableAttribute, Unsealed};
+pub use encrypted_table::{EncryptedTable, QueryBuilder};
 pub use error::Error;
 
-// Re-exports
-pub use cipherstash_client::encryption::compound_indexer::{ComposableIndex, ComposablePlaintext};
-pub use cipherstash_client::encryption::Plaintext;
-
-    let expanded = quote! {
-        use cryptonamo::target::DynamoTarget;
-
+/// Derive macro re-export
 pub use cryptonamo_derive::Cryptonamo;
+
+pub type Key = [u8; 32];

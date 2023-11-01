@@ -1,6 +1,6 @@
-use cryptonamo::{traits::DecryptedRecord, Cryptonamo, EncryptedTable, Plaintext};
+use cryptonamo::{Cryptonamo, EncryptedTable};
 use serial_test::serial;
-use std::{collections::HashMap, future::Future};
+use std::future::Future;
 
 #[derive(Debug, PartialEq, Cryptonamo)]
 #[cryptonamo(partition_key = "email")]
@@ -24,15 +24,6 @@ impl User {
     }
 }
 
-impl DecryptedRecord for User {
-    fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {
-        Self {
-            email: attributes.get("email").unwrap().try_into().unwrap(),
-            name: attributes.get("name").unwrap().try_into().unwrap(),
-        }
-    }
-}
-
 async fn run_test<F: Future<Output = ()>>(f: impl FnOnce(EncryptedTable) -> F) {
     let config = aws_config::from_env()
         .endpoint_url("http://localhost:8000")
@@ -46,17 +37,17 @@ async fn run_test<F: Future<Output = ()>>(f: impl FnOnce(EncryptedTable) -> F) {
         .expect("Failed to init table");
 
     table
-        .put(&User::new("dan@coderdan.co", "Dan Draper"))
+        .put(User::new("dan@coderdan.co", "Dan Draper"))
         .await
         .expect("Failed to insert Dan");
 
     table
-        .put(&User::new("jane@smith.org", "Jane Smith"))
+        .put(User::new("jane@smith.org", "Jane Smith"))
         .await
         .expect("Failed to insert Jane");
 
     table
-        .put(&User::new("daniel@example.com", "Daniel Johnson"))
+        .put(User::new("daniel@example.com", "Daniel Johnson"))
         .await
         .expect("Failed to insert Daniel");
 
@@ -77,7 +68,11 @@ async fn test_query_single_exact() {
         assert_eq!(res, vec![User::new("dan@coderdan.co", "Dan Draper")]);
     })
     .await;
+}
 
+#[tokio::test]
+#[serial]
+async fn test_query_single_prefix() {
     run_test(|table| async move {
         let res: Vec<User> = table
             .query()

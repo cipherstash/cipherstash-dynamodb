@@ -1,32 +1,31 @@
 use crate::{
-    crypto::encrypt_partition_key,
-    traits::{ReadConversionError, SearchableRecord, WriteConversionError},
+    crypto::{encrypt_partition_key},
+    traits::{ReadConversionError, SearchableRecord, WriteConversionError, DecryptedRecord}, error,
 };
 use aws_sdk_dynamodb::types::AttributeValue;
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
-    encryption::{compound_indexer::CompoundIndex, Encryption, IndexTerm, Plaintext},
+    encryption::{compound_indexer::CompoundIndex, Encryption, IndexTerm, Plaintext, EncryptionError, TypeParseError},
 };
 use paste::paste;
 use std::{collections::HashMap, iter::once};
+use thiserror::Error;
 
 const MAX_TERMS_PER_INDEX: usize = 25;
 
 // TODO: Override display and Debug
 // TODO: Use Zeroize
-/// Wrapper to indicate that a value is NOT encrypted
-pub struct Unsealed<T> {
+/// Builder pattern for sealing a record of type, `T`.
+pub struct Sealer<T> {
     inner: T,
-    protected: HashMap<String, Plaintext>,
-    unprotected: HashMap<String, TableAttribute>,
+    unsealed: Unsealed,
 }
 
-impl<T> Unsealed<T> {
+impl<T> Sealer<T> {
     pub fn new(inner: T) -> Self {
         Self {
             inner,
-            protected: Default::default(),
-            unprotected: Default::default(),
+            unsealed: Unsealed::new(),
         }
     }
 
@@ -34,13 +33,13 @@ impl<T> Unsealed<T> {
         mut self,
         name: impl Into<String>,
         f: F,
-    ) -> Result<Self, WriteConversionError>
+    ) -> Result<Self, SealError>
     where
         F: FnOnce(&T) -> Plaintext,
     {
         let name: String = name.into();
 
-        self.protected.insert(name.to_string(), f(&self.inner));
+        self.unsealed.add_protected(name, f(&self.inner));
         Ok(self)
     }
 
@@ -48,12 +47,12 @@ impl<T> Unsealed<T> {
         mut self,
         name: impl Into<String>,
         f: F,
-    ) -> Result<Self, WriteConversionError>
+    ) -> Result<Self, SealError>
     where
         F: FnOnce(&T) -> TableAttribute,
     {
         let name: String = name.into();
-        self.unprotected.insert(name.into(), f(&self.inner));
+        self.unsealed.add_unprotected(name, f(&self.inner));
         Ok(self)
     }
 
@@ -61,7 +60,7 @@ impl<T> Unsealed<T> {
         self,
         cipher: &Encryption<C>,
         term_length: usize, // TODO: SealError
-    ) -> (String, Vec<Sealed<TableEntry>>)
+    ) -> (String, Vec<Sealed>)
     where
         C: Credentials<Token = ViturToken>,
         T: SearchableRecord,
@@ -72,10 +71,11 @@ impl<T> Unsealed<T> {
             pk.clone(),
             T::type_name().to_string(),
             None,
-            self.unprotected,
+            self.unsealed.unprotected,
         );
 
         let i: Vec<(Plaintext, String)> = self
+            .unsealed
             .protected
             .into_iter()
             .map(|(name, plaintext)| {
@@ -138,7 +138,7 @@ impl<T> Unsealed<T> {
                                 .set_sk(format!("{}#{}#{}", T::type_name(), index_name, i)),
                         )
                     })
-                    .collect::<Vec<Sealed<TableEntry>>>()
+                    .collect::<Vec<Sealed>>()
             })
             .chain(once(Sealed(table_entry.clone())))
             .collect();
@@ -146,25 +146,74 @@ impl<T> Unsealed<T> {
         (pk, table_entries)
     }
 
-    pub(crate) async fn unseal<C>(sealed: Sealed<TableEntry>, cipher: &Encryption<C>) -> Self
+    fn seal_iter<I>(iter: I) -> Vec<Sealed>
     where
-        C: Credentials<Token = ViturToken>,
-    {
-        unimplemented!()
-    }
-
-    fn seal_iter<I>(iter: I) -> Vec<Sealed<TableEntry>>
-    where
-        I: IntoIterator<Item = Unsealed<T>>,
+        I: IntoIterator<Item = Self>,
     {
         unimplemented!()
     }
 }
 
-/// Wrapped to indicate that the value is encrypted
-pub struct Sealed<T>(T);
+// TODO: Zeroize, Debug, Display overrides (from SafeVec?)
+/// Wrapper to indicate that a value is NOT encrypted
+pub struct Unsealed {
+    protected: HashMap<String, Plaintext>,
+    unprotected: HashMap<String, TableAttribute>,
+}
 
-impl<T> Sealed<T> {
+impl Unsealed {
+    fn new() -> Self {
+        Self {
+            protected: Default::default(),
+            unprotected: Default::default(),
+        }
+    }
+
+    pub fn from_protected(&self, name: &str) -> Result<Plaintext, SealError> {
+        Ok(self.protected.get(name).ok_or(SealError::MissingAttribute(name.to_string()))?.clone())
+    }
+
+    pub fn from_plaintext(&self, name: &str) -> Result<TableAttribute, SealError> {
+        Ok(self.unprotected.get(name).ok_or(SealError::MissingAttribute(name.to_string()))?.clone())
+    }
+
+    fn add_protected(&mut self, name: impl Into<String>, plaintext: Plaintext) {
+        self.protected.insert(name.into(), plaintext);
+    }
+
+    fn add_unprotected(&mut self, name: impl Into<String>, attribute: TableAttribute) {
+        self.unprotected.insert(name.into(), attribute);
+    }
+
+    fn into_value<T>(self) -> Result<T, SealError>
+    where
+        T: DecryptedRecord,
+    {
+        T::from_unsealed(self)
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum SealError {
+    #[error("Failed to encrypt partition key")]
+    CryptoError(#[from] EncryptionError),
+    #[error("Failed to convert attribute: {0} from internal representation")]
+    ReadConversionError(#[from] ReadConversionError),
+    #[error("Failed to convert attribute: {0} to internal representation")]
+    WriteConversionError(#[from] WriteConversionError),
+    // TODO: Does TypeParseError correctly redact the plaintext value?
+    #[error("Failed to parse type for encryption: {0}")]
+    TypeParseError(#[from] TypeParseError),
+    #[error("Missing attribute: {0}")]
+    MissingAttribute(String),
+    #[error("Invalid ciphertext value: {0}")]
+    InvalidCiphertext(String),
+}
+
+/// Wrapped to indicate that the value is encrypted
+pub struct Sealed(TableEntry);
+
+impl Sealed {
     pub fn vec_from<O: TryInto<Self>>(
         items: Vec<O>,
     ) -> Result<Vec<Self>, <O as TryInto<Self>>::Error> {
@@ -177,12 +226,45 @@ impl<T> Sealed<T> {
         item.try_into()
     }
 
-    pub(super) fn into_inner(self) -> T {
-        self.0
+    pub(super) fn inner(&self) -> &TableEntry {
+        &self.0
     }
 
-    pub(super) fn inner(&self) -> &T {
-        &self.0
+    pub(crate) async fn unseal<C, T>(self, cipher: &Encryption<C>) -> Result<T, SealError>
+    where
+        C: Credentials<Token = ViturToken>,
+        T: DecryptedRecord,
+    {
+        let ciphertexts = T::decryptable_attributes().into_iter().map(|name| {
+            self.inner().attributes.get(name)
+                .ok_or(SealError::MissingAttribute(name.to_string()))?
+                .as_ciphertext()
+                .ok_or(SealError::InvalidCiphertext(name.to_string()))
+        }).collect::<Result<Vec<&str>, SealError>>()?;
+
+        let unprotected = T::plaintext_attributes().into_iter().map(|name| {
+            self.inner().attributes.get(name)
+                .ok_or(SealError::MissingAttribute(name.to_string()))
+        }).collect::<Result<Vec<&TableAttribute>, SealError>>()?;
+
+        let unsealed = dbg!(T::decryptable_attributes())
+            .into_iter()
+            .zip(cipher.decrypt(ciphertexts).await?.into_iter())
+            .fold(Unsealed::new(), |mut unsealed, (name, plaintext)| {
+                dbg!((&name, &plaintext));
+                unsealed.add_protected(name, plaintext);
+                unsealed
+            });
+
+        T::plaintext_attributes()
+            .into_iter()
+            .zip(unprotected)
+            .fold(unsealed, |mut unsealed, (name, table_attr)| {
+                unsealed.add_unprotected(name, table_attr.clone());
+                unsealed
+            })
+            .into_value()
+
     }
 }
 
@@ -251,31 +333,53 @@ pub enum TableAttribute {
     Null,
 }
 
-macro_rules! impl_from_table_attribute {
+impl TableAttribute {
+    fn as_ciphertext(&self) -> Option<&str> {
+        if let TableAttribute::String(s) = self {
+            Some(s)
+        } else {
+            None
+        }
+    }
+}
+
+macro_rules! impl_table_attribute_conversion {
     ($type:ident) => {
         paste! {
-        impl From<$type> for TableAttribute {
-            fn from(value: $type) -> Self {
-                Self::[<$type:camel>](value)
+            impl From<$type> for TableAttribute {
+                fn from(value: $type) -> Self {
+                    Self::[<$type:camel>](value)
+                }
             }
-        }
 
-        impl From<&$type> for TableAttribute {
-            fn from(value: &$type) -> Self {
-                Self::[<$type:camel>](value.clone())
+            impl From<&$type> for TableAttribute {
+                fn from(value: &$type) -> Self {
+                    Self::[<$type:camel>](value.clone())
+                }
             }
-        }
+
+            impl TryFrom<TableAttribute> for $type {
+                type Error = ReadConversionError;
+
+                fn try_from(value: TableAttribute) -> Result<Self, Self::Error> {
+                    if let TableAttribute::[<$type:camel>](x) = value {
+                        Ok(x)
+                    } else {
+                        Err(ReadConversionError::ConversionFailed(stringify!($type).to_string()))
+                    }
+                }
+            }
         }
     };
 }
 
-impl_from_table_attribute!(String);
-impl_from_table_attribute!(i32);
+impl_table_attribute_conversion!(String);
+impl_table_attribute_conversion!(i32);
 
-impl TryFrom<Sealed<TableEntry>> for HashMap<String, AttributeValue> {
+impl TryFrom<Sealed> for HashMap<String, AttributeValue> {
     type Error = WriteConversionError;
 
-    fn try_from(item: Sealed<TableEntry>) -> Result<Self, Self::Error> {
+    fn try_from(item: Sealed) -> Result<Self, Self::Error> {
         let mut map = HashMap::new();
 
         map.insert("pk".to_string(), AttributeValue::S(item.0.pk));
@@ -293,7 +397,7 @@ impl TryFrom<Sealed<TableEntry>> for HashMap<String, AttributeValue> {
     }
 }
 
-impl TryFrom<HashMap<String, AttributeValue>> for Sealed<TableEntry> {
+impl TryFrom<HashMap<String, AttributeValue>> for Sealed {
     type Error = ReadConversionError;
 
     fn try_from(item: HashMap<String, AttributeValue>) -> Result<Self, Self::Error> {

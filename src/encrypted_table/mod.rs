@@ -2,7 +2,7 @@ pub mod query;
 mod table_entry;
 pub use self::{
     query::{QueryBuilder, QueryError},
-    table_entry::{Sealed, TableAttribute, TableEntry, Unsealed},
+    table_entry::{Sealed, TableAttribute, TableEntry, Sealer, SealError, Unsealed},
 };
 use crate::{
     crypto::*,
@@ -39,19 +39,21 @@ pub enum PutError {
     AwsError(String),
     #[error("Write Conversion Error: {0}")]
     WriteConversionError(#[from] WriteConversionError),
-    #[error("SerdeError: {0}")]
-    SerdeError(#[from] serde_dynamo::Error),
+    #[error("SealError: {0}")]
+    SealError(#[from] SealError),
     #[error("CryptoError: {0}")]
     CryptoError(#[from] CryptoError),
 }
 
 #[derive(Error, Debug)]
 pub enum GetError {
+    #[error("SealError: {0}")]
+    SealError(#[from] SealError),
     #[error("CryptoError: {0}")]
     CryptoError(#[from] CryptoError),
     #[error("AwsError: {0}")]
     AwsError(String),
-    #[error("ReadConversionError: {0}")]
+    #[error("Read Conversion Error: {0}")]
     ReadConversionError(#[from] ReadConversionError),
 }
 
@@ -180,7 +182,7 @@ impl EncryptedTable {
 
     pub async fn get<T>(&self, pk: &str) -> Result<Option<T>, GetError>
     where
-        T: EncryptedRecord + DecryptedRecord,
+        T: EncryptedRecord + DecryptedRecord
     {
         let pk = encrypt_partition_key(pk, &self.cipher)?;
         let sk = T::type_name().to_string();
@@ -195,14 +197,13 @@ impl EncryptedTable {
             .await
             .map_err(|e| GetError::AwsError(e.to_string()))?;
 
-        let table_entry: Option<Sealed<TableEntry>> = result
+        let sealed: Option<Sealed> = result
             .item
-            .map(|item| Sealed::<TableEntry>::try_from(item))
+            .map(|item| Sealed::try_from(item))
             .transpose()?;
 
-        if let Some(sealed) = table_entry {
-            let unsealed = Unsealed::<T>::unseal(sealed, &self.cipher).await;
-            Ok(Some(T::from_unsealed(unsealed)?))
+        if let Some(sealed) = sealed {
+            Ok(Some(sealed.unseal(&self.cipher).await?))
         } else {
             Ok(None)
         }
@@ -246,8 +247,8 @@ impl EncryptedTable {
     {
         let mut seen_sk = HashSet::new();
 
-        let unsealed: Unsealed<T> = record.into_unsealed()?;
-        let (pk, sealed) = unsealed.seal(&self.cipher, 12).await;
+        let sealer: Sealer<T> = record.into_sealer()?;
+        let (pk, sealed) = sealer.seal(&self.cipher, 12).await;
 
         // TODO: Use a combinator
         //let (pk, table_entries) = encrypt(record, &self.cipher).await?;
