@@ -2,7 +2,7 @@ pub mod query;
 mod table_entry;
 pub use self::{
     query::{QueryBuilder, QueryError},
-    table_entry::{Sealed, TableAttribute, TableEntry, Sealer, SealError, Unsealed},
+    table_entry::{SealError, Sealed, Sealer, TableAttribute, TableEntry, Unsealed},
 };
 use crate::{
     crypto::*,
@@ -117,7 +117,7 @@ impl EncryptedTable {
 
     pub async fn get<T>(&self, pk: &str) -> Result<Option<T>, GetError>
     where
-        T: EncryptedRecord + DecryptedRecord
+        T: EncryptedRecord + DecryptedRecord,
     {
         let pk = encrypt_partition_key(pk, &self.cipher)?;
         let sk = T::type_name().to_string();
@@ -132,10 +132,7 @@ impl EncryptedTable {
             .await
             .map_err(|e| GetError::AwsError(e.to_string()))?;
 
-        let sealed: Option<Sealed> = result
-            .item
-            .map(|item| Sealed::try_from(item))
-            .transpose()?;
+        let sealed: Option<Sealed> = result.item.map(|item| Sealed::try_from(item)).transpose()?;
 
         if let Some(sealed) = sealed {
             Ok(Some(sealed.unseal(&self.cipher).await?))

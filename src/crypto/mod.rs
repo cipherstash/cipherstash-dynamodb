@@ -1,6 +1,6 @@
 use crate::{
     encrypted_table::{Sealed, TableEntry},
-    traits::{Cryptonamo, DecryptedRecord, SearchableRecord, ReadConversionError},
+    traits::{Cryptonamo, DecryptedRecord, ReadConversionError, SearchableRecord},
 };
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},

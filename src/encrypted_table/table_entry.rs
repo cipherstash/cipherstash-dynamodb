@@ -1,11 +1,15 @@
 use crate::{
-    crypto::{encrypt_partition_key},
-    traits::{ReadConversionError, SearchableRecord, WriteConversionError, DecryptedRecord}, error,
+    crypto::encrypt_partition_key,
+    error,
+    traits::{DecryptedRecord, ReadConversionError, SearchableRecord, WriteConversionError},
 };
 use aws_sdk_dynamodb::types::AttributeValue;
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
-    encryption::{compound_indexer::CompoundIndex, Encryption, IndexTerm, Plaintext, EncryptionError, TypeParseError},
+    encryption::{
+        compound_indexer::CompoundIndex, Encryption, EncryptionError, IndexTerm, Plaintext,
+        TypeParseError,
+    },
 };
 use paste::paste;
 use std::{collections::HashMap, iter::once};
@@ -29,11 +33,7 @@ impl<T> Sealer<T> {
         }
     }
 
-    pub fn protected<F>(
-        mut self,
-        name: impl Into<String>,
-        f: F,
-    ) -> Result<Self, SealError>
+    pub fn protected<F>(mut self, name: impl Into<String>, f: F) -> Result<Self, SealError>
     where
         F: FnOnce(&T) -> Plaintext,
     {
@@ -43,11 +43,7 @@ impl<T> Sealer<T> {
         Ok(self)
     }
 
-    pub fn plaintext<F>(
-        mut self,
-        name: impl Into<String>,
-        f: F,
-    ) -> Result<Self, SealError>
+    pub fn plaintext<F>(mut self, name: impl Into<String>, f: F) -> Result<Self, SealError>
     where
         F: FnOnce(&T) -> TableAttribute,
     {
@@ -170,11 +166,19 @@ impl Unsealed {
     }
 
     pub fn from_protected(&self, name: &str) -> Result<Plaintext, SealError> {
-        Ok(self.protected.get(name).ok_or(SealError::MissingAttribute(name.to_string()))?.clone())
+        Ok(self
+            .protected
+            .get(name)
+            .ok_or(SealError::MissingAttribute(name.to_string()))?
+            .clone())
     }
 
     pub fn from_plaintext(&self, name: &str) -> Result<TableAttribute, SealError> {
-        Ok(self.unprotected.get(name).ok_or(SealError::MissingAttribute(name.to_string()))?.clone())
+        Ok(self
+            .unprotected
+            .get(name)
+            .ok_or(SealError::MissingAttribute(name.to_string()))?
+            .clone())
     }
 
     fn add_protected(&mut self, name: impl Into<String>, plaintext: Plaintext) {
@@ -235,17 +239,27 @@ impl Sealed {
         C: Credentials<Token = ViturToken>,
         T: DecryptedRecord,
     {
-        let ciphertexts = T::decryptable_attributes().into_iter().map(|name| {
-            self.inner().attributes.get(name)
-                .ok_or(SealError::MissingAttribute(name.to_string()))?
-                .as_ciphertext()
-                .ok_or(SealError::InvalidCiphertext(name.to_string()))
-        }).collect::<Result<Vec<&str>, SealError>>()?;
+        let ciphertexts = T::decryptable_attributes()
+            .into_iter()
+            .map(|name| {
+                self.inner()
+                    .attributes
+                    .get(name)
+                    .ok_or(SealError::MissingAttribute(name.to_string()))?
+                    .as_ciphertext()
+                    .ok_or(SealError::InvalidCiphertext(name.to_string()))
+            })
+            .collect::<Result<Vec<&str>, SealError>>()?;
 
-        let unprotected = T::plaintext_attributes().into_iter().map(|name| {
-            self.inner().attributes.get(name)
-                .ok_or(SealError::MissingAttribute(name.to_string()))
-        }).collect::<Result<Vec<&TableAttribute>, SealError>>()?;
+        let unprotected = T::plaintext_attributes()
+            .into_iter()
+            .map(|name| {
+                self.inner()
+                    .attributes
+                    .get(name)
+                    .ok_or(SealError::MissingAttribute(name.to_string()))
+            })
+            .collect::<Result<Vec<&TableAttribute>, SealError>>()?;
 
         let unsealed = dbg!(T::decryptable_attributes())
             .into_iter()
@@ -264,7 +278,6 @@ impl Sealed {
                 unsealed
             })
             .into_value()
-
     }
 }
 

@@ -120,7 +120,6 @@ impl Settings {
             .collect()
     }
 
-
     pub(crate) fn add_compound_index(
         &mut self,
         name: String,
