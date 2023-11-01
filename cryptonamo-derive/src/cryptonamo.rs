@@ -214,7 +214,9 @@ pub(crate) fn derive_cryptonamo(
         }
     });
 
-    let into_unsealed_impl = protected_attributes.iter().map(|attr| {
+    let into_unsealed_impl = protected_attributes
+        .iter()
+        .map(|attr| {
             let attr_ident = format_ident!("{attr}");
 
             quote! {
@@ -229,7 +231,9 @@ pub(crate) fn derive_cryptonamo(
             }
         }));
 
-    let from_unsealed_impl = protected_attributes.iter().map(|attr| {
+    let from_unsealed_impl = protected_attributes
+        .iter()
+        .map(|attr| {
             let attr_ident = format_ident!("{attr}");
 
             quote! {

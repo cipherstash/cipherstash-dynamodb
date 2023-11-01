@@ -112,6 +112,14 @@ impl Settings {
         }
     }
 
+    pub(crate) fn non_skipped_attributes(&self) -> Vec<String> {
+        self.protected_attributes
+            .iter()
+            .chain(self.unprotected_attributes.iter())
+            .map(|s| s.to_string())
+            .collect()
+    }
+
     pub(crate) fn add_compound_index(
         &mut self,
         name: String,

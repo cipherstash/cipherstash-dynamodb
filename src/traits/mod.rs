@@ -1,5 +1,10 @@
-pub use crate::encrypted_table::{Sealer, SealError, Unsealed, TableAttribute};
-pub use cipherstash_client::encryption::{compound_indexer::{ComposablePlaintext, ComposableIndex, PrefixIndex, ExactIndex, CompoundIndex}, Plaintext};
+pub use crate::encrypted_table::{SealError, Sealer, TableAttribute, Unsealed};
+pub use cipherstash_client::encryption::{
+    compound_indexer::{
+        ComposableIndex, ComposablePlaintext, CompoundIndex, ExactIndex, PrefixIndex,
+    },
+    Plaintext,
+};
 use std::{collections::HashMap, fmt::Debug};
 use thiserror::Error;
 
