@@ -9,7 +9,7 @@ use thiserror::Error;
 
 use crate::{
     crypto::CryptoError,
-    encrypted_table::{Sealed, Unsealed},
+    encrypted_table::Sealed,
     traits::{DecryptedRecord, SearchableRecord},
 };
 use cipherstash_client::encryption::{compound_indexer::CompoundIndex, IndexTerm};
