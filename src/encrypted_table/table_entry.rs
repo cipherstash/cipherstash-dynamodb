@@ -99,9 +99,9 @@ impl<T> Sealer<T> {
             .flat_map(|index_name| {
                 let (attr, index) = self
                     .inner
-                    .attribute_for_index(*index_name)
+                    .attribute_for_index(index_name)
                     .and_then(|attr| {
-                        T::index_by_name(*index_name).and_then(|index| Some((attr, index)))
+                        T::index_by_name(index_name).map(|index| (attr, index))
                     })
                     .unwrap();
 
