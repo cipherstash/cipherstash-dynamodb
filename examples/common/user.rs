@@ -1,4 +1,4 @@
-use cryptonamo::Cryptonamo;
+use cryptonamo::{Cryptonamo, DecryptedRecord, EncryptedRecord, SearchableRecord};
 
 #[derive(Debug, Cryptonamo)]
 #[cryptonamo(partition_key = "email")]
@@ -30,6 +30,8 @@ impl User {
 // TODO: Move all these into a proper tests module
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
+
     use super::*;
 
     #[test]
@@ -41,25 +43,19 @@ mod tests {
     fn test_cryptonamo_instance() {
         let user = User::new("person@example.net", "Person Name");
         assert_eq!(user.partition_key(), "person@example.net");
-        assert_eq!(
-            User::protected_attributes(),
-            vec!["email", "name"]
-        );
-        assert_eq!(
-            User::plaintext_attributes(),
-            vec!["count"]
-        );
+    }
+
+    #[test]
+    fn test_cryptonamo_attributes() {
+        assert_eq!(User::protected_attributes(), vec!["email", "name"]);
+        assert_eq!(User::plaintext_attributes(), vec!["count"]);
     }
 
     #[test]
     fn test_cryptonamo_index_names() {
-        assert_eq!(User::protected_indexes(), vec!["email", "email#name"]);
-    }
-
-    #[test]
-    fn test_cryptonamo_indexes() {
-        //let index = User::index_by_name("email").unwrap();
-        //let exact = index.downcast::<ExactIndex>().unwrap();
-        //assert_eq!(exact.name(), "email");
+        assert_eq!(
+            User::protected_indexes(),
+            vec!["email", "email#name", "name"]
+        );
     }
 }

@@ -100,9 +100,7 @@ impl<T> Sealer<T> {
                 let (attr, index) = self
                     .inner
                     .attribute_for_index(index_name)
-                    .and_then(|attr| {
-                        T::index_by_name(index_name).map(|index| (attr, index))
-                    })
+                    .and_then(|attr| T::index_by_name(index_name).map(|index| (attr, index)))
                     .unwrap();
 
                 let index_term = cipher

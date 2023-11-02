@@ -1,3 +1,5 @@
+use indexmap::IndexMap;
+use itertools::Itertools;
 use proc_macro2::Span;
 use quote::format_ident;
 use std::collections::HashMap;
@@ -64,13 +66,13 @@ pub(crate) enum AttributeMode {
 pub(crate) struct Settings {
     pub(crate) sort_key_prefix: String,
     pub(crate) partition_key: Option<String>,
-    pub(crate) protected_attributes: Vec<String>,
-    pub(crate) unprotected_attributes: Vec<String>,
+    protected_attributes: Vec<String>,
+    unprotected_attributes: Vec<String>,
 
     /// Skipped attributes are never encrypted by the `DecryptedRecord` trait will
     /// use these to reconstruct the struct via `Default` (like serde).
-    pub(crate) skipped_attributes: Vec<String>,
-    pub(crate) indexes: HashMap<String, IndexType>,
+    skipped_attributes: Vec<String>,
+    indexes: HashMap<String, IndexType>,
 }
 
 impl Settings {
@@ -83,6 +85,40 @@ impl Settings {
             skipped_attributes: Vec::new(),
             indexes: HashMap::new(),
         }
+    }
+
+    pub(crate) fn protected_attributes(&self) -> Vec<&str> {
+        self.protected_attributes
+            .iter()
+            .map(|s| s.as_str())
+            .sorted()
+            .collect::<Vec<_>>()
+    }
+
+    pub(crate) fn plaintext_attributes(&self) -> Vec<&str> {
+        self.unprotected_attributes
+            .iter()
+            .map(|s| s.as_str())
+            .sorted()
+            .collect::<Vec<_>>()
+    }
+
+    pub(crate) fn skipped_attributes(&self) -> Vec<&str> {
+        self.skipped_attributes
+            .iter()
+            .map(|s| s.as_str())
+            .sorted()
+            .collect::<Vec<_>>()
+    }
+
+    /// Return the indexes defined for this struct as an `IndexMap` sorted by index name.
+    /// This is to make downstream functions and tests simpler.
+    pub(crate) fn indexes(&self) -> IndexMap<&str, IndexType> {
+        self.indexes
+            .iter()
+            .sorted_by(|(k1, _), (k2, _)| k1.cmp(k2))
+            .map(|(k, v)| (k.as_str(), v.clone()))
+            .collect()
     }
 
     pub(crate) fn set_sort_key_prefix(&mut self, value: LitStr) -> Result<(), syn::Error> {

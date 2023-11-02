@@ -12,6 +12,8 @@ proc = "0.1.4"
 proc-macro2 = "1.0.66"
 quote = "1.0.33"
 syn = {version = "2.0.31", features = [ "parsing" ]}
+itertools = "0.11.0"
 
 #cipherstash-client = { git = "ssh://git@github.com/cipherstash/cipherstash-suite.git", package = "cipherstash-client", features = [ "tokio" ] }
 cipherstash-client = { path = "../vendor/cipherstash-client/", features = [ "tokio" ] }
+indexmap = "2.1.0"

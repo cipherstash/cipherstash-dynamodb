@@ -929,6 +929,8 @@ name = "cryptonamo-derive"
 version = "0.1.0"
 dependencies = [
  "cipherstash-client",
+ "indexmap 2.1.0",
+ "itertools",
  "paste",
  "proc",
  "proc-macro2",

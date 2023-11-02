@@ -1,11 +1,7 @@
-use crate::{
-    traits::{Cryptonamo, ReadConversionError, SearchableRecord},
-};
+use crate::traits::{Cryptonamo, ReadConversionError, SearchableRecord};
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
-    encryption::{
-        Encryption, EncryptionError, Plaintext,
-    },
+    encryption::{Encryption, EncryptionError, Plaintext},
     schema::column::Index,
 };
 use thiserror::Error;

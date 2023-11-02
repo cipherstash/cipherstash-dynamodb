@@ -159,12 +159,13 @@ pub(crate) fn derive_cryptonamo(
     let partition_key = format_ident!("{}", settings.get_partition_key()?);
     let type_name = settings.sort_key_prefix.to_string();
 
-    let protected_index_names = settings.indexes.keys();
-    let protected_attributes = &settings.protected_attributes;
-    let plaintext_attributes = &settings.unprotected_attributes;
-    let skipped_attributes = &settings.skipped_attributes;
+    let indexes = settings.indexes();
+    let protected_index_names = indexes.keys();
+    let protected_attributes = settings.protected_attributes();
+    let plaintext_attributes = settings.plaintext_attributes();
+    let skipped_attributes = settings.skipped_attributes();
 
-    let indexes_impl = settings.indexes.iter().map(|(_, index)| {
+    let indexes_impl = indexes.iter().map(|(_, index)| {
         match index {
             IndexType::Single(name, index_type) => {
                 let index_type = IndexType::type_to_ident(index_type).unwrap();
@@ -182,7 +183,7 @@ pub(crate) fn derive_cryptonamo(
         }
     });
 
-    let attributes_for_index_impl = settings.indexes.iter().map(|(_, index)| match index {
+    let attributes_for_index_impl = indexes.iter().map(|(_, index)| match index {
         IndexType::Single(name, _) => {
             let field = format_ident!("{}", name);
 
@@ -257,8 +258,7 @@ pub(crate) fn derive_cryptonamo(
         }));
 
     let expanded = quote! {
-        use cryptonamo::traits::{Cryptonamo, EncryptedRecord, DecryptedRecord, SearchableRecord};
-
+        #[automatically_derived]
         impl cryptonamo::traits::Cryptonamo for #ident {
             fn type_name() -> &'static str {
                 #type_name
@@ -269,6 +269,7 @@ pub(crate) fn derive_cryptonamo(
             }
         }
 
+        #[automatically_derived]
         impl cryptonamo::traits::EncryptedRecord for #ident {
             fn protected_attributes() -> Vec<&'static str> {
                 vec![#(#protected_attributes,)*]
@@ -284,6 +285,7 @@ pub(crate) fn derive_cryptonamo(
             }
         }
 
+        #[automatically_derived]
         impl cryptonamo::traits::SearchableRecord for #ident {
             fn protected_indexes() -> Vec<&'static str> {
                 vec![#(#protected_index_names,)*]
@@ -305,6 +307,7 @@ pub(crate) fn derive_cryptonamo(
             }
         }
 
+        #[automatically_derived]
         impl cryptonamo::traits::DecryptedRecord for #ident {
             fn from_unsealed(unsealed: cryptonamo::traits::Unsealed) -> Result<Self, cryptonamo::traits::SealError> {
                 Ok(Self {
