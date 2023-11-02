@@ -37,41 +37,41 @@ pub struct EncryptedTable {
 #[derive(Error, Debug)]
 pub enum PutError {
     #[error("AwsError: {0}")]
-    AwsError(String),
+    Aws(String),
     #[error("Write Conversion Error: {0}")]
-    WriteConversionError(#[from] WriteConversionError),
+    WriteConversion(#[from] WriteConversionError),
     #[error("SealError: {0}")]
-    SealError(#[from] SealError),
+    Seal(#[from] SealError),
     #[error("CryptoError: {0}")]
-    CryptoError(#[from] CryptoError),
+    Crypto(#[from] CryptoError),
 }
 
 #[derive(Error, Debug)]
 pub enum GetError {
     #[error("SealError: {0}")]
-    SealError(#[from] SealError),
+    Seal(#[from] SealError),
     #[error("CryptoError: {0}")]
-    CryptoError(#[from] CryptoError),
+    Crypto(#[from] CryptoError),
     #[error("AwsError: {0}")]
-    AwsError(String),
+    Aws(String),
     #[error("Read Conversion Error: {0}")]
-    ReadConversionError(#[from] ReadConversionError),
+    ReadConversion(#[from] ReadConversionError),
 }
 
 #[derive(Error, Debug)]
 pub enum DeleteError {
     #[error("CryptoError: {0}")]
-    CryptoError(#[from] CryptoError),
+    Crypto(#[from] CryptoError),
     #[error("AwsError: {0}")]
-    AwsError(String),
+    Aws(String),
 }
 
 #[derive(Error, Debug)]
 pub enum InitError {
     #[error("ConfigError: {0}")]
-    ConfigError(#[from] ConfigError),
+    Config(#[from] ConfigError),
     #[error("LoadConfigError: {0}")]
-    LoadConfigError(#[from] LoadConfigError),
+    LoadConfig(#[from] LoadConfigError),
 }
 
 impl EncryptedTable {
@@ -130,9 +130,9 @@ impl EncryptedTable {
             .key("sk", AttributeValue::S(sk))
             .send()
             .await
-            .map_err(|e| GetError::AwsError(e.to_string()))?;
+            .map_err(|e| GetError::Aws(e.to_string()))?;
 
-        let sealed: Option<Sealed> = result.item.map(|item| Sealed::try_from(item)).transpose()?;
+        let sealed: Option<Sealed> = result.item.map(Sealed::try_from).transpose()?;
 
         if let Some(sealed) = sealed {
             Ok(Some(sealed.unseal(&self.cipher).await?))
@@ -167,7 +167,7 @@ impl EncryptedTable {
                 .set_transact_items(Some(items.collect()))
                 .send()
                 .await
-                .map_err(|e| DeleteError::AwsError(e.to_string()))?;
+                .map_err(|e| DeleteError::Aws(e.to_string()))?;
         }
 
         Ok(())
@@ -226,7 +226,7 @@ impl EncryptedTable {
                 .set_transact_items(Some(items.to_vec()))
                 .send()
                 .await
-                .map_err(|e| PutError::AwsError(e.to_string()))?;
+                .map_err(|e| PutError::Aws(e.to_string()))?;
         }
 
         Ok(())
