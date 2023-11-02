@@ -162,6 +162,7 @@ pub(crate) fn derive_cryptonamo(
     let protected_index_names = settings.indexes.keys();
     let protected_attributes = &settings.protected_attributes;
     let plaintext_attributes = &settings.unprotected_attributes;
+    let skipped_attributes = &settings.skipped_attributes;
 
     let indexes_impl = settings.indexes.iter().map(|(_, index)| {
         match index {
@@ -246,9 +247,18 @@ pub(crate) fn derive_cryptonamo(
             quote! {
                 #attr_ident: unsealed.from_plaintext(#attr)?.try_into()?
             }
+        }))
+        .chain(skipped_attributes.iter().map(|attr| {
+            let attr_ident = format_ident!("{attr}");
+
+            quote! {
+                #attr_ident: Default::default()
+            }
         }));
 
     let expanded = quote! {
+        use cryptonamo::traits::{Cryptonamo, EncryptedRecord, DecryptedRecord, SearchableRecord};
+
         impl cryptonamo::traits::Cryptonamo for #ident {
             fn type_name() -> &'static str {
                 #type_name

@@ -1,3 +1,4 @@
+#![doc(html_favicon_url = "https://cipherstash.com/favicon.ico")]
 //! ## Cryptonamo: Encrypted Tables for DynamoDB
 //!
 //! Based on the CipherStash SDK and ZeroKMS key service, Cryptonamo provides a simple interface for
@@ -403,7 +404,8 @@ pub mod traits;
 pub use encrypted_table::{EncryptedTable, QueryBuilder};
 pub use error::Error;
 
-/// Derive macro re-export
+/// Derive macro for Cryptonamo traits.
+/// See also [`crate::traits::Cryptonamo`].
 pub use cryptonamo_derive::Cryptonamo;
 
 pub type Key = [u8; 32];

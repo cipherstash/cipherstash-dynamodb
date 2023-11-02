@@ -30,10 +30,7 @@ impl User {
 // TODO: Move all these into a proper tests module
 #[cfg(test)]
 mod tests {
-    use super::User;
-    use cryptonamo::traits::*;
-    use std::any::Any;
-    use std::collections::HashMap;
+    use super::*;
 
     #[test]
     fn test_cryptonamo_typename() {
@@ -45,15 +42,12 @@ mod tests {
         let user = User::new("person@example.net", "Person Name");
         assert_eq!(user.partition_key(), "person@example.net");
         assert_eq!(
-            user.protected_attributes(),
-            HashMap::from([
-                ("email", "person@example.net".into()),
-                ("name", "Person Name".into()),
-            ])
+            User::protected_attributes(),
+            vec!["email", "name"]
         );
         assert_eq!(
-            user.plaintext_attributes(),
-            HashMap::from([("count", 100i32.into()),])
+            User::plaintext_attributes(),
+            vec!["count"]
         );
     }
 
