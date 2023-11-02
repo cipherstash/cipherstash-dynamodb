@@ -928,7 +928,9 @@ dependencies = [
 name = "cryptonamo-derive"
 version = "0.1.0"
 dependencies = [
- "cipherstash-client 0.6.0 (git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike)",
+ "cipherstash-client",
+ "indexmap 2.1.0",
+ "itertools",
  "paste",
  "proc",
  "proc-macro2",

@@ -1,4 +1,4 @@
-use cryptonamo::Cryptonamo;
+use cryptonamo::{Cryptonamo, DecryptedRecord, EncryptedRecord, SearchableRecord};
 
 #[derive(Debug, Cryptonamo)]
 #[cryptonamo(partition_key = "email")]
@@ -29,7 +29,7 @@ impl License {
 
 #[cfg(test)]
 mod tests {
-    use super::License;
+    use super::*;
 
     #[test]
     fn test_cryptonamo_typename() {
