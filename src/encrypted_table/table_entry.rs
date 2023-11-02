@@ -1,6 +1,5 @@
 use crate::{
     crypto::encrypt_partition_key,
-    error,
     traits::{DecryptedRecord, ReadConversionError, SearchableRecord, WriteConversionError},
 };
 use aws_sdk_dynamodb::types::AttributeValue;
@@ -142,7 +141,8 @@ impl<T> Sealer<T> {
         (pk, table_entries)
     }
 
-    fn seal_iter<I>(iter: I) -> Vec<Sealed>
+    #[allow(dead_code)]
+    fn seal_iter<I>(_iter: I) -> Vec<Sealed>
     where
         I: IntoIterator<Item = Self>,
     {
@@ -447,8 +447,6 @@ impl From<TableAttribute> for AttributeValue {
             TableAttribute::String(s) => AttributeValue::S(s),
             TableAttribute::I32(i) => AttributeValue::N(i.to_string()),
             TableAttribute::Null => AttributeValue::Null(true),
-
-            _ => unimplemented!(),
         }
     }
 }

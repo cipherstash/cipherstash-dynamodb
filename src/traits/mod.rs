@@ -5,7 +5,7 @@ pub use cipherstash_client::encryption::{
     },
     Plaintext,
 };
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::Debug;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
