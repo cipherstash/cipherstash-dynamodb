@@ -133,18 +133,3 @@ impl From<AttributeValue> for TableAttribute {
         }
     }
 }
-
-// FIXME: This probably should not be a thing...right?
-impl TryFrom<Plaintext> for TableAttribute {
-    type Error = String;
-
-    fn try_from(plaintext: Plaintext) -> Result<Self, Self::Error> {
-        match plaintext {
-            Plaintext::Utf8Str(Some(s)) => Ok(TableAttribute::String(s)),
-            Plaintext::Int(Some(i)) => Ok(TableAttribute::I32(i)),
-            // Null variants
-            Plaintext::Utf8Str(None) => Ok(TableAttribute::Null),
-            _ => Err("Unsupported plaintext type".to_string()),
-        }
-    }
-}
