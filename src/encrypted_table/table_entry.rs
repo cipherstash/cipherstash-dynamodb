@@ -1,6 +1,4 @@
-use crate::{
-    traits::{ReadConversionError},
-};
+use crate::traits::ReadConversionError;
 use aws_sdk_dynamodb::types::AttributeValue;
 use cipherstash_client::encryption::Plaintext;
 use paste::paste;
@@ -71,7 +69,6 @@ pub enum TableAttribute {
     // TODO: More here
     Null,
 }
-
 
 impl TableAttribute {
     pub(crate) fn as_ciphertext(&self) -> Option<&str> {

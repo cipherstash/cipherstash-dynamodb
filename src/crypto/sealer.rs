@@ -1,8 +1,14 @@
-use cipherstash_client::{encryption::{Plaintext, Encryption, compound_indexer::CompoundIndex, IndexTerm}, credentials::{Credentials, vitur_credentials::ViturToken}};
-use crate::{encrypted_table::{TableEntry, TableAttribute}, SearchableRecord};
-use super::{encrypt_partition_key, Sealed, MAX_TERMS_PER_INDEX, Unsealed, SealError};
-use std::iter::once;
+use super::{encrypt_partition_key, SealError, Sealed, Unsealed, MAX_TERMS_PER_INDEX};
+use crate::{
+    encrypted_table::{TableAttribute, TableEntry},
+    SearchableRecord,
+};
+use cipherstash_client::{
+    credentials::{vitur_credentials::ViturToken, Credentials},
+    encryption::{compound_indexer::CompoundIndex, Encryption, IndexTerm, Plaintext},
+};
 use itertools::Itertools;
+use std::iter::once;
 
 /// Builder pattern for sealing a record of type, `T`.
 pub struct Sealer<T> {

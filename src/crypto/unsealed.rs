@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use cipherstash_client::encryption::Plaintext;
 use crate::{encrypted_table::TableAttribute, DecryptedRecord};
+use cipherstash_client::encryption::Plaintext;
+use std::collections::HashMap;
 
 use super::SealError;
 
