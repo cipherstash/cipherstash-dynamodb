@@ -1,12 +1,39 @@
-use crate::traits::{Cryptonamo, ReadConversionError, SearchableRecord};
+mod sealed;
+mod sealer;
+mod unsealed;
+
+use crate::traits::{Cryptonamo, ReadConversionError, SearchableRecord, WriteConversionError};
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
-    encryption::{Encryption, EncryptionError, Plaintext},
+    encryption::{Encryption, EncryptionError, Plaintext, TypeParseError},
     schema::column::Index,
 };
 use thiserror::Error;
 
+pub use sealer::Sealer;
+pub use sealed::Sealed;
+pub use unsealed::Unsealed;
+
 const MAX_TERMS_PER_INDEX: usize = 25;
+
+
+// TODO: Should we just call this CryptoError?
+#[derive(Debug, Error)]
+pub enum SealError {
+    #[error("Failed to encrypt partition key")]
+    CryptoError(#[from] EncryptionError),
+    #[error("Failed to convert attribute: {0} from internal representation")]
+    ReadConversionError(#[from] ReadConversionError),
+    #[error("Failed to convert attribute: {0} to internal representation")]
+    WriteConversionError(#[from] WriteConversionError),
+    // TODO: Does TypeParseError correctly redact the plaintext value?
+    #[error("Failed to parse type for encryption: {0}")]
+    TypeParseError(#[from] TypeParseError),
+    #[error("Missing attribute: {0}")]
+    MissingAttribute(String),
+    #[error("Invalid ciphertext value: {0}")]
+    InvalidCiphertext(String),
+}
 
 #[derive(Error, Debug)]
 pub enum CryptoError {
