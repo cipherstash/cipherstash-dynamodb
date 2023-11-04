@@ -132,7 +132,7 @@ impl<T> Sealer<T> {
                 Sealed(
                     table_entry
                         .clone()
-                        .set_term(hex::encode(&term))
+                        .set_term(hex::encode(term))
                         // TODO: HMAC the sort key, too (users#index_name#pk)
                         .set_sk(format!("{}#{}#{}", T::type_name(), index_name, i)),
                 )
@@ -200,7 +200,7 @@ impl Unsealed {
     fn add_protected(&mut self, name: impl Into<String>, plaintext: Plaintext) {
         let name = name.into();
         let descriptor = format!("{}{}", self.descriptor.as_deref().unwrap_or(""), &name);
-        self.protected.insert(name.into(), (plaintext, descriptor));
+        self.protected.insert(name, (plaintext, descriptor));
     }
 
     fn add_unprotected(&mut self, name: impl Into<String>, attribute: TableAttribute) {

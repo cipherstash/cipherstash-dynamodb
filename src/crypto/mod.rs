@@ -44,5 +44,5 @@ where
         .index(&plaintext, &index_type)?
         .as_binary()
         .map(hex::encode)
-        .ok_or(EncryptionError::IndexingError(format!("Invalid term type")))
+        .ok_or(EncryptionError::IndexingError("Invalid term type".to_string()))
 }
