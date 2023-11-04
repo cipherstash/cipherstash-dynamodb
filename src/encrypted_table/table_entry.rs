@@ -10,6 +10,7 @@ use cipherstash_client::{
         TypeParseError,
     },
 };
+use itertools::Itertools;
 use paste::paste;
 use std::{collections::HashMap, iter::once};
 use thiserror::Error;
@@ -92,44 +93,49 @@ impl<T> Sealer<T> {
                 }
             });
 
-        let table_entries = T::protected_indexes()
+        let protected_indexes = T::protected_indexes();
+        let terms: Vec<(&&str, Vec<u8>)> = protected_indexes
             .iter()
-            .flat_map(|index_name| {
-                let (attr, index) = self
-                    .inner
+            .map(|index_name| {
+                self.inner
                     .attribute_for_index(index_name)
-                    .and_then(|attr| T::index_by_name(index_name).map(|index| (attr, index)))
-                    .unwrap();
-
-                let index_term = cipher
-                    .compound_index(
-                        &CompoundIndex::new(index),
-                        attr,
-                        Some(format!("{}#{}", T::type_name(), index_name)),
-                        term_length,
-                    )
-                    .unwrap(); // FIXME: Error
-
-                let terms = match index_term {
-                    IndexTerm::Binary(x) => vec![x],
-                    IndexTerm::BinaryVec(x) => x,
-                    _ => todo!(),
-                };
-
-                terms
-                    .iter()
-                    .enumerate()
-                    .take(MAX_TERMS_PER_INDEX)
-                    .map(|(i, term)| {
-                        Sealed(
-                            table_entry
-                                .clone()
-                                .set_term(hex::encode(term))
-                                // TODO: HMAC the sort key, too (users#index_name#pk)
-                                .set_sk(format!("{}#{}#{}", T::type_name(), index_name, i)),
-                        )
+                    .and_then(|attr| {
+                        T::index_by_name(index_name).map(|index| (attr, index, index_name))
                     })
-                    .collect::<Vec<Sealed>>()
+                    .ok_or(SealError::MissingAttribute(index_name.to_string()))
+                    .and_then(|(attr, index, index_name)| {
+                        cipher
+                            .compound_index(
+                                &CompoundIndex::new(index),
+                                attr,
+                                Some(format!("{}#{}", T::type_name(), index_name)),
+                                term_length,
+                            )
+                            .map_err(SealError::CryptoError)
+                            .and_then(|index_term| match index_term {
+                                IndexTerm::Binary(x) => Ok(vec![(index_name, x)]),
+                                IndexTerm::BinaryVec(x) => {
+                                    Ok(x.into_iter().map(|x| (index_name, x)).collect())
+                                }
+                                _ => unreachable!(),
+                            })
+                    })
+            })
+            .flatten_ok()
+            .try_collect()?;
+
+        let table_entries = terms
+            .into_iter()
+            .enumerate()
+            .take(MAX_TERMS_PER_INDEX)
+            .map(|(i, (index_name, term))| {
+                Sealed(
+                    table_entry
+                        .clone()
+                        .set_term(hex::encode(&term))
+                        // TODO: HMAC the sort key, too (users#index_name#pk)
+                        .set_sk(format!("{}#{}#{}", T::type_name(), index_name, i)),
+                )
             })
             .chain(once(Sealed(table_entry.clone())))
             .collect();
