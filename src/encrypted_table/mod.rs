@@ -197,6 +197,7 @@ impl EncryptedTable {
             .await
             .map_err(|e| GetError::Aws(e.to_string()))?;
 
+        dbg!("GET", &result.item);
         let sealed: Option<Sealed> = result.item.map(Sealed::try_from).transpose()?;
 
         if let Some(sealed) = sealed {
