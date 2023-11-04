@@ -181,7 +181,7 @@ impl EncryptedTable {
         let mut seen_sk = HashSet::new();
 
         let sealer: Sealer<T> = record.into_sealer()?;
-        let (pk, sealed) = sealer.seal(&self.cipher, 12).await;
+        let (pk, sealed) = sealer.seal(&self.cipher, 12).await?;
 
         // TODO: Use a combinator
         //let (pk, table_entries) = encrypt(record, &self.cipher).await?;

@@ -280,7 +280,7 @@ pub(crate) fn derive_cryptonamo(
             }
 
             fn into_sealer(self) -> Result<cryptonamo::traits::Sealer<Self>, cryptonamo::traits::SealError> {
-                Ok(cryptonamo::traits::Sealer::new(self)
+                Ok(cryptonamo::traits::Sealer::new_with_descriptor(self, Self::type_name())
                     #(#into_unsealed_impl?)*)
             }
         }
