@@ -18,7 +18,7 @@ use aws_sdk_dynamodb::{
 use cipherstash_client::{
     config::{console_config::ConsoleConfig, errors::ConfigError, vitur_config::ViturConfig},
     credentials::{auto_refresh::AutoRefresh, vitur_credentials::ViturCredentials},
-    encryption::Encryption,
+    encryption::{Encryption, EncryptionError},
     vitur::{errors::LoadConfigError, DatasetConfigWithIndexRootKey, Vitur},
 };
 use log::info;
@@ -49,8 +49,8 @@ pub enum PutError {
 pub enum GetError {
     #[error("SealError: {0}")]
     Seal(#[from] SealError),
-    #[error("CryptoError: {0}")]
-    Crypto(#[from] CryptoError),
+    #[error("Encryption Error: {0}")]
+    Encryption(#[from] EncryptionError),
     #[error("AwsError: {0}")]
     Aws(String),
     #[error("Read Conversion Error: {0}")]
@@ -59,8 +59,8 @@ pub enum GetError {
 
 #[derive(Error, Debug)]
 pub enum DeleteError {
-    #[error("CryptoError: {0}")]
-    Crypto(#[from] CryptoError),
+    #[error("Encryption Error: {0}")]
+    Encryption(#[from] EncryptionError),
     #[error("AwsError: {0}")]
     Aws(String),
 }

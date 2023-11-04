@@ -33,7 +33,7 @@ pub(crate) fn all_index_keys<E: SearchableRecord + Cryptonamo>() -> Vec<String> 
 pub(crate) fn encrypt_partition_key<C>(
     value: &str,
     cipher: &Encryption<C>,
-) -> Result<String, CryptoError>
+) -> Result<String, EncryptionError>
 where
     C: Credentials<Token = ViturToken>,
 {
@@ -44,5 +44,5 @@ where
         .index(&plaintext, &index_type)?
         .as_binary()
         .map(hex::encode)
-        .ok_or_else(|| CryptoError::Other("Encrypting partition key returned invalid value".into()))
+        .ok_or(EncryptionError::IndexingError(format!("Invalid term type")))
 }
