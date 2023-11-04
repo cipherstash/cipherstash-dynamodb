@@ -83,6 +83,8 @@ where
             )))?
         };
 
+        dbg!(&term);
+
         let query = builder
             .table
             .db
@@ -91,6 +93,7 @@ where
             .index_name("TermIndex")
             .key_condition_expression("term = :term")
             .expression_attribute_values(":term", AttributeValue::S(term));
+
 
         let result = query
             .send()

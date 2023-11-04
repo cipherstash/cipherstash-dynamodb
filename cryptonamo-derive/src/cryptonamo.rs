@@ -222,14 +222,14 @@ pub(crate) fn derive_cryptonamo(
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                .protected(#attr, |x| cryptonamo::traits::Plaintext::from(&x.#attr_ident))
+                .add_protected(#attr, |x| cryptonamo::traits::Plaintext::from(&x.#attr_ident))
             }
         })
         .chain(plaintext_attributes.iter().map(|attr| {
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                .plaintext(#attr, |x| cryptonamo::traits::TableAttribute::from(&x.#attr_ident))
+                .add_plaintext(#attr, |x| cryptonamo::traits::TableAttribute::from(&x.#attr_ident))
             }
         }));
 

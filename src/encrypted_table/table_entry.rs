@@ -32,7 +32,7 @@ impl<T> Sealer<T> {
         }
     }
 
-    pub fn protected<F>(mut self, name: impl Into<String>, f: F) -> Result<Self, SealError>
+    pub fn add_protected<F>(mut self, name: impl Into<String>, f: F) -> Result<Self, SealError>
     where
         F: FnOnce(&T) -> Plaintext,
     {
@@ -42,7 +42,7 @@ impl<T> Sealer<T> {
         Ok(self)
     }
 
-    pub fn plaintext<F>(mut self, name: impl Into<String>, f: F) -> Result<Self, SealError>
+    pub fn add_plaintext<F>(mut self, name: impl Into<String>, f: F) -> Result<Self, SealError>
     where
         F: FnOnce(&T) -> TableAttribute,
     {
@@ -66,8 +66,21 @@ impl<T> Sealer<T> {
             pk.clone(),
             T::type_name().to_string(),
             None,
-            self.unsealed.unprotected,
+            self.unsealed.unprotected(),
         );
+
+        // FIXME: This can all be simplified into one iterator
+        // Make `get_protected` return the descriptor as well (keep them in the unsealed hash so we can pass references)
+        // Protected plaintexts in order defined by protected_attributes
+        let protected = T::protected_attributes()
+            .into_iter()
+            .map(|name| {
+                self.unsealed
+                    .get_protected(name)
+                    .map(|plaintext| (name, plaintext.clone())) // TODO: Don't clone Plaintext
+            })
+            .collect::<Result<Vec<(&str, Plaintext)>, _>>()
+            .unwrap(); // FIXME
 
         let i: Vec<(Plaintext, String)> = self
             .unsealed
@@ -89,6 +102,7 @@ impl<T> Sealer<T> {
             .into_iter()
             .zip(T::protected_attributes().into_iter())
             .for_each(|(enc, name)| {
+                dbg!((&enc, &name));
                 if let Some(e) = enc {
                     table_entry.add_attribute(name, e.into());
                 }
@@ -151,11 +165,13 @@ impl<T> Sealer<T> {
 // TODO: Zeroize, Debug, Display overrides (from SafeVec?)
 /// Wrapper to indicate that a value is NOT encrypted
 pub struct Unsealed {
-    protected: HashMap<String, Plaintext>,
+    /// Protected plaintexts with their descriptors
+    protected: HashMap<String, (Plaintext, String)>,
     unprotected: HashMap<String, TableAttribute>,
 }
 
 impl Unsealed {
+    // TODO: Pass the "type_name" here as a decriptor prefix
     fn new() -> Self {
         Self {
             protected: Default::default(),
@@ -180,11 +196,19 @@ impl Unsealed {
     }
 
     fn add_protected(&mut self, name: impl Into<String>, plaintext: Plaintext) {
-        self.protected.insert(name.into(), plaintext);
+        self.protected.insert(name.into(), (plaintext, format!("{}#{}", T::type_name(), name)));
     }
 
     fn add_unprotected(&mut self, name: impl Into<String>, attribute: TableAttribute) {
         self.unprotected.insert(name.into(), attribute);
+    }
+
+    pub(crate) fn get_protected(&self, name: &str) -> Result<&Plaintext, SealError> {
+        self.protected.get(name).ok_or(SealError::MissingAttribute(name.to_string()))
+    }
+
+    pub(crate) fn unprotected(&self) -> HashMap<String, TableAttribute> {
+        self.unprotected.clone()
     }
 
     fn into_value<T>(self) -> Result<T, SealError>
@@ -259,11 +283,10 @@ impl Sealed {
             })
             .collect::<Result<Vec<&TableAttribute>, SealError>>()?;
 
-        let unsealed = dbg!(T::decryptable_attributes())
+        let unsealed = T::decryptable_attributes()
             .into_iter()
             .zip(cipher.decrypt(ciphertexts).await?.into_iter())
             .fold(Unsealed::new(), |mut unsealed, (name, plaintext)| {
-                dbg!((&name, &plaintext));
                 unsealed.add_protected(name, plaintext);
                 unsealed
             });
