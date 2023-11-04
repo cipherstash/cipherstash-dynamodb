@@ -94,7 +94,6 @@ where
             .key_condition_expression("term = :term")
             .expression_attribute_values(":term", AttributeValue::S(term));
 
-
         let result = query
             .send()
             .await
