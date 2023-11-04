@@ -76,22 +76,22 @@ impl<T> Sealer<T> {
             self.unsealed.unprotected(),
         );
 
-        // FIXME: This can all be simplified into one iterator
-        // Make `get_protected` return the descriptor as well (keep them in the unsealed hash so we can pass references)
-        // Protected plaintexts in order defined by protected_attributes
         let protected = T::protected_attributes()
             .iter()
             .map(|name| self.unsealed.protected_with_descriptor(name))
             .collect::<Result<Vec<(&Plaintext, &str)>, _>>()?;
 
-            //.process_results(|x| async { cipher.encrypt(x).await })?
-            //.await?;
-        cipher.encrypt(protected).await?.into_iter().zip(T::protected_attributes().into_iter()).for_each(|(enc, name)| {
-            if let Some(e) = enc {
-                table_entry.add_attribute(name, e.into());
-            }
-        });
-            
+        cipher
+            .encrypt(protected)
+            .await?
+            .into_iter()
+            .zip(T::protected_attributes().into_iter())
+            .for_each(|(enc, name)| {
+                if let Some(e) = enc {
+                    table_entry.add_attribute(name, e.into());
+                }
+            });
+
         let table_entries = T::protected_indexes()
             .iter()
             .flat_map(|index_name| {
@@ -206,8 +206,14 @@ impl Unsealed {
     }
 
     /// Returns a reference to the protected value along with its descriptor.
-    pub(crate) fn protected_with_descriptor(&self, name: &str) -> Result<(&Plaintext, &str), SealError> {
-        let out = self.protected.get(name).ok_or(SealError::MissingAttribute(name.to_string()))?;
+    pub(crate) fn protected_with_descriptor(
+        &self,
+        name: &str,
+    ) -> Result<(&Plaintext, &str), SealError> {
+        let out = self
+            .protected
+            .get(name)
+            .ok_or(SealError::MissingAttribute(name.to_string()))?;
         Ok((&out.0, &out.1))
     }
 
