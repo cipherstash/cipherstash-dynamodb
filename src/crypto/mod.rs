@@ -10,12 +10,11 @@ use cipherstash_client::{
 };
 use thiserror::Error;
 
-pub use sealer::Sealer;
 pub use sealed::Sealed;
+pub use sealer::Sealer;
 pub use unsealed::Unsealed;
 
 const MAX_TERMS_PER_INDEX: usize = 25;
-
 
 // TODO: Should we just call this CryptoError?
 #[derive(Debug, Error)]
@@ -71,5 +70,7 @@ where
         .index(&plaintext, &index_type)?
         .as_binary()
         .map(hex::encode)
-        .ok_or(EncryptionError::IndexingError("Invalid term type".to_string()))
+        .ok_or(EncryptionError::IndexingError(
+            "Invalid term type".to_string(),
+        ))
 }

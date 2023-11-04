@@ -1,11 +1,16 @@
-use std::collections::HashMap;
+use crate::{
+    encrypted_table::{TableAttribute, TableEntry},
+    traits::{ReadConversionError, WriteConversionError},
+    DecryptedRecord,
+};
 use aws_sdk_dynamodb::types::AttributeValue;
-use cipherstash_client::{encryption::Encryption, credentials::{Credentials, vitur_credentials::ViturToken}};
-use crate::{encrypted_table::{TableEntry, TableAttribute}, DecryptedRecord, traits::{ReadConversionError, WriteConversionError}};
+use cipherstash_client::{
+    credentials::{vitur_credentials::ViturToken, Credentials},
+    encryption::Encryption,
+};
+use std::collections::HashMap;
 
-use super::{Unsealed, SealError};
-
-
+use super::{SealError, Unsealed};
 
 /// Wrapped to indicate that the value is encrypted
 pub struct Sealed(pub(super) TableEntry);
@@ -72,7 +77,6 @@ impl Sealed {
             .into_value()
     }
 }
-
 
 impl TryFrom<HashMap<String, AttributeValue>> for Sealed {
     type Error = ReadConversionError;
