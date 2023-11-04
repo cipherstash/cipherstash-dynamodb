@@ -1,8 +1,9 @@
 use cryptonamo::{Cryptonamo, EncryptedTable};
+use itertools::Itertools;
 use serial_test::serial;
 use std::future::Future;
 
-#[derive(Debug, PartialEq, Cryptonamo)]
+#[derive(Cryptonamo, Debug, PartialEq, Ord, PartialOrd, Eq)]
 #[cryptonamo(partition_key = "email")]
 #[cryptonamo(sort_key_prefix = "user")]
 pub struct User {
@@ -79,7 +80,10 @@ async fn test_query_single_prefix() {
             .starts_with("name", "Dan")
             .send()
             .await
-            .expect("Failed to query");
+            .expect("Failed to query")
+            .into_iter()
+            .sorted()
+            .collect_vec();
 
         assert_eq!(
             res,
