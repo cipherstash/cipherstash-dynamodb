@@ -279,8 +279,8 @@ pub(crate) fn derive_cryptonamo(
                 vec![#(#plaintext_attributes,)*]
             }
 
-            fn into_sealer(self) -> Result<cryptonamo::traits::Sealer<Self>, cryptonamo::traits::SealError> {
-                Ok(cryptonamo::traits::Sealer::new_with_descriptor(self, Self::type_name())
+            fn into_sealer(self) -> Result<cryptonamo::crypto::Sealer<Self>, cryptonamo::crypto::SealError> {
+                Ok(cryptonamo::crypto::Sealer::new_with_descriptor(self, Self::type_name())
                     #(#into_unsealed_impl?)*)
             }
         }
@@ -309,7 +309,7 @@ pub(crate) fn derive_cryptonamo(
 
         #[automatically_derived]
         impl cryptonamo::traits::DecryptedRecord for #ident {
-            fn from_unsealed(unsealed: cryptonamo::traits::Unsealed) -> Result<Self, cryptonamo::traits::SealError> {
+            fn from_unsealed(unsealed: cryptonamo::crypto::Unsealed) -> Result<Self, cryptonamo::crypto::SealError> {
                 Ok(Self {
                     #(#from_unsealed_impl,)*
                 })
