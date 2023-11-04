@@ -17,8 +17,6 @@ use thiserror::Error;
 
 const MAX_TERMS_PER_INDEX: usize = 25;
 
-// TODO: Override display and Debug
-// TODO: Use Zeroize
 /// Builder pattern for sealing a record of type, `T`.
 pub struct Sealer<T> {
     inner: T,
