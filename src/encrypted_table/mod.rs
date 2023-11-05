@@ -7,7 +7,7 @@ pub use self::{
 use crate::{
     crypto::*,
     traits::{
-        Decryptable, Encryptable, ReadConversionError, Searchable,
+        Decryptable, ReadConversionError, Searchable,
         WriteConversionError,
     },
 };
