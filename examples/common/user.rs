@@ -1,6 +1,6 @@
 use cryptonamo::{Encryptable, Decryptable, Searchable};
 
-#[derive(Debug, Encryptable)]
+#[derive(Debug, Encryptable, Decryptable)]
 #[cryptonamo(partition_key = "email")]
 #[cryptonamo(sort_key_prefix = "user")]
 pub struct User {

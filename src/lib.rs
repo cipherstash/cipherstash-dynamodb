@@ -403,11 +403,9 @@ mod error;
 pub mod traits;
 pub use encrypted_table::{EncryptedTable, QueryBuilder};
 pub use error::Error;
-
 pub use traits::{Encryptable, Decryptable, Searchable};
 
-/// Derive macro for the Encryptable trait.
-/// See also [`crate::traits::Encryptable`].
-pub use cryptonamo_derive::Encryptable;
+#[doc(hidden)]
+pub use cryptonamo_derive::{Encryptable, Decryptable};
 
 pub type Key = [u8; 32];
