@@ -83,8 +83,6 @@ where
             )))?
         };
 
-        dbg!(&term);
-
         let query = builder
             .table
             .db

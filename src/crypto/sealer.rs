@@ -108,7 +108,7 @@ impl<T> Sealer<T> {
                                 IndexTerm::BinaryVec(x) => {
                                     Ok(x.into_iter().map(|x| (index_name, x)).collect())
                                 }
-                                _ => unreachable!(),
+                                _ => Err(SealError::InvalidCiphertext("Invalid index term".into())),
                             })
                     })
             })
