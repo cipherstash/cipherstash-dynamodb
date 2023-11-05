@@ -10,7 +10,7 @@ use thiserror::Error;
 use crate::{
     crypto::CryptoError,
     encrypted_table::Sealed,
-    traits::{DecryptedRecord, SearchableRecord},
+    traits::{Decryptable, Searchable},
 };
 use cipherstash_client::encryption::{compound_indexer::CompoundIndex, IndexTerm};
 
@@ -42,7 +42,7 @@ pub struct QueryBuilder<'t, T> {
 
 impl<'t, T> QueryBuilder<'t, T>
 where
-    T: SearchableRecord + DecryptedRecord,
+    T: Searchable + Decryptable,
 {
     pub fn new(table: &'t EncryptedTable) -> Self {
         Self {

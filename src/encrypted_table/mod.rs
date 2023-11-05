@@ -7,7 +7,7 @@ pub use self::{
 use crate::{
     crypto::*,
     traits::{
-        DecryptedRecord, EncryptedRecord, ReadConversionError, SearchableRecord,
+        Decryptable, Encryptable, ReadConversionError, Searchable,
         WriteConversionError,
     },
 };
@@ -175,14 +175,14 @@ impl EncryptedTable {
 
     pub fn query<R>(&self) -> QueryBuilder<R>
     where
-        R: SearchableRecord + DecryptedRecord,
+        R: Searchable + Decryptable,
     {
         QueryBuilder::new(self)
     }
 
     pub async fn get<T>(&self, pk: &str) -> Result<Option<T>, GetError>
     where
-        T: EncryptedRecord + DecryptedRecord,
+        T: Decryptable,
     {
         let pk = encrypt_partition_key(pk, &self.cipher)?;
         let sk = T::type_name().to_string();
@@ -206,7 +206,7 @@ impl EncryptedTable {
         }
     }
 
-    pub async fn delete<E: SearchableRecord>(&self, pk: &str) -> Result<(), DeleteError> {
+    pub async fn delete<E: Searchable>(&self, pk: &str) -> Result<(), DeleteError> {
         let pk = AttributeValue::S(encrypt_partition_key(pk, &self.cipher)?);
 
         let sk_to_delete = [E::type_name().to_string()]
@@ -240,7 +240,8 @@ impl EncryptedTable {
 
     pub async fn put<T>(&self, record: T) -> Result<(), PutError>
     where
-        T: SearchableRecord,
+        // TODO: We may want to create a separate put_with_indexes function for Searchable types
+        T: Searchable,
     {
         let mut seen_sk = HashSet::new();
 

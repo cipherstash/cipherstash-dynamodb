@@ -1,7 +1,7 @@
 use super::{encrypt_partition_key, SealError, Sealed, Unsealed, MAX_TERMS_PER_INDEX};
 use crate::{
     encrypted_table::{TableAttribute, TableEntry},
-    SearchableRecord,
+    Searchable,
 };
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
@@ -57,7 +57,7 @@ impl<T> Sealer<T> {
     ) -> Result<(String, Vec<Sealed>), SealError>
     where
         C: Credentials<Token = ViturToken>,
-        T: SearchableRecord,
+        T: Searchable,
     {
         let pk = encrypt_partition_key(&self.inner.partition_key(), cipher).unwrap(); // FIXME
 

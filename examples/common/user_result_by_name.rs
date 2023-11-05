@@ -1,4 +1,4 @@
-use cryptonamo::Cryptonamo;
+use cryptonamo::Encryptable;
 
 /*
 #[derive(Debug, Cryptonamo)]

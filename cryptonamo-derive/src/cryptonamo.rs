@@ -259,7 +259,7 @@ pub(crate) fn derive_cryptonamo(
 
     let expanded = quote! {
         #[automatically_derived]
-        impl cryptonamo::traits::Cryptonamo for #ident {
+        impl cryptonamo::traits::Encryptable for #ident {
             fn type_name() -> &'static str {
                 #type_name
             }
@@ -267,10 +267,7 @@ pub(crate) fn derive_cryptonamo(
             fn partition_key(&self) -> String {
                 self.#partition_key.to_string()
             }
-        }
 
-        #[automatically_derived]
-        impl cryptonamo::traits::EncryptedRecord for #ident {
             fn protected_attributes() -> Vec<&'static str> {
                 vec![#(#protected_attributes,)*]
             }
@@ -286,7 +283,7 @@ pub(crate) fn derive_cryptonamo(
         }
 
         #[automatically_derived]
-        impl cryptonamo::traits::SearchableRecord for #ident {
+        impl cryptonamo::traits::Searchable for #ident {
             fn protected_indexes() -> Vec<&'static str> {
                 vec![#(#protected_index_names,)*]
             }
@@ -308,7 +305,7 @@ pub(crate) fn derive_cryptonamo(
         }
 
         #[automatically_derived]
-        impl cryptonamo::traits::DecryptedRecord for #ident {
+        impl cryptonamo::traits::Decryptable for #ident {
             fn from_unsealed(unsealed: cryptonamo::crypto::Unsealed) -> Result<Self, cryptonamo::crypto::SealError> {
                 Ok(Self {
                     #(#from_unsealed_impl,)*

@@ -1,4 +1,4 @@
-use crate::{encrypted_table::TableAttribute, DecryptedRecord};
+use crate::{encrypted_table::TableAttribute, Decryptable};
 use cipherstash_client::encryption::Plaintext;
 use std::collections::HashMap;
 
@@ -78,7 +78,7 @@ impl Unsealed {
 
     pub(super) fn into_value<T>(self) -> Result<T, SealError>
     where
-        T: DecryptedRecord,
+        T: Decryptable,
     {
         T::from_unsealed(self)
     }

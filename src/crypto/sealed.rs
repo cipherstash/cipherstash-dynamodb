@@ -1,7 +1,7 @@
 use crate::{
     encrypted_table::{TableAttribute, TableEntry},
     traits::{ReadConversionError, WriteConversionError},
-    DecryptedRecord,
+    Decryptable,
 };
 use aws_sdk_dynamodb::types::AttributeValue;
 use cipherstash_client::{
@@ -35,7 +35,7 @@ impl Sealed {
     pub(crate) async fn unseal<C, T>(self, cipher: &Encryption<C>) -> Result<T, SealError>
     where
         C: Credentials<Token = ViturToken>,
-        T: DecryptedRecord,
+        T: Decryptable,
     {
         let ciphertexts = T::decryptable_attributes()
             .into_iter()

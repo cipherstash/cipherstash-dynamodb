@@ -23,14 +23,11 @@ pub enum WriteConversionError {
     ConversionFailed(String),
 }
 
-pub trait Cryptonamo: Debug + Sized {
+pub trait Encryptable: Debug + Sized {
     // TODO: Add a function indicating that the root should be stored
     fn type_name() -> &'static str;
     fn partition_key(&self) -> String;
-}
 
-// These are analogous to serde (rename to Encrypt and Decrypt)
-pub trait EncryptedRecord: Cryptonamo {
     fn protected_attributes() -> Vec<&'static str>;
 
     fn plaintext_attributes() -> Vec<&'static str> {
@@ -40,7 +37,7 @@ pub trait EncryptedRecord: Cryptonamo {
     fn into_sealer(self) -> Result<Sealer<Self>, SealError>;
 }
 
-pub trait SearchableRecord: EncryptedRecord {
+pub trait Searchable: Encryptable {
     // FIXME: This would be cleaner with a DSL
     #[allow(unused_variables)]
     fn attribute_for_index(&self, index_name: &str) -> Option<ComposablePlaintext> {
@@ -63,7 +60,7 @@ Decrypt the ciphertexts and convert them all into the final record.
 Conversion would take the that were decrypted and a subset of the TableAttributes.
 */
 
-pub trait DecryptedRecord: EncryptedRecord {
+pub trait Decryptable: Encryptable {
     /// Convert an `Unsealed` into a `Self`.
     fn from_unsealed(unsealed: Unsealed) -> Result<Self, SealError>;
 
