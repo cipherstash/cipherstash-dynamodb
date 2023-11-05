@@ -1,9 +1,9 @@
-use cryptonamo::{Encryptable, Decryptable, EncryptedTable};
+use cryptonamo::{Encryptable, Decryptable, Searchable, EncryptedTable};
 use itertools::Itertools;
 use serial_test::serial;
 use std::future::Future;
 
-#[derive(Encryptable, Decryptable, Debug, PartialEq, Ord, PartialOrd, Eq)]
+#[derive(Encryptable, Decryptable, Searchable, Debug, PartialEq, Ord, PartialOrd, Eq)]
 #[cryptonamo(partition_key = "email")]
 #[cryptonamo(sort_key_prefix = "user")]
 pub struct User {

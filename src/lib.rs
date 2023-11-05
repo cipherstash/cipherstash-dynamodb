@@ -406,6 +406,6 @@ pub use error::Error;
 pub use traits::{Encryptable, Decryptable, Searchable};
 
 #[doc(hidden)]
-pub use cryptonamo_derive::{Encryptable, Decryptable};
+pub use cryptonamo_derive::{Encryptable, Decryptable, Searchable};
 
 pub type Key = [u8; 32];
