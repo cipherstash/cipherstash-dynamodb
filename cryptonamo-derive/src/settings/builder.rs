@@ -1,8 +1,7 @@
-use std::collections::HashMap;
+use super::{index_type::IndexType, AttributeMode, Settings};
 use proc_macro2::{Ident, Span};
-use syn::{DeriveInput, LitStr, Data, Fields};
-use super::{Settings, AttributeMode, index_type::IndexType};
-
+use std::collections::HashMap;
+use syn::{Data, DeriveInput, Fields, LitStr};
 
 pub(crate) struct SettingsBuilder {
     ident: Ident,
@@ -42,7 +41,10 @@ impl SettingsBuilder {
         }
     }
 
-    pub(crate) fn container_attributes(mut self, DeriveInput { attrs, .. }: &DeriveInput) -> Result<Self, syn::Error> {
+    pub(crate) fn container_attributes(
+        mut self,
+        DeriveInput { attrs, .. }: &DeriveInput,
+    ) -> Result<Self, syn::Error> {
         for attr in attrs {
             if attr.path().is_ident("cryptonamo") {
                 attr.parse_nested_meta(|meta| {
@@ -68,30 +70,33 @@ impl SettingsBuilder {
         Ok(self)
     }
 
-    pub(crate) fn field_attributes(mut self, DeriveInput { data, .. }: &DeriveInput) -> Result<Self, syn::Error> {
+    pub(crate) fn field_attributes(
+        mut self,
+        DeriveInput { data, .. }: &DeriveInput,
+    ) -> Result<Self, syn::Error> {
         // Only support structs
-    if let Data::Struct(data_struct) = data {
-        if let Fields::Named(fields_named) = &data_struct.fields {
-            let all_field_names: Vec<String> = fields_named
-                .named
-                .iter()
-                .flat_map(|x| x.ident.as_ref().map(|x| x.to_string()))
-                .collect();
+        if let Data::Struct(data_struct) = data {
+            if let Fields::Named(fields_named) = &data_struct.fields {
+                let all_field_names: Vec<String> = fields_named
+                    .named
+                    .iter()
+                    .flat_map(|x| x.ident.as_ref().map(|x| x.to_string()))
+                    .collect();
 
-            let mut compound_indexes: HashMap<String, Vec<(String, String, Span)>> =
-                Default::default();
+                let mut compound_indexes: HashMap<String, Vec<(String, String, Span)>> =
+                    Default::default();
 
-            for field in &fields_named.named {
-                let ident = &field.ident;
-                let mut attr_mode = AttributeMode::Protected;
+                for field in &fields_named.named {
+                    let ident = &field.ident;
+                    let mut attr_mode = AttributeMode::Protected;
 
-                // Parse the meta for the field
-                for attr in &field.attrs {
-                    if attr.path().is_ident("cryptonamo") {
-                        let mut query: Option<(String, String, Span)> = None;
-                        let mut compound_index_name: Option<(String, Span)> = None;
+                    // Parse the meta for the field
+                    for attr in &field.attrs {
+                        if attr.path().is_ident("cryptonamo") {
+                            let mut query: Option<(String, String, Span)> = None;
+                            let mut compound_index_name: Option<(String, Span)> = None;
 
-                        attr.parse_nested_meta(|meta| {
+                            attr.parse_nested_meta(|meta| {
                             let directive = meta.path.get_ident().map(|i| i.to_string());
                             match directive.as_deref() {
                                 Some("plaintext") => {
@@ -150,51 +155,47 @@ impl SettingsBuilder {
                             }
                         })?;
 
-                        match (query, compound_index_name) {
-                            (
-                                Some((index_name, index_type, span)),
-                                Some((compound_index_name, _)),
-                            ) => {
-                                compound_indexes
-                                    .entry(compound_index_name)
-                                    .or_default()
-                                    .push((index_name, index_type, span));
-                            }
+                            match (query, compound_index_name) {
+                                (
+                                    Some((index_name, index_type, span)),
+                                    Some((compound_index_name, _)),
+                                ) => {
+                                    compound_indexes
+                                        .entry(compound_index_name)
+                                        .or_default()
+                                        .push((index_name, index_type, span));
+                                }
 
-                            (Some((index_name, index_type, span)), None) => {
-                                self.add_index(index_name, index_type.as_ref(), span)?;
-                            }
+                                (Some((index_name, index_type, span)), None) => {
+                                    self.add_index(index_name, index_type.as_ref(), span)?;
+                                }
 
-                            (None, Some((compound_index_name, span))) => {
-                                return Err(syn::Error::new(span,  format!("Compound attribute was specified but no query options were. Specify how this field should be queried with the attribute #[cryptonamo(query = <option>, compound = \"{compound_index_name}\")]")));
-                            }
+                                (None, Some((compound_index_name, span))) => {
+                                    return Err(syn::Error::new(span,  format!("Compound attribute was specified but no query options were. Specify how this field should be queried with the attribute #[cryptonamo(query = <option>, compound = \"{compound_index_name}\")]")));
+                                }
 
-                            (None, None) => {}
-                        };
+                                (None, None) => {}
+                            };
+                        }
                     }
+
+                    self.add_attribute(
+                        ident
+                            .as_ref()
+                            .ok_or(syn::Error::new_spanned(field, "missing field"))?
+                            .to_string(),
+                        attr_mode,
+                    );
                 }
 
-                self.add_attribute(
-                    ident
-                        .as_ref()
-                        .ok_or(syn::Error::new_spanned(
-                            field,
-                            "missing field",
-                        ))?
-                        .to_string(),
-                    attr_mode,
-                );
-            }
-
-            for (name, parts) in compound_indexes.into_iter() {
-                self.add_compound_index(name, parts)?;
+                for (name, parts) in compound_indexes.into_iter() {
+                    self.add_compound_index(name, parts)?;
+                }
             }
         }
-    }
 
         Ok(self)
     }
-
 
     pub(crate) fn build(self) -> Result<Settings, syn::Error> {
         let SettingsBuilder {

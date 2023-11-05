@@ -1,11 +1,11 @@
 mod builder;
 pub mod index_type;
+use self::{builder::SettingsBuilder, index_type::IndexType};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use proc_macro2::Ident;
 use std::collections::HashMap;
 use syn::DeriveInput;
-use self::{index_type::IndexType, builder::SettingsBuilder};
 
 pub(crate) enum AttributeMode {
     Protected,
