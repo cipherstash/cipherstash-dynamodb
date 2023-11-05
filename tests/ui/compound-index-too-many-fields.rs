@@ -1,6 +1,6 @@
-use cryptonamo::Cryptonamo;
+use cryptonamo::Encryptable;
 
-#[derive(Cryptonamo)]
+#[derive(Encryptable)]
 struct User {
     #[cryptonamo(query = "exact", compound = "email#name")]
     email: String,

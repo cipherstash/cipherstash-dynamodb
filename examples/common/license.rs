@@ -1,6 +1,6 @@
-use cryptonamo::{Cryptonamo, DecryptedRecord, EncryptedRecord, SearchableRecord};
+use cryptonamo::{Encryptable, Decryptable, Searchable};
 
-#[derive(Debug, Cryptonamo)]
+#[derive(Debug, Encryptable)]
 #[cryptonamo(partition_key = "email")]
 pub struct License {
     email: String,

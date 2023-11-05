@@ -2,7 +2,7 @@ mod sealed;
 mod sealer;
 mod unsealed;
 
-use crate::traits::{Cryptonamo, ReadConversionError, SearchableRecord, WriteConversionError};
+use crate::traits::{Encryptable, ReadConversionError, Searchable, WriteConversionError};
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
     encryption::{Encryption, EncryptionError, Plaintext, TypeParseError},
@@ -44,7 +44,7 @@ pub enum CryptoError {
     Other(String),
 }
 
-pub(crate) fn all_index_keys<E: SearchableRecord + Cryptonamo>() -> Vec<String> {
+pub(crate) fn all_index_keys<E: Searchable + Encryptable>() -> Vec<String> {
     E::protected_indexes()
         .iter()
         .flat_map(|index_name| {
