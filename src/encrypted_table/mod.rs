@@ -6,10 +6,7 @@ pub use self::{
 };
 use crate::{
     crypto::*,
-    traits::{
-        Decryptable, ReadConversionError, Searchable,
-        WriteConversionError,
-    },
+    traits::{Decryptable, ReadConversionError, Searchable, WriteConversionError},
 };
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Delete, Put, TransactWriteItem},
