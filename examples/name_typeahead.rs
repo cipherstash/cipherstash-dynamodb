@@ -1,5 +1,5 @@
 mod common;
-use crate::common::User; //, UserResultByName};
+use crate::common::UserResultByName;
 use cryptonamo::EncryptedTable;
 
 #[tokio::main]
@@ -20,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = aws_sdk_dynamodb::Client::new(&config);
     let table = EncryptedTable::init(client, "users").await?;
 
-    let results: Vec<User> = table
+    let results: Vec<UserResultByName> = table
         .query()
         .eq("email", "dan@coderdan.co")
         .starts_with("name", "Dan")

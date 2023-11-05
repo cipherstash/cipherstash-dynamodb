@@ -76,7 +76,7 @@ pub enum InitError {
 
 impl EncryptedTable {
     pub async fn init(
-        db: Client,
+        db: aws_sdk_dynamodb::Client,
         table_name: impl Into<String>,
     ) -> Result<EncryptedTable, InitError> {
         info!("Initializing...");

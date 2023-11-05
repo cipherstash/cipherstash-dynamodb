@@ -19,7 +19,7 @@ pub(crate) fn derive_searchable(input: DeriveInput) -> Result<TokenStream, syn::
                 let index_type = IndexType::type_to_ident(index_type).unwrap();
 
                 quote! {
-                    #name => Some(Box::new(cipherstash_client::encryption::compound_indexer::#index_type::new(#name, vec![])))
+                    #name => Some(Box::new(cryptonamo::encryption::compound_indexer::#index_type::new(#name, vec![])))
                 }
             },
             IndexType::Compound2 { name, index: ((a, b), (c, d)) } => {
@@ -72,7 +72,6 @@ pub(crate) fn derive_searchable(input: DeriveInput) -> Result<TokenStream, syn::
             }
 
             fn index_by_name(name: &str) -> Option<Box<dyn cryptonamo::traits::ComposableIndex>> {
-                use cipherstash_client::encryption::compound_indexer::*;
                 match name {
                     #(#indexes_impl,)*
                     _ => None,

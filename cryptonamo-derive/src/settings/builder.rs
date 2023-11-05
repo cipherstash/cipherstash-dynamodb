@@ -99,6 +99,7 @@ impl SettingsBuilder {
                             attr.parse_nested_meta(|meta| {
                             let directive = meta.path.get_ident().map(|i| i.to_string());
                             match directive.as_deref() {
+
                                 Some("plaintext") => {
                                     // Don't encrypt this field
                                     attr_mode = AttributeMode::Plaintext;

@@ -408,4 +408,7 @@ pub use traits::{Encryptable, Decryptable, Searchable};
 #[doc(hidden)]
 pub use cryptonamo_derive::{Encryptable, Decryptable, Searchable};
 
+// Re-exports
+pub use cipherstash_client::encryption;
+
 pub type Key = [u8; 32];
