@@ -1,6 +1,5 @@
 use crate::traits::ReadConversionError;
 use aws_sdk_dynamodb::types::AttributeValue;
-use cipherstash_client::encryption::Plaintext;
 use paste::paste;
 use std::collections::HashMap;
 
