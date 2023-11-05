@@ -910,9 +910,6 @@ dependencies = [
  "lambda_runtime",
  "log",
  "paste",
- "serde",
- "serde_bytes",
- "serde_dynamo",
  "serde_with",
  "serial_test",
  "sha2",
@@ -2668,15 +2665,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_bytes"
-version = "0.11.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab33ec92f677585af6d88c65593ae2375adde54efdbf16d597f2cbc7a6d368ff"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "serde_cbor"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2695,17 +2683,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.38",
-]
-
-[[package]]
-name = "serde_dynamo"
-version = "4.2.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba7e04e6ccab970073e94e691746e6e737de039317fb3ebf47c7e61598822434"
-dependencies = [
- "aws-sdk-dynamodb",
- "base64 0.21.5",
- "serde",
 ]
 
 [[package]]
