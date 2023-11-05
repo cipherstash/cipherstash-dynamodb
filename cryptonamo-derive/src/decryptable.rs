@@ -3,9 +3,7 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::DeriveInput;
 
-pub(crate) fn derive_decryptable(
-    input: DeriveInput,
-) -> Result<TokenStream, syn::Error> {
+pub(crate) fn derive_decryptable(input: DeriveInput) -> Result<TokenStream, syn::Error> {
     let settings = Settings::builder(&input)
         .container_attributes(&input)?
         .field_attributes(&input)?

@@ -1,4 +1,4 @@
-use crate::settings::{Settings, index_type::IndexType};
+use crate::settings::{index_type::IndexType, Settings};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::DeriveInput;
