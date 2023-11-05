@@ -127,8 +127,8 @@ impl From<AttributeValue> for TableAttribute {
         match attribute {
             AttributeValue::S(s) => TableAttribute::String(s),
             AttributeValue::N(n) => TableAttribute::I32(n.parse().unwrap()),
-
-            _ => unimplemented!(),
+            AttributeValue::Null(_) => TableAttribute::Null,
+            _ => todo!(),
         }
     }
 }
