@@ -16,7 +16,7 @@ pub(crate) struct SettingsBuilder {
 
 impl SettingsBuilder {
     fn validate_index_type(index_type: &str, index_type_span: Span) -> Result<(), syn::Error> {
-        if matches!(index_type.as_ref(), "exact" | "prefix") {
+        if matches!(index_type, "exact" | "prefix") {
             Ok(())
         } else {
             Err(syn::Error::new(
@@ -133,15 +133,15 @@ impl SettingsBuilder {
                                     let index_name = value.parse::<LitStr>()?.value();
 
                                     let is_valid_index = index_name
-                                        .split("#")
+                                        .split('#')
                                         .all(|x| all_field_names.iter().any(|y| y == x));
 
                                     if !is_valid_index {
                                         return Err(meta.error(format!("Compound index '{index_name}' is not valid. It must be valid fields separated by a '#' character.")));
                                     }
 
-                                    let is_field_mentioned = index_name.split("#")
-                                        .any(|x| x == &field_name);
+                                    let is_field_mentioned = index_name.split('#')
+                                        .any(|x| x == field_name);
 
                                     if !is_field_mentioned {
                                         return Err(meta.error(format!("Compound index '{index_name}' does not include current field '{field_name}'.")));
@@ -271,12 +271,12 @@ impl SettingsBuilder {
         name: String,
         parts: Vec<(String, String, Span)>,
     ) -> Result<(), syn::Error> {
-        let name_parts = name.split("#").collect::<Vec<_>>();
+        let name_parts = name.split('#').collect::<Vec<_>>();
 
         if name_parts.len() > parts.len() {
             let missing_fields = name_parts
                 .iter()
-                .filter(|x| !parts.iter().find(|(y, _, _)| x == &y).is_some())
+                .filter(|x| parts.iter().any(|(y, _, _)| x == &y))
                 .cloned()
                 .collect::<Vec<_>>();
 
@@ -293,7 +293,7 @@ impl SettingsBuilder {
             let extra_fields = parts
                 .iter()
                 .map(|(x, _, _)| x)
-                .filter(|x| !name_parts.iter().find(|y| x == y).is_some())
+                .filter(|x| name_parts.iter().any(|y| x == y))
                 .cloned()
                 .collect::<Vec<_>>();
 
@@ -328,7 +328,7 @@ impl SettingsBuilder {
             index: (field, index_type),
         };
 
-        while let Some(field) = name_parts_iter.next() {
+        for field in name_parts_iter {
             let (field, index_type, index_type_span) = parts
                 .iter()
                 .find(|x| x.0 == field)
