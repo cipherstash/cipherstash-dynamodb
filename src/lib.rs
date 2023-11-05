@@ -403,10 +403,10 @@ mod error;
 pub mod traits;
 pub use encrypted_table::{EncryptedTable, QueryBuilder};
 pub use error::Error;
-pub use traits::{Encryptable, Decryptable, Searchable};
+pub use traits::{Decryptable, Encryptable, Searchable};
 
 #[doc(hidden)]
-pub use cryptonamo_derive::{Encryptable, Decryptable, Searchable};
+pub use cryptonamo_derive::{Decryptable, Encryptable, Searchable};
 
 // Re-exports
 pub use cipherstash_client::encryption;

@@ -1,4 +1,4 @@
-use cryptonamo::{Encryptable, Decryptable, Searchable, EncryptedTable};
+use cryptonamo::{Decryptable, Encryptable, EncryptedTable, Searchable};
 use itertools::Itertools;
 use serial_test::serial;
 use std::future::Future;
@@ -74,7 +74,10 @@ async fn test_query_single_exact() {
             .await
             .expect("Failed to query");
 
-        assert_eq!(res, vec![User::new("dan@coderdan.co", "Dan Draper", "blue")]);
+        assert_eq!(
+            res,
+            vec![User::new("dan@coderdan.co", "Dan Draper", "blue")]
+        );
     })
     .await;
 }
@@ -116,7 +119,10 @@ async fn test_query_compound() {
             .await
             .expect("Failed to query");
 
-        assert_eq!(res, vec![User::new("dan@coderdan.co", "Dan Draper", "blue")]);
+        assert_eq!(
+            res,
+            vec![User::new("dan@coderdan.co", "Dan Draper", "blue")]
+        );
     })
     .await;
 }
@@ -126,7 +132,10 @@ async fn test_query_compound() {
 async fn test_get_by_partition_key() {
     run_test(|table| async move {
         let res: Option<User> = table.get("dan@coderdan.co").await.expect("Failed to send");
-        assert_eq!(res, Some(User::new("dan@coderdan.co", "Dan Draper", "blue")));
+        assert_eq!(
+            res,
+            Some(User::new("dan@coderdan.co", "Dan Draper", "blue"))
+        );
     })
     .await;
 }
@@ -152,7 +161,10 @@ async fn test_delete() {
             .send()
             .await
             .expect("Failed to send");
-        assert_eq!(res, vec![User::new("daniel@example.com", "Daniel Johnson", "green")]);
+        assert_eq!(
+            res,
+            vec![User::new("daniel@example.com", "Daniel Johnson", "green")]
+        );
 
         let res = table
             .query::<User>()
