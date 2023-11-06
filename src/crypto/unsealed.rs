@@ -52,7 +52,7 @@ impl Unsealed {
 
     pub(super) fn add_protected(&mut self, name: impl Into<String>, plaintext: Plaintext) {
         let name = name.into();
-        let descriptor = format!("{}{}", self.descriptor.as_deref().unwrap_or(""), &name);
+        let descriptor = format!("{}/{}", self.descriptor.as_deref().unwrap_or(""), &name);
         self.protected.insert(name, (plaintext, descriptor));
     }
 
