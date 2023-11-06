@@ -138,12 +138,16 @@ impl EncryptedTable {
         }
     }
 
-    pub async fn delete<E: Searchable>(&self, pk: &str) -> Result<(), DeleteError> {
+    // TODO: create PrimaryKey abstraction
+    pub async fn delete<E: Searchable>(
+        &self,
+        pk: &str,
+        sk: impl Into<String>,
+    ) -> Result<(), DeleteError> {
         let pk = AttributeValue::S(encrypt_partition_key(pk, &self.cipher)?);
+        let sk: String = sk.into();
 
-        let sk_to_delete = [E::type_name().to_string()]
-            .into_iter()
-            .chain(all_index_keys::<E>().into_iter());
+        let sk_to_delete = all_index_keys::<E>(&sk).into_iter().into_iter().chain([sk]);
 
         let transact_items = sk_to_delete.map(|sk| {
             TransactWriteItem::builder()
@@ -177,6 +181,7 @@ impl EncryptedTable {
     {
         let mut seen_sk = HashSet::new();
 
+        let sk = record.sort_key();
         let sealer: Sealer<T> = record.into_sealer()?;
         let (pk, sealed) = sealer.seal(&self.cipher, 12).await?;
 
@@ -198,7 +203,7 @@ impl EncryptedTable {
             );
         }
 
-        for index_sk in all_index_keys::<T>() {
+        for index_sk in all_index_keys::<T>(&sk) {
             if seen_sk.contains(&index_sk) {
                 continue;
             }

@@ -26,6 +26,11 @@ pub enum WriteConversionError {
 pub trait Encryptable: Debug + Sized {
     // TODO: Add a function indicating that the root should be stored
     fn type_name() -> &'static str;
+
+    fn sort_key(&self) -> String {
+        Self::type_name().into()
+    }
+
     fn partition_key(&self) -> String;
 
     fn protected_attributes() -> Vec<&'static str>;

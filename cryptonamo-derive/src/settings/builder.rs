@@ -7,7 +7,8 @@ pub(crate) struct SettingsBuilder {
     ident: Ident,
     type_name: String,
     sort_key_prefix: Option<String>,
-    partition_key: Option<String>,
+    sort_key_field: Option<String>,
+    partition_key_field: Option<String>,
     protected_attributes: Vec<String>,
     unprotected_attributes: Vec<String>,
     skipped_attributes: Vec<String>,
@@ -33,7 +34,8 @@ impl SettingsBuilder {
             ident: input.ident.clone(),
             type_name,
             sort_key_prefix: None,
-            partition_key: None,
+            sort_key_field: None,
+            partition_key_field: None,
             protected_attributes: Vec::new(),
             unprotected_attributes: Vec::new(),
             skipped_attributes: Vec::new(),
@@ -92,6 +94,48 @@ impl SettingsBuilder {
 
                     // Parse the meta for the field
                     for attr in &field.attrs {
+                        if attr.path().is_ident("sort_key") {
+                            let field_name = ident
+                                .as_ref()
+                                .ok_or_else(|| {
+                                    syn::Error::new_spanned(
+                                        field,
+                                        "internal error: identifier was not Some",
+                                    )
+                                })?
+                                .to_string();
+
+                            if let Some(f) = &self.sort_key_field {
+                                return Err(syn::Error::new_spanned(
+                                    field,
+                                    format!("sort key was already specified to be '{f}'"),
+                                ));
+                            }
+
+                            self.sort_key_field = Some(field_name);
+                        }
+
+                        if attr.path().is_ident("partition_key") {
+                            let field_name = ident
+                                .as_ref()
+                                .ok_or_else(|| {
+                                    syn::Error::new_spanned(
+                                        field,
+                                        "internal error: identifier was not Some",
+                                    )
+                                })?
+                                .to_string();
+
+                            if let Some(f) = &self.partition_key_field {
+                                return Err(syn::Error::new_spanned(
+                                    field,
+                                    format!("partition key was already specified to be '{f}'"),
+                                ));
+                            }
+
+                            self.partition_key_field = Some(field_name);
+                        }
+
                         if attr.path().is_ident("cryptonamo") {
                             let mut query: Option<(String, String, Span)> = None;
                             let mut compound_index_name: Option<(String, Span)> = None;
@@ -203,7 +247,8 @@ impl SettingsBuilder {
             ident,
             type_name,
             sort_key_prefix,
-            partition_key,
+            sort_key_field,
+            partition_key_field: partition_key,
             protected_attributes,
             unprotected_attributes,
             skipped_attributes,
@@ -222,7 +267,8 @@ impl SettingsBuilder {
         Ok(Settings {
             ident,
             sort_key_prefix,
-            partition_key: Some(partition_key), // TODO: Remove the Some
+            sort_key_field,
+            partition_key_field: Some(partition_key), // TODO: Remove the Some
             protected_attributes,
             unprotected_attributes,
             skipped_attributes,
@@ -236,7 +282,7 @@ impl SettingsBuilder {
     }
 
     pub(crate) fn set_partition_key(&mut self, value: String) -> Result<(), syn::Error> {
-        self.partition_key = Some(value);
+        self.partition_key_field = Some(value);
         Ok(())
     }
 
