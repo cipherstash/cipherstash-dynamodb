@@ -43,9 +43,9 @@ impl Sealed {
                 self.inner()
                     .attributes
                     .get(name)
-                    .ok_or(SealError::MissingAttribute(name.to_string()))?
+                    .ok_or_else(|| SealError::MissingAttribute(name.to_string()))?
                     .as_ciphertext()
-                    .ok_or(SealError::InvalidCiphertext(name.to_string()))
+                    .ok_or_else(|| SealError::InvalidCiphertext(name.to_string()))
             })
             .collect::<Result<Vec<&str>, SealError>>()?;
 
