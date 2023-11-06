@@ -103,14 +103,15 @@ impl<T> Sealer<T> {
                                 term_length,
                             )
                             .map_err(SealError::CryptoError)
-                            .and_then(|index_term| match index_term {
-                                IndexTerm::Binary(x) => Ok(vec![(index_name, x)]),
-                                IndexTerm::BinaryVec(x) => {
-                                    Ok(x.into_iter().map(|x| (index_name, x)).collect())
-                                }
-                                _ => Err(SealError::InvalidCiphertext("Invalid index term".into())),
-                            })
+                            .map(|result| (index_name, result))
                     })
+            })
+            .map(|index_term| match index_term {
+                Ok((index_name, IndexTerm::Binary(x))) => Ok(vec![(index_name, x)]),
+                Ok((index_name, IndexTerm::BinaryVec(x))) => {
+                    Ok(x.into_iter().map(|x| (index_name, x)).collect())
+                }
+                _ => Err(SealError::InvalidCiphertext("Invalid index term".into())),
             })
             .flatten_ok()
             .try_collect()?;

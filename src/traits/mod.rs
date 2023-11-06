@@ -54,12 +54,6 @@ pub trait Searchable: Encryptable {
     }
 }
 
-/*
-We need to identify which fields from TableAttributes are encrypted and which are plaintext.
-Decrypt the ciphertexts and convert them all into the final record.
-Conversion would take the that were decrypted and a subset of the TableAttributes.
-*/
-
 pub trait Decryptable: Encryptable {
     /// Convert an `Unsealed` into a `Self`.
     fn from_unsealed(unsealed: Unsealed) -> Result<Self, SealError>;
