@@ -181,7 +181,6 @@ impl EncryptedTable {
         let (pk, sealed) = sealer.seal(&self.cipher, 12).await?;
 
         // TODO: Use a combinator
-        //let (pk, table_entries) = encrypt(record, &self.cipher).await?;
         let mut items: Vec<TransactWriteItem> = Vec::with_capacity(sealed.len());
 
         for entry in sealed.into_iter() {
