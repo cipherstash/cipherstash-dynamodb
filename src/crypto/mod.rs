@@ -1,28 +1,50 @@
-use crate::{
-    encrypted_table::TableEntry,
-    traits::{Cryptonamo, SearchableRecord},
-};
+mod sealed;
+mod sealer;
+mod unsealed;
+
+use crate::traits::{Encryptable, ReadConversionError, Searchable, WriteConversionError};
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
-    encryption::{
-        compound_indexer::CompoundIndex, Encryption, EncryptionError, IndexTerm, Plaintext,
-    },
+    encryption::{Encryption, EncryptionError, Plaintext, TypeParseError},
     schema::column::Index,
 };
-use std::collections::HashMap;
 use thiserror::Error;
 
+pub use sealed::Sealed;
+pub use sealer::Sealer;
+pub use unsealed::Unsealed;
+
 const MAX_TERMS_PER_INDEX: usize = 25;
+
+// TODO: Should we just call this CryptoError?
+#[derive(Debug, Error)]
+pub enum SealError {
+    #[error("Failed to encrypt partition key")]
+    CryptoError(#[from] EncryptionError),
+    #[error("Failed to convert attribute: {0} from internal representation")]
+    ReadConversionError(#[from] ReadConversionError),
+    #[error("Failed to convert attribute: {0} to internal representation")]
+    WriteConversionError(#[from] WriteConversionError),
+    // TODO: Does TypeParseError correctly redact the plaintext value?
+    #[error("Failed to parse type for encryption: {0}")]
+    TypeParseError(#[from] TypeParseError),
+    #[error("Missing attribute: {0}")]
+    MissingAttribute(String),
+    #[error("Invalid ciphertext value: {0}")]
+    InvalidCiphertext(String),
+}
 
 #[derive(Error, Debug)]
 pub enum CryptoError {
     #[error("EncryptionError: {0}")]
     EncryptionError(#[from] EncryptionError),
+    #[error("ReadConversionError: {0}")]
+    ReadConversionError(#[from] ReadConversionError),
     #[error("{0}")]
     Other(String),
 }
 
-pub fn all_index_keys<E: SearchableRecord + Cryptonamo>() -> Vec<String> {
+pub(crate) fn all_index_keys<E: Searchable + Encryptable>() -> Vec<String> {
     E::protected_indexes()
         .iter()
         .flat_map(|index_name| {
@@ -34,130 +56,10 @@ pub fn all_index_keys<E: SearchableRecord + Cryptonamo>() -> Vec<String> {
         .collect()
 }
 
-fn encrypt_indexes<E, C>(
-    parition_key: &str,
-    target: &E,
-    term_length: usize,
-    // FIXME: Make a type for *encrypted attribute*
-    attributes: &HashMap<String, String>,
-    entries: &mut Vec<TableEntry>,
-    cipher: &Encryption<C>,
-) -> Result<(), CryptoError>
-where
-    E: SearchableRecord + Cryptonamo,
-    C: Credentials<Token = ViturToken>,
-{
-    for index_name in E::protected_indexes().iter() {
-        if let Some((attr, index)) = target
-            .attribute_for_index(index_name)
-            .and_then(|attr| E::index_by_name(index_name).map(|index| (attr, index)))
-        {
-            let index_term = cipher.compound_index(
-                &CompoundIndex::new(index),
-                attr,
-                Some(format!("{}#{}", E::type_name(), index_name)),
-                term_length,
-            )?;
-
-            let terms = match index_term {
-                IndexTerm::Binary(x) => vec![x],
-                IndexTerm::BinaryVec(x) => x,
-                _ => todo!(),
-            };
-
-            for (i, term) in terms.into_iter().enumerate().take(MAX_TERMS_PER_INDEX) {
-                let sk = format!("{}#{}#{}", E::type_name(), index_name, i); // TODO: HMAC the sort key, too (users#index_name#pk)
-                let term = hex::encode(term);
-
-                entries.push(TableEntry {
-                    pk: parition_key.to_string(),
-                    sk,
-                    term: Some(term),
-                    attributes: attributes.clone(),
-                });
-            }
-        }
-    }
-
-    Ok(())
-}
-
-pub(crate) async fn decrypt<C>(
-    ciphertexts: HashMap<String, String>,
-    cipher: &Encryption<C>,
-) -> Result<HashMap<String, Plaintext>, CryptoError>
-where
-    C: Credentials<Token = ViturToken>,
-{
-    let values: Vec<&String> = ciphertexts.values().collect();
-    let plaintexts: Vec<Plaintext> = cipher.decrypt(values).await?;
-    Ok(ciphertexts
-        .into_keys()
-        .zip(plaintexts.into_iter())
-        .collect())
-}
-
-pub(crate) async fn encrypt<E, C>(
-    target: &E,
-    cipher: &Encryption<C>,
-) -> Result<(String, Vec<TableEntry>), CryptoError>
-where
-    // TODO: Can we overload this to index if the record is searchable?
-    E: SearchableRecord,
-    C: Credentials<Token = ViturToken>,
-{
-    let protected_attributes = target.protected_attributes();
-
-    let entries_to_encrypt = protected_attributes
-        .into_iter()
-        .map(|(name, plaintext)| (name, plaintext, format!("{}#{}", E::type_name(), name)))
-        .collect::<Vec<_>>();
-
-    let encrypted = cipher
-        .encrypt(
-            entries_to_encrypt
-                .iter()
-                .map(|(_, plaintext, descriptor)| (plaintext, descriptor.as_str())),
-        )
-        .await?;
-
-    let attributes: HashMap<String, String> = entries_to_encrypt
-        .into_iter()
-        .map(|(name, _, _)| name)
-        .zip(encrypted.into_iter())
-        .flat_map(|(name, ct)| ct.map(|ct| (name.to_string(), ct)))
-        .collect();
-
-    let partition_key = encrypt_partition_key(&target.partition_key(), cipher)?;
-
-    let mut table_entries: Vec<TableEntry> = Vec::new();
-
-    // TODO: Make a constructor on TableEntry so the elements don't have to be pub
-    table_entries.push(TableEntry {
-        pk: partition_key.to_string(),
-        sk: E::type_name().to_string(),
-        term: None,
-        attributes: attributes.clone(),
-    });
-
-    // TODO: Handle the plaintext attributes
-
-    encrypt_indexes(
-        &partition_key,
-        target,
-        12, // output term length
-        &attributes,
-        &mut table_entries,
-        cipher,
-    )?;
-
-    Ok((partition_key, table_entries))
-}
-
 pub(crate) fn encrypt_partition_key<C>(
     value: &str,
     cipher: &Encryption<C>,
-) -> Result<String, CryptoError>
+) -> Result<String, EncryptionError>
 where
     C: Credentials<Token = ViturToken>,
 {
@@ -168,5 +70,7 @@ where
         .index(&plaintext, &index_type)?
         .as_binary()
         .map(hex::encode)
-        .ok_or_else(|| CryptoError::Other("Encrypting partition key returned invalid value".into()))
+        .ok_or(EncryptionError::IndexingError(
+            "Invalid term type".to_string(),
+        ))
 }

@@ -1,8 +1,9 @@
-use cryptonamo::{traits::DecryptedRecord, Cryptonamo, EncryptedTable, Plaintext};
+use cryptonamo::{Decryptable, Encryptable, EncryptedTable, Searchable};
+use itertools::Itertools;
 use serial_test::serial;
-use std::{collections::HashMap, future::Future};
+use std::future::Future;
 
-#[derive(Debug, PartialEq, Cryptonamo)]
+#[derive(Encryptable, Decryptable, Searchable, Debug, PartialEq, Ord, PartialOrd, Eq)]
 #[cryptonamo(partition_key = "email")]
 #[cryptonamo(sort_key_prefix = "user")]
 pub struct User {
@@ -13,22 +14,21 @@ pub struct User {
     #[cryptonamo(query = "prefix", compound = "email#name")]
     #[cryptonamo(query = "prefix")]
     pub name: String,
+
+    #[cryptonamo(plaintext)]
+    pub tag: String,
+
+    #[cryptonamo(skip)]
+    pub temp: bool,
 }
 
 impl User {
-    fn new(email: impl Into<String>, name: impl Into<String>) -> Self {
+    fn new(email: impl Into<String>, name: impl Into<String>, tag: impl Into<String>) -> Self {
         Self {
             name: name.into(),
             email: email.into(),
-        }
-    }
-}
-
-impl DecryptedRecord for User {
-    fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {
-        Self {
-            email: attributes.get("email").unwrap().try_into().unwrap(),
-            name: attributes.get("name").unwrap().try_into().unwrap(),
+            tag: tag.into(),
+            temp: false,
         }
     }
 }
@@ -46,17 +46,17 @@ async fn run_test<F: Future<Output = ()>>(f: impl FnOnce(EncryptedTable) -> F) {
         .expect("Failed to init table");
 
     table
-        .put(&User::new("dan@coderdan.co", "Dan Draper"))
+        .put(User::new("dan@coderdan.co", "Dan Draper", "blue"))
         .await
         .expect("Failed to insert Dan");
 
     table
-        .put(&User::new("jane@smith.org", "Jane Smith"))
+        .put(User::new("jane@smith.org", "Jane Smith", "red"))
         .await
         .expect("Failed to insert Jane");
 
     table
-        .put(&User::new("daniel@example.com", "Daniel Johnson"))
+        .put(User::new("daniel@example.com", "Daniel Johnson", "green"))
         .await
         .expect("Failed to insert Daniel");
 
@@ -74,23 +74,33 @@ async fn test_query_single_exact() {
             .await
             .expect("Failed to query");
 
-        assert_eq!(res, vec![User::new("dan@coderdan.co", "Dan Draper")]);
+        assert_eq!(
+            res,
+            vec![User::new("dan@coderdan.co", "Dan Draper", "blue")]
+        );
     })
     .await;
+}
 
+#[tokio::test]
+#[serial]
+async fn test_query_single_prefix() {
     run_test(|table| async move {
         let res: Vec<User> = table
             .query()
             .starts_with("name", "Dan")
             .send()
             .await
-            .expect("Failed to query");
+            .expect("Failed to query")
+            .into_iter()
+            .sorted()
+            .collect_vec();
 
         assert_eq!(
             res,
             vec![
-                User::new("dan@coderdan.co", "Dan Draper"),
-                User::new("daniel@example.com", "Daniel Johnson")
+                User::new("dan@coderdan.co", "Dan Draper", "blue"),
+                User::new("daniel@example.com", "Daniel Johnson", "green")
             ]
         );
     })
@@ -109,7 +119,10 @@ async fn test_query_compound() {
             .await
             .expect("Failed to query");
 
-        assert_eq!(res, vec![User::new("dan@coderdan.co", "Dan Draper")]);
+        assert_eq!(
+            res,
+            vec![User::new("dan@coderdan.co", "Dan Draper", "blue")]
+        );
     })
     .await;
 }
@@ -119,7 +132,10 @@ async fn test_query_compound() {
 async fn test_get_by_partition_key() {
     run_test(|table| async move {
         let res: Option<User> = table.get("dan@coderdan.co").await.expect("Failed to send");
-        assert_eq!(res, Some(User::new("dan@coderdan.co", "Dan Draper")));
+        assert_eq!(
+            res,
+            Some(User::new("dan@coderdan.co", "Dan Draper", "blue"))
+        );
     })
     .await;
 }
@@ -145,7 +161,10 @@ async fn test_delete() {
             .send()
             .await
             .expect("Failed to send");
-        assert_eq!(res, vec![User::new("daniel@example.com", "Daniel Johnson")]);
+        assert_eq!(
+            res,
+            vec![User::new("daniel@example.com", "Daniel Johnson", "green")]
+        );
 
         let res = table
             .query::<User>()

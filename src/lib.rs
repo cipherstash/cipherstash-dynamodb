@@ -1,3 +1,4 @@
+#![doc(html_favicon_url = "https://cipherstash.com/favicon.ico")]
 //! ## Cryptonamo: Encrypted Tables for DynamoDB
 //!
 //! Based on the CipherStash SDK and ZeroKMS key service, Cryptonamo provides a simple interface for
@@ -396,15 +397,18 @@
 //! - [ ] Using the derive macros for compound macros is not working correctly (you can implement the traits directly)
 //! - [ ] Sort keys are not currently hashed (and should be)
 //!
-mod crypto;
+pub mod crypto;
 mod encrypted_table;
+mod error;
 pub mod traits;
 pub use encrypted_table::{EncryptedTable, QueryBuilder};
+pub use error::Error;
+pub use traits::{Decryptable, Encryptable, Searchable};
+
+#[doc(hidden)]
+pub use cryptonamo_derive::{Decryptable, Encryptable, Searchable};
 
 // Re-exports
-pub use cipherstash_client::encryption::compound_indexer::{ComposableIndex, ComposablePlaintext};
-pub use cipherstash_client::encryption::Plaintext;
+pub use cipherstash_client::encryption;
 
 pub type Key = [u8; 32];
-
-pub use cryptonamo_derive::Cryptonamo;

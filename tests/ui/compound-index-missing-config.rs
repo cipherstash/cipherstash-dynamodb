@@ -1,6 +1,6 @@
-use cryptonamo::Cryptonamo;
+use cryptonamo::Encryptable;
 
-#[derive(Cryptonamo)]
+#[derive(Encryptable)]
 #[cryptonamo(partition_key = "email")]
 struct User {
     #[cryptonamo(compound = "email#name")]

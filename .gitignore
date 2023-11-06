@@ -2,3 +2,4 @@
 .rtx.toml
 .envrc
 .env
+.DS_Store

@@ -1,17 +1,7 @@
-use cryptonamo::{traits::DecryptedRecord, Cryptonamo, Plaintext};
-use std::collections::HashMap;
+use cryptonamo::{Decryptable, Encryptable, Searchable};
 
-#[derive(Debug, Cryptonamo)]
+#[derive(Debug, Encryptable, Decryptable, Searchable)]
 #[cryptonamo(partition_key = "name")]
 pub struct UserResultByName {
     pub name: String,
-}
-
-impl DecryptedRecord for UserResultByName {
-    fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {
-        // TODO: Don't unwrap, make try_from_attributes and return a Result
-        Self {
-            name: attributes.get("name").unwrap().try_into().unwrap(),
-        }
-    }
 }

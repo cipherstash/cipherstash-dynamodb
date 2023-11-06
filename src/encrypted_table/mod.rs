@@ -2,11 +2,11 @@ pub mod query;
 mod table_entry;
 pub use self::{
     query::{QueryBuilder, QueryError},
-    table_entry::TableEntry,
+    table_entry::{TableAttribute, TableEntry},
 };
 use crate::{
     crypto::*,
-    traits::{DecryptedRecord, EncryptedRecord, SearchableRecord},
+    traits::{Decryptable, ReadConversionError, Searchable, WriteConversionError},
 };
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Delete, Put, TransactWriteItem},
@@ -15,12 +15,11 @@ use aws_sdk_dynamodb::{
 use cipherstash_client::{
     config::{console_config::ConsoleConfig, errors::ConfigError, vitur_config::ViturConfig},
     credentials::{auto_refresh::AutoRefresh, vitur_credentials::ViturCredentials},
-    encryption::Encryption,
+    encryption::{Encryption, EncryptionError},
     vitur::{errors::LoadConfigError, DatasetConfigWithIndexRootKey, Vitur},
 };
 use itertools::Itertools;
 use log::info;
-use serde_dynamo::{aws_sdk_dynamodb_0_29::from_item, to_item};
 use std::collections::HashSet;
 use thiserror::Error;
 
@@ -35,40 +34,46 @@ pub struct EncryptedTable {
 #[derive(Error, Debug)]
 pub enum PutError {
     #[error("AwsError: {0}")]
-    AwsError(String),
-    #[error("SerdeError: {0}")]
-    SerdeError(#[from] serde_dynamo::Error),
+    Aws(String),
+    #[error("Write Conversion Error: {0}")]
+    WriteConversion(#[from] WriteConversionError),
+    #[error("SealError: {0}")]
+    Seal(#[from] SealError),
     #[error("CryptoError: {0}")]
-    CryptoError(#[from] CryptoError),
+    Crypto(#[from] CryptoError),
 }
 
 #[derive(Error, Debug)]
 pub enum GetError {
-    #[error("CryptoError: {0}")]
-    CryptoError(#[from] CryptoError),
+    #[error("SealError: {0}")]
+    Seal(#[from] SealError),
+    #[error("Encryption Error: {0}")]
+    Encryption(#[from] EncryptionError),
     #[error("AwsError: {0}")]
-    AwsError(String),
+    Aws(String),
+    #[error("Read Conversion Error: {0}")]
+    ReadConversion(#[from] ReadConversionError),
 }
 
 #[derive(Error, Debug)]
 pub enum DeleteError {
-    #[error("CryptoError: {0}")]
-    CryptoError(#[from] CryptoError),
+    #[error("Encryption Error: {0}")]
+    Encryption(#[from] EncryptionError),
     #[error("AwsError: {0}")]
-    AwsError(String),
+    Aws(String),
 }
 
 #[derive(Error, Debug)]
 pub enum InitError {
     #[error("ConfigError: {0}")]
-    ConfigError(#[from] ConfigError),
+    Config(#[from] ConfigError),
     #[error("LoadConfigError: {0}")]
-    LoadConfigError(#[from] LoadConfigError),
+    LoadConfig(#[from] LoadConfigError),
 }
 
 impl EncryptedTable {
     pub async fn init(
-        db: Client,
+        db: aws_sdk_dynamodb::Client,
         table_name: impl Into<String>,
     ) -> Result<EncryptedTable, InitError> {
         info!("Initializing...");
@@ -102,41 +107,38 @@ impl EncryptedTable {
 
     pub fn query<R>(&self) -> QueryBuilder<R>
     where
-        R: SearchableRecord + DecryptedRecord,
+        R: Searchable + Decryptable,
     {
         QueryBuilder::new(self)
     }
 
     pub async fn get<T>(&self, pk: &str) -> Result<Option<T>, GetError>
     where
-        T: EncryptedRecord + DecryptedRecord,
+        T: Decryptable,
     {
         let pk = encrypt_partition_key(pk, &self.cipher)?;
+        let sk = T::type_name().to_string();
 
         let result = self
             .db
             .get_item()
             .table_name(&self.table_name)
             .key("pk", AttributeValue::S(pk))
-            .key("sk", AttributeValue::S(T::type_name().to_string()))
+            .key("sk", AttributeValue::S(sk))
             .send()
             .await
-            .map_err(|e| GetError::AwsError(e.to_string()))?;
+            .map_err(|e| GetError::Aws(e.to_string()))?;
 
-        let table_entry: Option<TableEntry> = result
-            .item
-            .map(|item| from_item(item).map_err(|e| GetError::AwsError(e.to_string())))
-            .transpose()?;
+        let sealed: Option<Sealed> = result.item.map(Sealed::try_from).transpose()?;
 
-        if let Some(TableEntry { attributes, .. }) = table_entry {
-            let attributes = decrypt(attributes, &self.cipher).await?;
-            Ok(Some(T::from_attributes(attributes)))
+        if let Some(sealed) = sealed {
+            Ok(Some(sealed.unseal(&self.cipher).await?))
         } else {
             Ok(None)
         }
     }
 
-    pub async fn delete<E: SearchableRecord>(&self, pk: &str) -> Result<(), DeleteError> {
+    pub async fn delete<E: Searchable>(&self, pk: &str) -> Result<(), DeleteError> {
         let pk = AttributeValue::S(encrypt_partition_key(pk, &self.cipher)?);
 
         let sk_to_delete = [E::type_name().to_string()]
@@ -162,31 +164,34 @@ impl EncryptedTable {
                 .set_transact_items(Some(items.collect()))
                 .send()
                 .await
-                .map_err(|e| DeleteError::AwsError(e.to_string()))?;
+                .map_err(|e| DeleteError::Aws(e.to_string()))?;
         }
 
         Ok(())
     }
 
-    pub async fn put<T>(&self, record: &T) -> Result<(), PutError>
+    pub async fn put<T>(&self, record: T) -> Result<(), PutError>
     where
-        T: SearchableRecord,
+        // TODO: We may want to create a separate put_with_indexes function for Searchable types
+        T: Searchable,
     {
         let mut seen_sk = HashSet::new();
 
-        // TODO: Use a combinator
-        let (pk, table_entries) = encrypt(record, &self.cipher).await?;
-        let mut items: Vec<TransactWriteItem> = Vec::with_capacity(table_entries.len());
+        let sealer: Sealer<T> = record.into_sealer()?;
+        let (pk, sealed) = sealer.seal(&self.cipher, 12).await?;
 
-        for entry in table_entries.into_iter() {
-            seen_sk.insert(entry.sk.clone());
-            let item = Some(to_item(entry)?);
+        // TODO: Use a combinator
+        let mut items: Vec<TransactWriteItem> = Vec::with_capacity(sealed.len());
+
+        for entry in sealed.into_iter() {
+            seen_sk.insert(entry.inner().sk.clone());
+
             items.push(
                 TransactWriteItem::builder()
                     .put(
                         Put::builder()
                             .table_name(&self.table_name)
-                            .set_item(item)
+                            .set_item(Some(entry.try_into()?))
                             .build(),
                     )
                     .build(),
@@ -218,7 +223,7 @@ impl EncryptedTable {
                 .set_transact_items(Some(items.to_vec()))
                 .send()
                 .await
-                .map_err(|e| PutError::AwsError(e.to_string()))?;
+                .map_err(|e| PutError::Aws(e.to_string()))?;
         }
 
         Ok(())

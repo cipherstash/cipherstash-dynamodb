@@ -4,30 +4,32 @@ use cipherstash_client::encryption::{
     EncryptionError, Plaintext,
 };
 use itertools::Itertools;
-use serde_dynamo::from_items;
 use std::marker::PhantomData;
 use thiserror::Error;
 
 use crate::{
-    crypto::{decrypt, CryptoError},
-    traits::{DecryptedRecord, SearchableRecord},
+    crypto::CryptoError,
+    encrypted_table::Sealed,
+    traits::{Decryptable, Searchable},
 };
 use cipherstash_client::encryption::{compound_indexer::CompoundIndex, IndexTerm};
 
-use super::{EncryptedTable, TableEntry};
+use super::{EncryptedTable, SealError};
 
 #[derive(Error, Debug)]
 pub enum QueryError {
     #[error("InvaldQuery: {0}")]
     InvalidQuery(String),
-    #[error("EncryptionError: {0}")]
-    EncryptionError(#[from] EncryptionError),
     #[error("CryptoError: {0}")]
     CryptoError(#[from] CryptoError),
-    #[error("SerdeError: {0}")]
-    SerdeError(#[from] serde_dynamo::Error),
+    #[error("SealError: {0}")]
+    SealError(#[from] SealError),
+    #[error("EncryptionError: {0}")]
+    EncryptionError(#[from] EncryptionError),
     #[error("AwsError: {0}")]
     AwsError(String),
+    #[error("ReadConversionError: {0}")]
+    ReadConversionError(#[from] crate::traits::ReadConversionError),
     #[error("{0}")]
     Other(String),
 }
@@ -40,7 +42,7 @@ pub struct QueryBuilder<'t, T> {
 
 impl<'t, T> QueryBuilder<'t, T>
 where
-    T: SearchableRecord + DecryptedRecord,
+    T: Searchable + Decryptable,
 {
     pub fn new(table: &'t EncryptedTable) -> Self {
         Self {
@@ -93,21 +95,20 @@ where
         let result = query
             .send()
             .await
-            .map_err(|e| QueryError::AwsError(e.to_string()))?;
+            .map_err(|e| QueryError::AwsError(format!("{e:?}")))?;
 
         let items = result
             .items
             .ok_or_else(|| QueryError::AwsError("Expected items entry on aws response".into()))?;
 
-        let table_entries: Vec<TableEntry> = from_items(items)?;
+        let table_entries = Sealed::vec_from(items)?;
 
+        // TODO: Use a combinator for this
         let mut results: Vec<T> = Vec::with_capacity(table_entries.len());
 
         // TODO: Bulk Decrypt
-        for te in table_entries.into_iter() {
-            let attributes = decrypt(te.attributes, &builder.table.cipher).await?;
-            let record: T = T::from_attributes(attributes);
-            results.push(record);
+        for sealed in table_entries.into_iter() {
+            results.push(sealed.unseal(&builder.table.cipher).await?);
         }
 
         Ok(results)

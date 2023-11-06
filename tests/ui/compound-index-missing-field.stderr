@@ -1,7 +1,7 @@
-error: Not all fields were annotated with the #[cryptonamo(compound)] attribute. Missing fields: email
+error: Not all fields were annotated with the #[cryptonamo(compound)] attribute. Missing fields: name
  --> tests/ui/compound-index-missing-field.rs:3:10
   |
-3 | #[derive(Cryptonamo)]
-  |          ^^^^^^^^^^
+3 | #[derive(Encryptable)]
+  |          ^^^^^^^^^^^
   |
-  = note: this error originates in the derive macro `Cryptonamo` (in Nightly builds, run with -Z macro-backtrace for more info)
+  = note: this error originates in the derive macro `Encryptable` (in Nightly builds, run with -Z macro-backtrace for more info)

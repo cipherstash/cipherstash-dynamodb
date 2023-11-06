@@ -28,13 +28,11 @@ tracing = { version = "0.1", features = ["log"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
 hmac = "0.12.1"
 sha2 = "0.10.7"
-serde = "1.0.183"
-serde_dynamo = { version = "4.2.4", features = ["aws-sdk-dynamodb+0_29"] }
-serde_bytes = "0.11.9"
 aes = "0.8.3"
 hex = { version = "0.4.3", features = [ "serde" ] }
 cryptonamo-derive = { path = "cryptonamo-derive" }
 
+# cipherstash-client = { path = "../../cipherstash-suite/packages/cipherstash-client/", features = [ "tokio" ] }
 cipherstash-client = { path = "./vendor/cipherstash-client/", features = [ "tokio" ] }
 # cipherstash-client = { git = "ssh://git@github.com/cipherstash/cipherstash-suite.git", branch = "feat/compound-spike", package = "cipherstash-client", features = [ "tokio" ] }
 
@@ -45,6 +43,7 @@ env_logger = "0.10.0"
 itertools = "0.11.0"
 thiserror = "1.0.50"
 tokio-stream = "0.1.14"
+paste = "1.0.14"
 
 [dev-dependencies]
 serial_test = "2.0.0"

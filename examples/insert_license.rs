@@ -21,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let table = EncryptedTable::init(client, "users").await?;
     table
-        .put(&License::new("dan@coderdan.co", "1234567", "2027-01-10"))
+        .put(License::new("dan@coderdan.co", "1234567", "2027-01-10"))
         .await?;
 
     Ok(())

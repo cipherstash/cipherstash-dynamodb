@@ -1,13 +1,14 @@
-use cryptonamo::{traits::DecryptedRecord, Cryptonamo, Plaintext};
-use std::collections::HashMap;
+use cryptonamo::{Decryptable, Encryptable, Searchable};
 
-#[derive(Debug, Cryptonamo)]
+#[derive(Debug, Encryptable, Decryptable, Searchable)]
 #[cryptonamo(partition_key = "email")]
 pub struct License {
-    #[cryptonamo(skip)]
     email: String,
     number: String,
     expires: String,
+    #[allow(dead_code)]
+    #[cryptonamo(skip)]
+    reviewed_at: Option<String>,
 }
 
 impl License {
@@ -21,25 +22,14 @@ impl License {
             email: email.into(),
             number: number.into(),
             expires: expires.into(),
-        }
-    }
-}
-
-impl DecryptedRecord for License {
-    fn from_attributes(attributes: HashMap<String, Plaintext>) -> Self {
-        Self {
-            number: attributes.get("number").unwrap().try_into().unwrap(),
-            expires: attributes.get("expires").unwrap().try_into().unwrap(),
-            email: attributes.get("email").unwrap().try_into().unwrap(),
+            reviewed_at: None,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::License;
-    use cryptonamo::traits::*;
-    use std::collections::HashMap;
+    use super::*;
 
     #[test]
     fn test_cryptonamo_typename() {
@@ -51,9 +41,9 @@ mod tests {
         let license = License::new("person@example.net", "1234", "2020-01-01");
         assert_eq!(license.partition_key(), "person@example.net");
         assert_eq!(
-            license.protected_attributes(),
-            HashMap::from([("number", "1234".into()), ("expires", "2020-01-01".into()),])
+            License::protected_attributes(),
+            vec!["email", "number", "expires"]
         );
-        assert!(license.plaintext_attributes().is_empty());
+        assert!(License::plaintext_attributes().is_empty());
     }
 }
