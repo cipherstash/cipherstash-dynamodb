@@ -4,11 +4,11 @@ use serial_test::serial;
 use std::future::Future;
 
 #[derive(Encryptable, Decryptable, Searchable, Debug, PartialEq, Ord, PartialOrd, Eq)]
-#[cryptonamo(partition_key = "email")]
 #[cryptonamo(sort_key_prefix = "user")]
 pub struct User {
     #[cryptonamo(query = "exact", compound = "email#name")]
     #[cryptonamo(query = "exact")]
+    #[partition_key]
     pub email: String,
 
     #[cryptonamo(query = "prefix", compound = "email#name")]
@@ -33,7 +33,7 @@ impl User {
     }
 }
 
-async fn run_test<F: Future<Output = ()>>(f: impl FnOnce(EncryptedTable) -> F) {
+async fn run_test<F: Future<Output = ()>>(mut f: impl FnMut(EncryptedTable) -> F) {
     let config = aws_config::from_env()
         .endpoint_url("http://localhost:8000")
         .load()
@@ -145,7 +145,7 @@ async fn test_get_by_partition_key() {
 async fn test_delete() {
     run_test(|table| async move {
         table
-            .delete::<User>("dan@coderdan.co")
+            .delete::<User>("dan@coderdan.co", User::type_name())
             .await
             .expect("Failed to send");
 
