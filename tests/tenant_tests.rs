@@ -1,4 +1,4 @@
-use cryptonamo::{Decryptable, Encryptable, EncryptedTable, Searchable};
+use cryptonamo::{Decryptable, Encryptable, EncryptedTable, Searchable, PkSk};
 use itertools::Itertools;
 use serial_test::serial;
 use std::future::Future;
@@ -143,7 +143,7 @@ async fn test_query_compound() {
 async fn test_get_by_partition_key() {
     run_test(|table| async move {
         let res: Option<User> = table
-            .get("first-tenant", Some("dan@coderdan.co"))
+            .get(PkSk::new("first-tenant", "dan@coderdan.co"))
             .await
             .expect("Failed to send");
         assert_eq!(
@@ -159,12 +159,12 @@ async fn test_get_by_partition_key() {
 async fn test_delete() {
     run_test(|table| async move {
         table
-            .delete::<User>("first-tenant", Some("dan@coderdan.co"))
+            .delete::<User>(PkSk::new("first-tenant", "dan@coderdan.co"))
             .await
             .expect("Failed to send");
 
         let res = table
-            .get::<User>("first-tenant", Some("dan@coderdan.co"))
+            .get::<User>(PkSk::new("first-tenant", "dan@coderdan.co"))
             .await
             .expect("Failed to send");
         assert_eq!(res, None);

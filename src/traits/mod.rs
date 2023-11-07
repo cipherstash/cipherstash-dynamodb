@@ -6,6 +6,10 @@ pub use cipherstash_client::encryption::{
     },
     Plaintext,
 };
+
+mod primary_key;
+pub use primary_key::*;
+
 use std::fmt::Debug;
 use thiserror::Error;
 
@@ -24,6 +28,8 @@ pub enum WriteConversionError {
 }
 
 pub trait Encryptable: Debug + Sized {
+    type PrimaryKey: PrimaryKey;
+
     // TODO: Add a function indicating that the root should be stored
     fn type_name() -> &'static str;
 
@@ -61,6 +67,7 @@ pub trait Searchable: Encryptable {
 
 pub trait Decryptable: Encryptable {
     /// Convert an `Unsealed` into a `Self`.
+
     fn from_unsealed(unsealed: Unsealed) -> Result<Self, SealError>;
 
     /// Defines which attributes are decryptable for this type.
