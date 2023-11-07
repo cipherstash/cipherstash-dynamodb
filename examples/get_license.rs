@@ -20,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = aws_sdk_dynamodb::Client::new(&config);
 
     let table = EncryptedTable::init(client, "users").await?;
-    let license: Option<License> = table.get("dan@coderdan.co", None).await?;
+    let license: Option<License> = table.get("dan@coderdan.co").await?;
 
     dbg!(license);
 

@@ -6,7 +6,10 @@ pub use self::{
 };
 use crate::{
     crypto::*,
-    traits::{Decryptable, ReadConversionError, Searchable, WriteConversionError},
+    traits::{
+        Decryptable, PrimaryKey, PrimaryKeyParts, ReadConversionError, Searchable,
+        WriteConversionError,
+    },
 };
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Delete, Put, TransactWriteItem},
@@ -112,14 +115,13 @@ impl EncryptedTable {
         QueryBuilder::new(self)
     }
 
-    pub async fn get<T>(&self, pk: &str, sk: Option<&str>) -> Result<Option<T>, GetError>
+    pub async fn get<T>(&self, k: impl Into<T::PrimaryKey>) -> Result<Option<T>, GetError>
     where
         T: Decryptable,
     {
-        let pk = encrypt_partition_key(pk, &self.cipher)?;
-        let sk = sk
-            .map(|sk| format!("{}#{}", T::type_name(), sk))
-            .unwrap_or_else(|| T::type_name().to_string());
+        let PrimaryKeyParts { pk, sk } = k.into().into_parts(T::type_name());
+
+        let pk = encrypt_partition_key(&pk, &self.cipher)?;
 
         let result = self
             .db
@@ -141,15 +143,10 @@ impl EncryptedTable {
     }
 
     // TODO: create PrimaryKey abstraction
-    pub async fn delete<E: Searchable>(
-        &self,
-        pk: &str,
-        sk: Option<&str>,
-    ) -> Result<(), DeleteError> {
-        let pk = AttributeValue::S(encrypt_partition_key(pk, &self.cipher)?);
-        let sk = sk
-            .map(|sk| format!("{}#{}", E::type_name(), sk))
-            .unwrap_or_else(|| E::type_name().to_string());
+    pub async fn delete<E: Searchable>(&self, k: impl Into<E::PrimaryKey>) -> Result<(), DeleteError> {
+        let PrimaryKeyParts { pk, sk } = k.into().into_parts(E::type_name());
+
+        let pk = AttributeValue::S(encrypt_partition_key(&pk, &self.cipher)?);
 
         let sk_to_delete = all_index_keys::<E>(&sk).into_iter().into_iter().chain([sk]);
 

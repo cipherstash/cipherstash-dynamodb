@@ -138,10 +138,7 @@ async fn test_query_compound() {
 #[serial]
 async fn test_get_by_partition_key() {
     run_test(|table| async move {
-        let res: Option<User> = table
-            .get("dan@coderdan.co", None)
-            .await
-            .expect("Failed to send");
+        let res: Option<User> = table.get("dan@coderdan.co").await.expect("Failed to send");
         assert_eq!(
             res,
             Some(User::new("dan@coderdan.co", "Dan Draper", "blue"))
@@ -155,12 +152,12 @@ async fn test_get_by_partition_key() {
 async fn test_delete() {
     run_test(|table| async move {
         table
-            .delete::<User>("dan@coderdan.co", None)
+            .delete::<User>("dan@coderdan.co")
             .await
             .expect("Failed to send");
 
         let res = table
-            .get::<User>("dan@coderdan.co", None)
+            .get::<User>("dan@coderdan.co")
             .await
             .expect("Failed to send");
         assert_eq!(res, None);
