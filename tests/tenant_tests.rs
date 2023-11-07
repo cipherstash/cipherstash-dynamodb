@@ -9,7 +9,6 @@ mod common;
 #[cryptonamo(sort_key_prefix = "user-something")]
 pub struct User {
     #[partition_key]
-    #[cryptonamo(query = "exact")]
     pub tenant_id: String,
 
     #[sort_key]
