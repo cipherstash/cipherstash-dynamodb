@@ -60,13 +60,10 @@ impl<T> Sealer<T> {
         T: Searchable,
     {
         let pk = encrypt_partition_key(&self.inner.partition_key(), cipher).unwrap(); // FIXME
+        let sk = self.inner.sort_key();
 
-        let mut table_entry = TableEntry::new_with_attributes(
-            pk.clone(),
-            T::type_name().to_string(),
-            None,
-            self.unsealed.unprotected(),
-        );
+        let mut table_entry =
+            TableEntry::new_with_attributes(pk.clone(), sk, None, self.unsealed.unprotected());
 
         let protected = T::protected_attributes()
             .iter()
@@ -83,6 +80,8 @@ impl<T> Sealer<T> {
                     table_entry.add_attribute(name, e.into());
                 }
             });
+
+        let sort_key = self.inner.sort_key();
 
         let protected_indexes = T::protected_indexes();
         let terms: Vec<(&&str, Vec<u8>)> = protected_indexes
@@ -126,7 +125,7 @@ impl<T> Sealer<T> {
                         .clone()
                         .set_term(hex::encode(term))
                         // TODO: HMAC the sort key, too (users#index_name#pk)
-                        .set_sk(format!("{}#{}#{}", T::type_name(), index_name, i)),
+                        .set_sk(format!("{}#{}#{}", &sort_key, index_name, i)),
                 )
             })
             .chain(once(Sealed(table_entry.clone())))

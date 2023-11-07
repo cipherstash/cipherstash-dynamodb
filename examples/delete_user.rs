@@ -1,6 +1,6 @@
 mod common;
 use crate::common::User;
-use cryptonamo::{Encryptable, EncryptedTable};
+use cryptonamo::EncryptedTable;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -21,15 +21,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let table = EncryptedTable::init(client, "users").await?;
 
-    table
-        .delete::<User>("jane@smith.org", User::type_name())
-        .await?;
-    table
-        .delete::<User>("dan@coderdan.co", User::type_name())
-        .await?;
-    table
-        .delete::<User>("daniel@example.com", User::type_name())
-        .await?;
+    table.delete::<User>("jane@smith.org", None).await?;
+    table.delete::<User>("dan@coderdan.co", None).await?;
+    table.delete::<User>("daniel@example.com", None).await?;
 
     Ok(())
 }

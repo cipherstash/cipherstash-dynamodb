@@ -253,7 +253,7 @@ To delete a record, use the [`EncryptedTable::delete`] method:
 
 ```rust
 #
-table.delete::<User>("jane@smith.org", User::type_name()).await?;
+table.delete::<User>("jane@smith.org", None).await?;
 ```
 
 #### Querying Records
