@@ -112,12 +112,14 @@ impl EncryptedTable {
         QueryBuilder::new(self)
     }
 
-    pub async fn get<T>(&self, pk: &str) -> Result<Option<T>, GetError>
+    pub async fn get<T>(&self, pk: &str, sk: Option<&str>) -> Result<Option<T>, GetError>
     where
         T: Decryptable,
     {
         let pk = encrypt_partition_key(pk, &self.cipher)?;
-        let sk = T::type_name().to_string();
+        let sk = sk
+            .map(|sk| format!("{}#{}", T::type_name(), sk))
+            .unwrap_or_else(|| T::type_name().to_string());
 
         let result = self
             .db
@@ -142,10 +144,12 @@ impl EncryptedTable {
     pub async fn delete<E: Searchable>(
         &self,
         pk: &str,
-        sk: impl Into<String>,
+        sk: Option<&str>,
     ) -> Result<(), DeleteError> {
         let pk = AttributeValue::S(encrypt_partition_key(pk, &self.cipher)?);
-        let sk: String = sk.into();
+        let sk = sk
+            .map(|sk| format!("{}#{}", E::type_name(), sk))
+            .unwrap_or_else(|| E::type_name().to_string());
 
         let sk_to_delete = all_index_keys::<E>(&sk).into_iter().into_iter().chain([sk]);
 
