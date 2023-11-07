@@ -16,7 +16,8 @@ pub(crate) enum AttributeMode {
 pub(crate) struct Settings {
     ident: Ident,
     pub(crate) sort_key_prefix: String,
-    pub(crate) partition_key: Option<String>,
+    pub(crate) sort_key_field: Option<String>,
+    pub(crate) partition_key_field: Option<String>,
     protected_attributes: Vec<String>,
     unprotected_attributes: Vec<String>,
 
@@ -70,7 +71,7 @@ impl Settings {
     }
 
     pub(crate) fn get_partition_key(&self) -> Result<String, syn::Error> {
-        self.partition_key.clone().ok_or_else(|| {
+        self.partition_key_field.clone().ok_or_else(|| {
             syn::Error::new_spanned(
                 &self.sort_key_prefix,
                 "No partition key defined for this struct",

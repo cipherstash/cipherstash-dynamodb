@@ -33,11 +33,30 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
             }
         }));
 
+    let sort_key_impl = if let Some(sort_key_field) = &settings.sort_key_field {
+        let sort_key_attr = format_ident!("{sort_key_field}");
+        quote! { format!("{}#{}", Self::type_name(), self.#sort_key_attr) }
+    } else {
+        quote! { Self::type_name().into() }
+    };
+
+    let primary_key_impl = if settings.sort_key_field.is_some() {
+        quote! { type PrimaryKey = cryptonamo::PkSk; }
+    } else {
+        quote! { type PrimaryKey = cryptonamo::Pk; }
+    };
+
     let expanded = quote! {
         #[automatically_derived]
         impl cryptonamo::traits::Encryptable for #ident {
+            #primary_key_impl
+
             fn type_name() -> &'static str {
                 #type_name
+            }
+
+            fn sort_key(&self) -> String {
+                #sort_key_impl
             }
 
             fn partition_key(&self) -> String {

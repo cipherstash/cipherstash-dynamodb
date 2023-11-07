@@ -403,7 +403,7 @@ mod error;
 pub mod traits;
 pub use encrypted_table::{EncryptedTable, QueryBuilder};
 pub use error::Error;
-pub use traits::{Decryptable, Encryptable, Searchable};
+pub use traits::{Decryptable, Encryptable, Searchable, PrimaryKey, PkSk, Pk};
 
 #[doc(hidden)]
 pub use cryptonamo_derive::{Decryptable, Encryptable, Searchable};

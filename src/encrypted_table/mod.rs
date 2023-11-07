@@ -6,7 +6,10 @@ pub use self::{
 };
 use crate::{
     crypto::*,
-    traits::{Decryptable, ReadConversionError, Searchable, WriteConversionError},
+    traits::{
+        Decryptable, PrimaryKey, PrimaryKeyParts, ReadConversionError, Searchable,
+        WriteConversionError,
+    },
 };
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Delete, Put, TransactWriteItem},
@@ -112,12 +115,13 @@ impl EncryptedTable {
         QueryBuilder::new(self)
     }
 
-    pub async fn get<T>(&self, pk: &str) -> Result<Option<T>, GetError>
+    pub async fn get<T>(&self, k: impl Into<T::PrimaryKey>) -> Result<Option<T>, GetError>
     where
         T: Decryptable,
     {
-        let pk = encrypt_partition_key(pk, &self.cipher)?;
-        let sk = T::type_name().to_string();
+        let PrimaryKeyParts { pk, sk } = k.into().into_parts(T::type_name());
+
+        let pk = encrypt_partition_key(&pk, &self.cipher)?;
 
         let result = self
             .db
@@ -138,12 +142,13 @@ impl EncryptedTable {
         }
     }
 
-    pub async fn delete<E: Searchable>(&self, pk: &str) -> Result<(), DeleteError> {
-        let pk = AttributeValue::S(encrypt_partition_key(pk, &self.cipher)?);
+    // TODO: create PrimaryKey abstraction
+    pub async fn delete<E: Searchable>(&self, k: impl Into<E::PrimaryKey>) -> Result<(), DeleteError> {
+        let PrimaryKeyParts { pk, sk } = k.into().into_parts(E::type_name());
 
-        let sk_to_delete = [E::type_name().to_string()]
-            .into_iter()
-            .chain(all_index_keys::<E>().into_iter());
+        let pk = AttributeValue::S(encrypt_partition_key(&pk, &self.cipher)?);
+
+        let sk_to_delete = all_index_keys::<E>(&sk).into_iter().into_iter().chain([sk]);
 
         let transact_items = sk_to_delete.map(|sk| {
             TransactWriteItem::builder()
@@ -177,6 +182,7 @@ impl EncryptedTable {
     {
         let mut seen_sk = HashSet::new();
 
+        let sk = record.sort_key();
         let sealer: Sealer<T> = record.into_sealer()?;
         let (pk, sealed) = sealer.seal(&self.cipher, 12).await?;
 
@@ -198,7 +204,7 @@ impl EncryptedTable {
             );
         }
 
-        for index_sk in all_index_keys::<T>() {
+        for index_sk in all_index_keys::<T>(&sk) {
             if seen_sk.contains(&index_sk) {
                 continue;
             }

@@ -44,13 +44,13 @@ pub enum CryptoError {
     Other(String),
 }
 
-pub(crate) fn all_index_keys<E: Searchable + Encryptable>() -> Vec<String> {
+pub(crate) fn all_index_keys<E: Searchable + Encryptable>(sort_key: &str) -> Vec<String> {
     E::protected_indexes()
         .iter()
         .flat_map(|index_name| {
             (0..)
                 .take(MAX_TERMS_PER_INDEX)
-                .map(|i| format!("{}#{}#{}", E::type_name(), index_name, i))
+                .map(|i| format!("{}#{}#{}", sort_key, index_name, i))
                 .collect::<Vec<String>>()
         })
         .collect()
