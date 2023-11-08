@@ -1,11 +1,11 @@
 use cryptonamo::{Decryptable, Encryptable, Searchable};
 
 #[derive(Debug, Encryptable, Decryptable, Searchable)]
-#[cryptonamo(partition_key = "email")]
 #[cryptonamo(sort_key_prefix = "user")]
 pub struct User {
     #[cryptonamo(query = "exact", compound = "email#name")]
     #[cryptonamo(query = "exact")]
+    #[partition_key]
     pub email: String,
 
     #[cryptonamo(query = "prefix", compound = "email#name")]

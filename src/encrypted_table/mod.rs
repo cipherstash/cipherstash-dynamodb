@@ -142,8 +142,10 @@ impl EncryptedTable {
         }
     }
 
-    // TODO: create PrimaryKey abstraction
-    pub async fn delete<E: Searchable>(&self, k: impl Into<E::PrimaryKey>) -> Result<(), DeleteError> {
+    pub async fn delete<E: Searchable>(
+        &self,
+        k: impl Into<E::PrimaryKey>,
+    ) -> Result<(), DeleteError> {
         let PrimaryKeyParts { pk, sk } = k.into().into_parts(E::type_name());
 
         let pk = AttributeValue::S(encrypt_partition_key(&pk, &self.cipher)?);

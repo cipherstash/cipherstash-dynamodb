@@ -1,9 +1,9 @@
 use cryptonamo::Encryptable;
 
 #[derive(Encryptable)]
-#[cryptonamo(partition_key = "email")]
 struct User {
     #[cryptonamo(compound = "email#name")]
+    #[partition_key]
     email: String,
     #[cryptonamo(compound = "email#name")]
     name: String,
