@@ -119,6 +119,8 @@
 //! You can choose the field using the `#[sort_key]` attribute.
 //!
 //! ```rust
+//! use cryptonamo::Encryptable;
+//!
 //! #[derive(Debug, Encryptable)]
 //! struct User {
 //!     #[partition_key]
