@@ -4,9 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-# Disable for now
-doctest = false
-
 # Starting in Rust 1.62 you can use `cargo add` to add dependencies 
 # to your project.
 #

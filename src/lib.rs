@@ -32,22 +32,21 @@
 //! To use Cryptonamo, you must first annotate a struct with the `Cryptonamo` derive macro.
 //!
 //! ```rust
-//! use cryptonamo::Cryptonamo;
+//! use cryptonamo::{Searchable, Decryptable, Encryptable};
 //!
-//! #[derive(Cryptonamo)]
-//! #[cryptonamo(partition_key = "email")]
+//! #[derive(Debug, Searchable, Decryptable, Encryptable)]
 //! struct User {
 //!     name: String,
+//!     #[partition_key]
 //!     email: String,
 //! }
 //! ```
 //!
 //! The `Cryptonamo` derive macro will generate implementations of the following traits:
 //!
-//! * `Cryptonamo` - a top-level trait that sets up the table name and partition key
-//! * `DecryptedRecord` - a trait that allows you to decrypt a record from DynamoDB
-//! * `EncryptedRecord` - a trait that allows you to encrypt a record for storage in DynamoDB
-//! * `SearchableRecord` - a trait that allows you to search for records in DynamoDB
+//! * `Decryptable` - a trait that allows you to decrypt a record from DynamoDB
+//! * `Encryptable` - a trait that allows you to encrypt a record for storage in DynamoDB
+//! * `Searchable`  - a trait that allows you to search for records in DynamoDB
 //!
 //! The above example is the minimum required to use Cryptonamo however you can expand capabilities via several macros.
 //!
@@ -57,11 +56,11 @@
 //! To store a field as a plaintext, use the `plaintext` attribute:
 //!
 //! ```rust
-//! use cryptonamo::Cryptonamo;
+//! use cryptonamo::{Searchable, Decryptable, Encryptable};
 //!
-//! #[derive(Cryptonamo)]
-//! #[cryptonamo(partition_key = "email")]
+//! #[derive(Debug, Searchable, Decryptable, Encryptable)]
 //! struct User {
+//!     #[partition_key]
 //!     email: String,
 //!     name: String,
 //!
@@ -72,7 +71,7 @@
 //!
 //! Most basic rust types will work automatically but you can implement a conversion trait for [Plaintext] to support custom types.
 //!
-//! ```rust
+//! ```ignore
 //! impl From<MyType> for Plaintext {
 //!     fn from(t: MyType) -> Self {
 //!         t.as_bytes().into()
@@ -83,11 +82,11 @@
 //! If you don't want a field stored in the the database at all, you can annotate the field with `#[cryptonamo(skip)]`.
 //!
 //!```rust
-//! use cryptonamo::Cryptonamo;
+//! use cryptonamo::{Searchable, Encryptable, Decryptable};
 //!
-//! #[derive(Cryptonamo)]
-//! #[cryptonamo(partition_key = "email")]
+//! #[derive(Debug, Searchable, Encryptable, Decryptable)]
 //! struct User {
+//!     #[partition_key]
 //!     email: String,
 //!     name: String,
 //!
@@ -102,20 +101,19 @@
 //! However, if you want to specify your own, you can use the `sort_key_prefix` attribute:
 //!
 //!```rust
-//! use cryptonamo::Cryptonamo;
+//! use cryptonamo::Encryptable;
 //!
-//! #[derive(Cryptonamo)]
-//! #[cryptonamo(partition_key = "email")]
+//! #[derive(Debug, Encryptable)]
 //! #[cryptonamo(sort_key_prefix = "user")]
 //! struct User {
+//!     #[partition_key]
+//!     email: String,
 //!     name: String,
 //!
 //!     #[cryptonamo(skip)]
 //!     not_required: String,
 //! }
 //! ```
-//! Note that you can `skip` the partition key as well.
-//! In this case, the data won't be stored as an attribute table but a hash of the value will be used for the `pk` value.
 //!
 //! ## Indexing
 //!
@@ -124,12 +122,12 @@
 //! To index a field, use the `query` attribute:
 //!
 //! ```rust
-//! use cryptonamo::Cryptonamo;
+//! use cryptonamo::Encryptable;
 //!
-//! #[derive(Cryptonamo)]
-//! #[cryptonamo(partition_key = "email")]
+//! #[derive(Debug, Encryptable)]
 //! struct User {
 //!     #[cryptonamo(query = "exact")]
+//!     #[partition_key]
 //!     email: String,
 //!     
 //!    #[cryptonamo(query = "prefix")]
@@ -141,12 +139,12 @@
 //! All indexes with the same compound name are combined into a single index.
 //!
 //! ```rust
-//! use cryptonamo::Cryptonamo;
+//! use cryptonamo::Encryptable;
 //!
-//! #[derive(Cryptonamo)]
-//! #[cryptonamo(partition_key = "email")]
+//! #[derive(Debug, Encryptable)]
 //! struct User {
 //!     #[cryptonamo(query = "exact", compound = "email#name")]
+//!     #[partition_key]
 //!     email: String,
 //!     
 //!    #[cryptonamo(query = "prefix", compound = "email#name")]
@@ -161,7 +159,7 @@
 //!
 //! Interacting with a table in DynamoDB is done via the [EncryptedTable] struct.
 //!
-//! ```rust
+//! ```no_run
 //! use cryptonamo::{EncryptedTable, Key};
 //!
 //! #[tokio::main]
@@ -173,6 +171,8 @@
 //!
 //!     let client = aws_sdk_dynamodb::Client::new(&config);
 //!     let table = EncryptedTable::init(client, "users").await?;
+//!
+//!     Ok(())
 //! }
 //! ```
 //!
@@ -184,12 +184,19 @@
 //!
 //! To store a record in the table, use the [`EncryptedTable::put`] method:
 //!
-//! ```rust
-//! # use cryptonamo::{EncryptedTable, Key};
+//! ```no_run
+//! # use cryptonamo::{Encryptable, Searchable, Decryptable, EncryptedTable};
 //! #
+//! # #[derive(Debug, Encryptable, Searchable, Decryptable)]
 //! # struct User {
+//! #    #[partition_key]
 //! #    email: String,
 //! #    name: String,
+//! # }
+//! # impl User {
+//! #   fn new(email: impl Into<String>, name: impl Into<String>) -> Self {
+//! #       Self { email: email.into(), name: name.into() }
+//! #   }
 //! # }
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -200,19 +207,23 @@
 //! #   let client = aws_sdk_dynamodb::Client::new(&config);
 //! #   let table = EncryptedTable::init(client, "users").await?;
 //! let user = User::new("dan@coderdan", "Dan Draper");
-//! table.put(&user).await?;
+//! table.put(user).await?;
+//! # Ok(())
 //! # }
 //! ```
 //!
 //! To get a record, use the [`EncryptedTable::get`] method:
 //!
-//! ```rust
-//! # use cryptonamo::{EncryptedTable, Key};
+//! ```no_run
+//! # use cryptonamo::{EncryptedTable, Decryptable, Encryptable, Key};
 //! #
+//! # #[derive(Debug, Decryptable, Encryptable)]
 //! # struct User {
+//! #    #[partition_key]
 //! #    email: String,
 //! #    name: String,
 //! # }
+//!
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! #    let config = aws_config::from_env()
@@ -222,6 +233,7 @@
 //! #   let client = aws_sdk_dynamodb::Client::new(&config);
 //! #   let table = EncryptedTable::init(client, "users").await?;
 //! let user: Option<User> = table.get("dan@coderdan.co").await?;
+//! # Ok(())
 //! # }
 //! ```
 //!
@@ -232,10 +244,12 @@
 //!
 //! To delete a record, use the [`EncryptedTable::delete`] method:
 //!
-//! ```rust
-//! # use cryptonamo::{EncryptedTable, Key};
+//! ```no_run
+//! # use cryptonamo::{Decryptable, Searchable, Encryptable, EncryptedTable};
 //! #
+//! # #[derive(Debug, Decryptable, Searchable, Encryptable)]
 //! # struct User {
+//! #    #[partition_key]
 //! #    email: String,
 //! #    name: String,
 //! # }
@@ -248,6 +262,7 @@
 //! #   let client = aws_sdk_dynamodb::Client::new(&config);
 //! #   let table = EncryptedTable::init(client, "users").await?;
 //! table.delete::<User>("jane@smith.org").await?;
+//! # Ok(())
 //! # }
 //! ```
 //!
@@ -255,10 +270,12 @@
 //!
 //! To query records, use the [`EncryptedTable::query`] method which returns a builder:
 //!
-//! ```rust
-//! # use cryptonamo::{EncryptedTable, Key};
+//! ```no_run
+//! # use cryptonamo::{Searchable, Decryptable, Encryptable, EncryptedTable};
 //! #
+//! # #[derive(Debug, Decryptable, Searchable, Encryptable)]
 //! # struct User {
+//! #    #[partition_key]
 //! #    email: String,
 //! #    name: String,
 //! # }
@@ -275,16 +292,21 @@
 //!     .starts_with("name", "Dan")
 //!     .send()
 //!     .await?;
+//! # Ok(())
 //! # }
 //! ```
 //!
 //! If you have a compound index defined, Cryptonamo will automatically use it when querying.
 //!
-//! ```rust
-//! # use cryptonamo::{EncryptedTable, Key};
+//! ```no_run
+//! # use cryptonamo::{Encryptable, Searchable, Decryptable, EncryptedTable, Key};
 //! #
+//! # #[derive(Debug, Encryptable, Searchable, Decryptable)]
 //! # struct User {
+//! #    #[partition_key]
+//! #    #[cryptonamo(query = "exact")]
 //! #    email: String,
+//! #    #[cryptonamo(query = "prefix")]
 //! #    name: String,
 //! # }
 //! # #[tokio::main]
@@ -301,6 +323,7 @@
 //!     .starts_with("name", "Dan")
 //!     .send()
 //!     .await?;
+//! # Ok(())
 //! # }
 //! ```
 //!
@@ -312,12 +335,12 @@
 //! For example, you might want to store related records to `User` such as `License`.
 //!
 //! ```rust
-//! use cryptonamo::Cryptonamo;
+//! use cryptonamo::{ Searchable, Encryptable, Decryptable };
 //!
-//! #[derive(Cryptonamo)]
-//! #[cryptonamo(partition_key = "user_email")]
+//! #[derive(Debug, Searchable, Encryptable, Decryptable)]
 //! struct License {
 //!     #[cryptonamo(query = "exact")]
+//!     #[partition_key]
 //!     user_email: String,
 //!
 //!     #[cryptonamo(plaintext)]
@@ -333,11 +356,13 @@
 //! In some cases, these types might simply be a different representation of the same data based on query requirements.
 //! For example, you might want to query users by name using a prefix (say for using a "type ahead") but only return the name.
 //!
-//! ```
-//! #[derive(Cryptonamo)]
-//! #[cryptonamo(partition_key = "email")]
+//! ```rust
+//! # use cryptonamo::{Searchable, Encryptable, Decryptable};
+//!
+//! #[derive(Debug, Searchable, Encryptable, Decryptable)]
 //! pub struct UserView {
 //!     #[cryptonamo(skip)]
+//!     #[partition_key]
 //!     email: String,
 //!     
 //!     #[cryptonamo(query = "prefix")]
@@ -347,14 +372,40 @@
 //!
 //! To use the view, you can first `put` and then `query` the value.
 //!
-//! ```rust
+//! ```no_run
+//! # use cryptonamo::{Searchable, Encryptable, Decryptable, EncryptedTable};
+//! # #[derive(Debug, Searchable, Encryptable, Decryptable)]
+//! # pub struct UserView {
+//! #     #[cryptonamo(skip)]
+//! #     #[partition_key]
+//! #     email: String,
+//! #     
+//! #     #[cryptonamo(query = "prefix")]
+//! #     name: String,
+//! # }
+//! # impl UserView {
+//! #     fn new(email: impl Into<String>, name: impl Into<String>) -> Self {
+//! #         Self { email: email.into(), name: name.into() }
+//! #     }
+//! # }
+//! #
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! #    let config = aws_config::from_env()
+//! #        .endpoint_url("http://localhost:8000")
+//! #        .load()
+//! #        .await;
+//! #   let client = aws_sdk_dynamodb::Client::new(&config);
+//! #   let table = EncryptedTable::init(client, "users").await?;
 //! let user = UserView::new("dan@coderdan", "Dan Draper");
-//! table.put(&user).await?;
+//! table.put(user).await?;
 //! let results: Vec<UserView> = table
 //!     .query()
 //!     .starts_with("name", "Dan")
 //!     .send()
 //!     .await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! So long as the indexes are equivalent, you can mix and match types.
@@ -365,7 +416,7 @@
 //!
 //! Tables created by Cryptonamo have the following schema:
 //!
-//! ```
+//! ```txt
 //! PK        |  SK           |  term                  |   name       |  email   ....
 //! ---------------------------------------------------------------------------
 //! HMAC(123) |  user         |                        |   Enc(name)  |  Enc(email)
@@ -403,7 +454,7 @@ mod error;
 pub mod traits;
 pub use encrypted_table::{EncryptedTable, QueryBuilder};
 pub use error::Error;
-pub use traits::{Decryptable, Encryptable, Searchable, PrimaryKey, PkSk, Pk};
+pub use traits::{Decryptable, Encryptable, Pk, PkSk, PrimaryKey, Searchable};
 
 #[doc(hidden)]
 pub use cryptonamo_derive::{Decryptable, Encryptable, Searchable};

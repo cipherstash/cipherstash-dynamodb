@@ -76,25 +76,25 @@ See below for more information on schema design for Cryptonamo tables.
 
 #### Annotating a Cryptanomo Type
 
-To use Cryptonamo, you must first annotate a struct with the `Cryptonamo` derive macro.
+To use Cryptonamo, you must first annotate a struct with the the derive macros for the Cryptonamo traits you wish to implement.
 
 ```rust
-use cryptonamo::Cryptonamo;
+use cryptonamo::{Encryptable, Decryptable, Searchable};
 
-#[derive(Cryptonamo)]
-#[cryptonamo(partition_key = "email")]
+#[derive(Debug, Encryptable, Decryptable, Searchable)]
 struct User {
     name: String,
+
+    #[partition_key]
     email: String,
 }
 ```
 
-The `Cryptonamo` derive macro will generate implementations of the following traits:
+This example implements the traits:
 
-* `Cryptonamo` - a top-level trait that sets up the table name and partition key
-* `DecryptedRecord` - a trait that allows you to decrypt a record from DynamoDB
-* `EncryptedRecord` - a trait that allows you to encrypt a record for storage in DynamoDB
-* `SearchableRecord` - a trait that allows you to search for records in DynamoDB
+* `Decryptable` - a trait that allows you to decrypt the record from DynamoDB
+* `Encryptable` - a trait that allows you to encrypt the record for storage in DynamoDB
+* `Searchable`  - a trait that allows you to search for records in DynamoDB
 
 The above example is the minimum required to use Cryptonamo however you can expand capabilities via several macros.
 
@@ -107,8 +107,8 @@ To store a field as a plaintext, use the `plaintext` attribute:
 use cryptonamo::Cryptonamo;
 
 #[derive(Cryptonamo)]
-#[cryptonamo(partition_key = "email")]
 struct User {
+    #[partition_key]
     email: String,
     name: String,
 
@@ -133,8 +133,8 @@ If you don't want a field stored in the the database at all, you can annotate th
 use cryptonamo::Cryptonamo;
 
 #[derive(Cryptonamo)]
-#[cryptonamo(partition_key = "email")]
 struct User {
+    #[partition_key]
     email: String,
     name: String,
 
@@ -174,9 +174,9 @@ To index a field, use the `query` attribute:
 use cryptonamo::Cryptonamo;
 
 #[derive(Cryptonamo)]
-#[cryptonamo(partition_key = "email")]
 struct User {
     #[cryptonamo(query = "exact")]
+    #[partition_key]
     email: String,
 
    #[cryptonamo(query = "prefix")]
@@ -191,9 +191,9 @@ All indexes with the same compound name are combined into a single index.
 use cryptonamo::Cryptonamo;
 
 #[derive(Cryptonamo)]
-#[cryptonamo(partition_key = "email")]
 struct User {
     #[cryptonamo(query = "exact", compound = "email#name")]
+    #[partition_key]
     email: String,
 
    #[cryptonamo(query = "prefix", compound = "email#name")]
@@ -292,9 +292,9 @@ For example, you might want to store related records to `User` such as `License`
 use cryptonamo::Cryptonamo;
 
 #[derive(Cryptonamo)]
-#[cryptonamo(partition_key = "user_email")]
 struct License {
     #[cryptonamo(query = "exact")]
+    #[partition_key]
     user_email: String,
 
     #[cryptonamo(plaintext)]
@@ -312,9 +312,9 @@ For example, you might want to query users by name using a prefix (say for using
 
 ```rust
 #[derive(Cryptonamo)]
-#[cryptonamo(partition_key = "email")]
 pub struct UserView {
     #[cryptonamo(skip)]
+    #[partition_key]
     email: String,
 
     #[cryptonamo(query = "prefix")]
