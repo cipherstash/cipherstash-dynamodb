@@ -1,25 +1,25 @@
 # cryptonamo
 
-### Cryptonamo: Encrypted Tables for DynamoDB
+## Cryptonamo: Encrypted Tables for DynamoDB
 
 Based on the CipherStash SDK and ZeroKMS key service, Cryptonamo provides a simple interface for
 storing and retrieving encrypted data in DynamoDB.
 
 ---
 
-### Prerequisites
+## Prerequisites
 
-#### Install Stash CLI
+### Install Stash CLI
 
 The `stash` CLI tool is required for creating an account and security credentials so that Cryptonamo can interact with the ZeroKMS key server.
 
 See [here](https://docs.cipherstash.com/reference/cli.html#install-the-cipherstash-cli) for instructions on how to download and install the `stash` CLI tool.
 
-#### Sign up to create an account
+### Sign up to create an account
 
 Run `stash signup` and follow the on screen instructions.
 
-#### Login and create a Dataset
+### Login and create a Dataset
 
 *The pages linked to below contain information that is generally applicable even though it is framed within the context of a Rails application*
 
@@ -35,7 +35,7 @@ Run `stash signup` and follow the on screen instructions.
 
 3. [Create a Client](https://docs.cipherstash.com/tutorials/rails-getting-started/define.html#3-create-a-client)
 
-#### Upload a dataset config
+### Upload a dataset config
 
 Cryptonamo fully manages the encrypted record and index settings.
 
@@ -53,12 +53,7 @@ Upload it to ZeroKMS using the following command:
 
 <!-- cargo-rdme start -->
 
-###### Cryptonamo: Encrypted Tables for DynamoDB
-
-Based on the CipherStash SDK and ZeroKMS key service, Cryptonamo provides a simple interface for
-storing and retrieving encrypted data in DynamoDB.
-
-###### Usage
+## Usage
 
 To use Cryptonamo, you must first create a table in DynamoDB.
 The table must have a at least partition key, sort key, and term field - all of type String.
@@ -85,7 +80,7 @@ aws dynamodb create-table \
 
 See below for more information on schema design for Cryptonamo tables.
 
-####### Annotating a Cryptanomo Type
+### Annotating a Cryptanomo Type
 
 To use Cryptonamo, you must first annotate a struct with the `Encryptable` derive macro, as
 well as the `Searchable` and `Decryptable` macros if you want to support those features.
@@ -109,7 +104,7 @@ These derive macros will generate implementations for the following traits of th
 
 The above example is the minimum required to use Cryptonamo however you can expand capabilities via several macros.
 
-####### Controlling Encryption
+### Controlling Encryption
 
 By default, all fields on an annotated struct are stored encrypted in the table.
 
@@ -147,7 +142,7 @@ struct User {
 
 If you implement the `Decryptable` trait these skipped fields need to implement `Default`.
 
-####### Sort keys
+### Sort keys
 
 Cryptanomo requires every record to have a sort key. By default this will be derived based on the name of the struct.
 However, if you want to specify your own, you can use the `sort_key_prefix` attribute:
@@ -167,7 +162,7 @@ struct User {
 }
 ```
 
-######## Dynamic Sort keys
+#### Dynamic Sort keys
 
 Cryptonamo also supports specifying the sort key dynamically based on a field on the struct.
 You can choose the field using the `#[sort_key]` attribute.
@@ -189,7 +184,7 @@ struct User {
 
 Sort keys will contain that value and will be prefixed by the sort key prefix.
 
-###### Indexing
+## Indexing
 
 Cryptanomo supports indexing of encrypted fields for searching.
 Exact, prefix and compound match types are currently supported.
@@ -253,7 +248,7 @@ struct User {
 It's important to note that the more annotations that are added to a field the more index terms that will be generated. Adding too many attributes could result in a
 proliferation of terms and data.
 
-###### Storing and Retrieving Records
+## Storing and Retrieving Records
 
 Interacting with a table in DynamoDB is done via the [EncryptedTable] struct.
 
@@ -278,7 +273,7 @@ All operations on the table are `async` and so you will need a runtime to execut
 In the above example, we connect to a DynamoDB running in a local container and initialize an `EncryptedTable` struct
 for the "users" table.
 
-####### Putting Records
+### Putting Records
 
 To store a record in the table, use the [`EncryptedTable::put`] method:
 
@@ -297,7 +292,7 @@ let user: Option<User> = table.get("dan@coderdan.co").await?;
 The `get` method will return `None` if the record does not exist.
 It uses type information to decrypt the record and return it as a struct.
 
-####### Deleting Records
+### Deleting Records
 
 To delete a record, use the [`EncryptedTable::delete`] method:
 
@@ -305,7 +300,7 @@ To delete a record, use the [`EncryptedTable::delete`] method:
 table.delete::<User>("jane@smith.org").await?;
 ```
 
-####### Querying Records
+### Querying Records
 
 To query records, use the [`EncryptedTable::query`] method which returns a builder:
 
@@ -331,7 +326,7 @@ let results: Vec<User> = table
 Note: if you don't have the correct indexes defined this query builder will return a runtime
 error.
 
-###### Table Verticalization
+## Table Verticalization
 
 Cryptonamo uses a technique called "verticalization" which is a popular approach to storing data in DynamoDB.
 In practice, this means you can store multiple types in the same table.
@@ -355,7 +350,7 @@ struct License {
 }
 ```
 
-####### Data Views
+### Data Views
 
 In some cases, these types might simply be a different representation of the same data based on query requirements.
 For example, you might want to query users by name using a prefix (say for using a "type ahead") but only return the name.
@@ -387,9 +382,9 @@ let results: Vec<UserView> = table
 
 So long as the indexes are equivalent, you can mix and match types.
 
-###### Internals
+## Internals
 
-####### Table Schema
+### Table Schema
 
 Tables created by Cryptonamo have the following schema:
 
@@ -409,7 +404,7 @@ HMAC(123) |  user#name#4  | STE("Mike R")          |
 And all other attributes are dependent on the type.
 They may be encrypted or otherwise.
 
-####### Source Encryption
+### Source Encryption
 
 Cryptonamo uses the CipherStash SDK to encrypt and decrypt data.
 Values are encypted using a unique key for each record using AES-GCM-SIV with 256-bit keys.
@@ -419,7 +414,7 @@ ZeroKMS's root keys are encrypted using AWS KMS and stored in DynamoDB (separate
 
 When self-hosting ZeroKMS, we recommend running it in different account to your main application workloads.
 
-###### Issues and TODO
+## Issues and TODO
 
 - [ ] Sort keys are not currently hashed (and should be)
 
