@@ -33,8 +33,8 @@
 //!
 //! ### Annotating a Cryptanomo Type
 //!
-//! To use Cryptonamo, you must first annotate a struct with the `Encryptable` derive macro, as
-//! well as the `Searchable` and `Decryptable` macros if you want to support those features.
+//! To use Cryptonamo, you must first annotate a struct with the `Encryptable`, `Searchable` and
+//! `Decryptable` derive macros.
 //!
 //! ```rust
 //! use cryptonamo::{Searchable, Decryptable, Encryptable};
@@ -159,7 +159,7 @@
 //! Indexes with the same name will be combined into the one index.
 //!
 //! Compound index names must be a combination of field names separated by a #.
-//! Fields mentioned in the compound index name that aren't correctly annottated will result in a
+//! Fields mentioned in the compound index name that aren't correctly annotated will result in a
 //! compilation error.
 //!
 //! ```rust
