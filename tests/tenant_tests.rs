@@ -1,4 +1,4 @@
-use cryptonamo::{Decryptable, Encryptable, EncryptedTable, Searchable, PkSk};
+use cryptonamo::{Decryptable, Encryptable, EncryptedTable, PkSk, Searchable};
 use itertools::Itertools;
 use serial_test::serial;
 use std::future::Future;

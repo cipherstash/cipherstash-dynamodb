@@ -1,8 +1,8 @@
 use cryptonamo::{Decryptable, Encryptable, Searchable};
 
 #[derive(Debug, Encryptable, Decryptable, Searchable)]
-#[cryptonamo(partition_key = "email")]
 pub struct License {
+    #[partition_key]
     email: String,
     number: String,
     expires: String,
