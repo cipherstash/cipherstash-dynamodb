@@ -196,8 +196,17 @@
 //!     name: String,
 //! }
 //! ```
-//! It's important to note that the more annotations that are added to a field the more index terms that will be generated. Adding too many attributes could result in a
-//! proliferation of terms and data.
+//! It's important to note that the more annotations that are added to a field the more index terms that will be generated.
+//! Adding too many attributes could result in a proliferation of terms and data.
+//!
+//! The previous example for example would have the following terms generated:
+//!
+//! - One term for the exact index on email
+//! - One term for the exact index on name
+//! - Up to 25 terms for the prefix index on name
+//! - Up to 25 terms for the compound index of email and name
+//!
+//! This would mean a total of 53 records would be inserted.
 //!
 //! ## Storing and Retrieving Records
 //!
