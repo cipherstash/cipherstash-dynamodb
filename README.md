@@ -53,6 +53,11 @@ Upload it to ZeroKMS using the following command:
 
 <!-- cargo-rdme start -->
 
+## Cryptonamo: Encrypted Tables for DynamoDB
+
+Based on the CipherStash SDK and ZeroKMS key service, Cryptonamo provides a simple interface for
+storing and retrieving encrypted data in DynamoDB.
+
 ## Usage
 
 To use Cryptonamo, you must first create a table in DynamoDB.
@@ -82,8 +87,8 @@ See below for more information on schema design for Cryptonamo tables.
 
 ### Annotating a Cryptanomo Type
 
-To use Cryptonamo, you must first annotate a struct with the `Encryptable` derive macro, as
-well as the `Searchable` and `Decryptable` macros if you want to support those features.
+To use Cryptonamo, you must first annotate a struct with the `Encryptable`, `Searchable` and
+`Decryptable` derive macros.
 
 ```rust
 use cryptonamo::{Searchable, Decryptable, Encryptable};
@@ -208,7 +213,7 @@ You can also specify a compound index by using the `compound` attribute.
 Indexes with the same name will be combined into the one index.
 
 Compound index names must be a combination of field names separated by a #.
-Fields mentioned in the compound index name that aren't correctly annottated will result in a
+Fields mentioned in the compound index name that aren't correctly annotated will result in a
 compilation error.
 
 ```rust
