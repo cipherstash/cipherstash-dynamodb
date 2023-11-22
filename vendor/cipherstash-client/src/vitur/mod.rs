@@ -18,7 +18,7 @@ use self::{
 use log::debug;
 
 pub use schema::{DatasetConfig, DatasetConfigWithIndexRootKey};
-pub use vitur_client::{ClientKey, EncryptPayload, EncryptedRecord};
+pub use vitur_client::{ClientKey, EncryptPayload, EncryptedRecord, Iv};
 pub use vitur_protocol::{CreateClientResponse, Dataset, DatasetClient, RevokeClientResponse};
 
 type ViturClient = vitur_client::Client<vitur_client::HttpConnection>;

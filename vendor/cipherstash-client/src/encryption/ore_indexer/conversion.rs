@@ -101,18 +101,16 @@ mod tests {
     #[test]
     fn test_naive_date_preserves_ordering() {
         assert!(
-            (&Plaintext::NaiveDate(Some(NaiveDate::from_ymd_opt(2023, 2, 3).unwrap()))).to_ore()
-                < (&Plaintext::NaiveDate(Some(NaiveDate::from_ymd_opt(2023, 2, 4).unwrap())))
-                    .to_ore()
+            (&Plaintext::from(NaiveDate::from_ymd_opt(2023, 2, 3).unwrap())).to_ore()
+                < (&Plaintext::from(NaiveDate::from_ymd_opt(2023, 2, 4).unwrap())).to_ore()
         );
         assert!(
-            (&Plaintext::NaiveDate(Some(NaiveDate::from_ymd_opt(2024, 2, 3).unwrap()))).to_ore()
-                > (&Plaintext::NaiveDate(Some(NaiveDate::from_ymd_opt(2023, 2, 4).unwrap())))
-                    .to_ore()
+            (&Plaintext::from(NaiveDate::from_ymd_opt(2024, 2, 3).unwrap())).to_ore()
+                > (&Plaintext::from(NaiveDate::from_ymd_opt(2023, 2, 4).unwrap())).to_ore()
         );
         assert_eq!(
-            (&Plaintext::NaiveDate(Some(NaiveDate::from_ymd_opt(2024, 5, 5).unwrap()))).to_ore(),
-            (&Plaintext::NaiveDate(Some(NaiveDate::from_ymd_opt(2024, 5, 5).unwrap()))).to_ore()
+            (&Plaintext::from(NaiveDate::from_ymd_opt(2024, 5, 5).unwrap())).to_ore(),
+            (&Plaintext::from(NaiveDate::from_ymd_opt(2024, 5, 5).unwrap())).to_ore()
         );
     }
 }

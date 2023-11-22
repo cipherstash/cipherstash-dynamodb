@@ -50,13 +50,13 @@ features = [
 default_features = false
 
 [dependencies.cipherstash-core]
-path = "../cipherstash-core/"
+path = "../cipherstash-core"
 
 [dependencies.open]
 version = "3.0.3"
 
 [dependencies.ore-rs]
-path = "../ore-rs/"
+git = "https://github.com/cipherstash/ore.rs"
 
 [dependencies.reqwest]
 version = "0.11.12"
@@ -68,7 +68,7 @@ features = [
 default-features = false
 
 [dependencies.schema]
-path = "../vitur-config/"
+path = "../vitur-config"
 package = "vitur-config"
 
 [dependencies.serde]
@@ -81,10 +81,14 @@ features = ["full"]
 optional = true
 
 [dependencies.vitur-client]
-path = "../vitur-client/"
+path = "../vitur-client"
 
 [dependencies.vitur-protocol]
-path = "../vitur-protocol/"
+path = "../vitur-protocol"
+
+[dependencies.zeroize]
+version = "1.6.0"
+features = ["derive"]
 
 [dev-dependencies]
 anyhow = "1.0.71"
@@ -94,7 +98,7 @@ sealed_test = "1.0.0"
 serde_json = "1.0"
 
 [dev-dependencies.clap]
-version = "4.3.0"
+version = "4.4.6"
 features = ["derive"]
 
 [dev-dependencies.tokio]
