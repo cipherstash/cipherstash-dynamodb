@@ -9,7 +9,7 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
         .field_attributes(&input)?
         .build()?;
 
-    let partition_key = format_ident!("{}", settings.get_partition_key()?);
+    let partition_key = settings.get_partition_key()?.to_string();
     let type_name = settings.sort_key_prefix.to_string();
 
     let protected_attributes = settings.protected_attributes();
@@ -55,12 +55,12 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
                 #type_name
             }
 
-            fn sort_key(&self) -> String {
-                #sort_key_impl
+            fn partition_key_field() -> &'static str {
+                #partition_key
             }
 
-            fn partition_key(&self) -> String {
-                self.#partition_key.to_string()
+            fn sort_key(&self) -> String {
+                #sort_key_impl
             }
 
             fn protected_attributes() -> Vec<&'static str> {
