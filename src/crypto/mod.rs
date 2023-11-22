@@ -56,21 +56,23 @@ pub(crate) fn all_index_keys<E: Searchable + Encryptable>(sort_key: &str) -> Vec
         .collect()
 }
 
-pub(crate) fn encrypt_partition_key<C>(
-    value: &str,
+pub(crate) fn encrypt_partition_key<C, const N: usize>(
+    plaintext: &Plaintext,
     cipher: &Encryption<C>,
-) -> Result<String, EncryptionError>
+) -> Result<[u8; N], EncryptionError>
 where
     C: Credentials<Token = ViturToken>,
 {
-    let plaintext = Plaintext::Utf8Str(Some(value.to_string()));
     let index_type = Index::new_unique().index_type;
 
-    cipher
-        .index(&plaintext, &index_type)?
-        .as_binary()
-        .map(hex::encode)
-        .ok_or(EncryptionError::IndexingError(
-            "Invalid term type".to_string(),
+    let hmac_bytes = cipher.index(&plaintext, &index_type)?.as_binary().ok_or(
+        EncryptionError::IndexingError("Invalid term type".to_string()),
+    )?;
+
+    hmac_bytes[..N].try_into().map_err(|_| {
+        EncryptionError::IndexingError(format!(
+            "expected hmac bytes to have len {N} but got len {}",
+            hmac_bytes.len()
         ))
+    })
 }

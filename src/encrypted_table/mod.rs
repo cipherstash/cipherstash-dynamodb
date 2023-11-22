@@ -9,7 +9,7 @@ use crate::{
     traits::{
         Decryptable, PrimaryKey, PrimaryKeyParts, ReadConversionError, Searchable,
         WriteConversionError,
-    },
+    }, Encryptable,
 };
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Delete, Put, TransactWriteItem},
@@ -18,8 +18,8 @@ use aws_sdk_dynamodb::{
 use cipherstash_client::{
     config::{console_config::ConsoleConfig, errors::ConfigError, vitur_config::ViturConfig},
     credentials::{auto_refresh::AutoRefresh, vitur_credentials::ViturCredentials},
-    encryption::{Encryption, EncryptionError},
-    vitur::{errors::LoadConfigError, DatasetConfigWithIndexRootKey, Vitur},
+    encryption::{Encryption, EncryptionError, Plaintext},
+    vitur::{errors::LoadConfigError, DatasetConfigWithIndexRootKey, Iv, Vitur},
 };
 use itertools::Itertools;
 use log::info;
@@ -56,6 +56,8 @@ pub enum GetError {
     Aws(String),
     #[error("Read Conversion Error: {0}")]
     ReadConversion(#[from] ReadConversionError),
+    #[error("Failed to encrypt partition key")]
+    EncryptPartitionKey,
 }
 
 #[derive(Error, Debug)]
@@ -115,23 +117,40 @@ impl EncryptedTable {
         QueryBuilder::new(self)
     }
 
+    async fn get_primary_parts<T: Encryptable>(&self, k: impl Into<T::PrimaryKey>) -> Result<(String, String), EncryptionError> {
+        let PrimaryKeyParts { pk, sk } = k.into().into_parts(T::type_name());
+
+        let pk = if T::protected_attributes().contains(&T::partition_key_field()) {
+            let plaintext = Plaintext::from(pk);
+            let descriptor = format!("{}/{}", T::type_name(), T::partition_key_field());
+            let iv: Iv = encrypt_partition_key(&plaintext, &self.cipher)?;
+
+            self.cipher
+                .encrypt_single((&plaintext, descriptor, iv))
+                .await?
+                .ok_or(EncryptionError::IndexingError("Expected encryption to be some".into()))?
+        } else {
+            pk
+        };
+
+        Ok(( pk, sk ))
+    }
+
     pub async fn get<T>(&self, k: impl Into<T::PrimaryKey>) -> Result<Option<T>, GetError>
     where
         T: Decryptable,
     {
-        let PrimaryKeyParts { pk, sk } = k.into().into_parts(T::type_name());
-
-        let pk = encrypt_partition_key(&pk, &self.cipher)?;
+        let ( pk, sk ) = self.get_primary_parts::<T>(k).await?;
 
         let result = self
             .db
             .get_item()
             .table_name(&self.table_name)
-            .key("pk", AttributeValue::S(pk))
+            .key(T::partition_key_field(), AttributeValue::S(pk))
             .key("sk", AttributeValue::S(sk))
             .send()
             .await
-            .map_err(|e| GetError::Aws(e.to_string()))?;
+            .map_err(|e| GetError::Aws(format!("{e:?}")))?;
 
         let sealed: Option<Sealed> = result.item.map(Sealed::try_from).transpose()?;
 
@@ -146,9 +165,7 @@ impl EncryptedTable {
         &self,
         k: impl Into<E::PrimaryKey>,
     ) -> Result<(), DeleteError> {
-        let PrimaryKeyParts { pk, sk } = k.into().into_parts(E::type_name());
-
-        let pk = AttributeValue::S(encrypt_partition_key(&pk, &self.cipher)?);
+        let ( pk, sk ) = self.get_primary_parts::<E>(k).await?;
 
         let sk_to_delete = all_index_keys::<E>(&sk).into_iter().into_iter().chain([sk]);
 
@@ -157,7 +174,7 @@ impl EncryptedTable {
                 .delete(
                     Delete::builder()
                         .table_name(&self.table_name)
-                        .key("pk", pk.clone())
+                        .key(E::partition_key_field(), AttributeValue::S(pk.clone()))
                         .key("sk", AttributeValue::S(sk))
                         .build(),
                 )
@@ -171,7 +188,7 @@ impl EncryptedTable {
                 .set_transact_items(Some(items.collect()))
                 .send()
                 .await
-                .map_err(|e| DeleteError::Aws(e.to_string()))?;
+                .map_err(|e| DeleteError::Aws(format!("{e:?}")))?;
         }
 
         Ok(())
@@ -216,7 +233,7 @@ impl EncryptedTable {
                     .delete(
                         Delete::builder()
                             .table_name(&self.table_name)
-                            .key("pk", AttributeValue::S(pk.clone()))
+                            .key(T::partition_key_field(), AttributeValue::S(pk.clone()))
                             .key("sk", AttributeValue::S(index_sk))
                             .build(),
                     )
@@ -231,7 +248,7 @@ impl EncryptedTable {
                 .set_transact_items(Some(items.to_vec()))
                 .send()
                 .await
-                .map_err(|e| PutError::Aws(e.to_string()))?;
+                .map_err(|e| PutError::Aws(format!("{e:?}")))?;
         }
 
         Ok(())

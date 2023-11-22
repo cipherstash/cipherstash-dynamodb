@@ -20,7 +20,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         let keys = vitur
             .generate_keys(
-                std::iter::repeat_with(|| GenerateKeyPayload { descriptor: "blah" }).take(val),
+                std::iter::repeat_with(|| GenerateKeyPayload::new("blah")).take(val),
                 &key,
                 "access_token",
             )

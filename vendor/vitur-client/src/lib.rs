@@ -95,8 +95,19 @@ impl EncryptedRecord {
 
 #[derive(Debug, Clone)]
 pub struct EncryptPayload<'a> {
-    pub msg: &'a [u8],
-    pub descriptor: &'a str,
+    pub msg: Cow<'a, [u8]>,
+    pub descriptor: Cow<'a, str>,
+    pub iv: Option<Iv>,
+}
+
+impl<'a> EncryptPayload<'a> {
+    pub fn new(msg: &'a [u8], descriptor: &'a str) -> Self {
+        Self {
+            msg: Cow::Borrowed(msg),
+            descriptor: Cow::Borrowed(descriptor),
+            iv: None,
+        }
+    }
 }
 
 pub struct DecryptPayload<'a> {
@@ -106,6 +117,16 @@ pub struct DecryptPayload<'a> {
 /// The requirements for generating a data key from Vitur.
 pub struct GenerateKeyPayload<'a> {
     pub descriptor: &'a str,
+    pub iv: Option<Iv>,
+}
+
+impl<'a> GenerateKeyPayload<'a> {
+    pub fn new(descriptor: &'a str) -> Self {
+        Self {
+            descriptor,
+            iv: None,
+        }
+    }
 }
 
 /// The requirements for retrieving a data key from Vitur.
@@ -396,8 +417,9 @@ impl<C: ViturConnection> Client<C> {
             trace!(target: "vitur_client::generate_keys", "got rand lock");
 
             keys.into_iter()
-                .map(|GenerateKeyPayload { descriptor }| {
-                    GenRandom::gen_random(&mut *guard)
+                .map(|GenerateKeyPayload { descriptor, iv }| {
+                    iv.map(Ok)
+                        .unwrap_or_else(|| GenRandom::gen_random(&mut *guard))
                         .map(|iv: Iv| GenerateKeySpec {
                             iv,
                             descriptor: descriptor.into(),
@@ -477,7 +499,14 @@ impl<C: ViturConnection> Client<C> {
         access_token: &str,
     ) -> Result<DataKeyWithTag, GenerateKeyError> {
         let mut keys = self
-            .generate_keys([GenerateKeyPayload { descriptor }], key, access_token)
+            .generate_keys(
+                [GenerateKeyPayload {
+                    descriptor,
+                    iv: None,
+                }],
+                key,
+                access_token,
+            )
             .await?;
         debug_assert_eq!(keys.len(), 1);
         Ok(keys.remove(0))
@@ -499,7 +528,10 @@ impl<C: ViturConnection> Client<C> {
             .generate_keys(
                 payloads
                     .iter()
-                    .map(|EncryptPayload { descriptor, .. }| GenerateKeyPayload { descriptor }),
+                    .map(|EncryptPayload { descriptor, iv, .. }| GenerateKeyPayload {
+                        descriptor,
+                        iv: *iv,
+                    }),
                 key,
                 access_token,
             )
@@ -507,8 +539,12 @@ impl<C: ViturConnection> Client<C> {
 
         trace!(target: "vitur_client::encrypt", "generated {} keys - encrypting records", keys.len());
 
-        for (EncryptPayload { msg, descriptor }, DataKeyWithTag { key, tag }) in
-            payloads.into_iter().zip(keys)
+        for (
+            EncryptPayload {
+                msg, descriptor, ..
+            },
+            DataKeyWithTag { key, tag },
+        ) in payloads.into_iter().zip(keys)
         {
             let DataKey { iv, key } = key;
             let key = AesKey::<Aes256GcmSiv>::from_slice(&key);
@@ -523,7 +559,7 @@ impl<C: ViturConnection> Client<C> {
                 .encrypt(
                     nonce,
                     Payload {
-                        msg,
+                        msg: &msg,
                         aad: descriptor.as_bytes(),
                     },
                 )
@@ -667,10 +703,7 @@ impl<C: ViturConnection> Client<C> {
 
                     let encrypted_index_root_key = self
                         .encrypt_single(
-                            EncryptPayload {
-                                msg: &index_root_key,
-                                descriptor: INDEX_ROOT_KEY_DESCRIPTOR,
-                            },
+                            EncryptPayload::new(&index_root_key, INDEX_ROOT_KEY_DESCRIPTOR),
                             key,
                             access_token,
                         )
@@ -817,10 +850,7 @@ mod tests {
 
         let encrypted_existing_index_root_key = key_client
             .encrypt_single(
-                EncryptPayload {
-                    descriptor: "dataset-config-index-root-key",
-                    msg: &existing_index_root_key,
-                },
+                EncryptPayload::new(&existing_index_root_key, "dataset-config-index-root-key"),
                 &key,
                 "token",
             )
@@ -906,10 +936,7 @@ mod tests {
 
         let encrypted_index_root_key = key_client
             .encrypt_single(
-                EncryptPayload {
-                    descriptor: "dataset-config-index-root-key",
-                    msg: &[3; 32],
-                },
+                EncryptPayload::new(&[3; 32], "dataset-config-index-root-key"),
                 &key,
                 "token",
             )
@@ -954,10 +981,7 @@ mod tests {
 
         let encrypted_index_root_key = key_client
             .encrypt_single(
-                EncryptPayload {
-                    descriptor: "dataset-config-index-root-key",
-                    msg: &[3; 16],
-                },
+                EncryptPayload::new(&[3; 16], "dataset-config-index-root-key"),
                 &key,
                 "token",
             )

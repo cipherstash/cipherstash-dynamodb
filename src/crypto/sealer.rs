@@ -5,7 +5,9 @@ use crate::{
 };
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
-    encryption::{compound_indexer::CompoundIndex, Encryption, IndexTerm, Plaintext},
+    encryption::{
+        compound_indexer::CompoundIndex, Encryption, IndexTerm, IntoEncryptionMaterial, Plaintext,
+    },
 };
 use itertools::Itertools;
 use std::iter::once;
@@ -59,16 +61,25 @@ impl<T> Sealer<T> {
         C: Credentials<Token = ViturToken>,
         T: Searchable,
     {
-        let pk = encrypt_partition_key(&self.inner.partition_key(), cipher).unwrap(); // FIXME
         let sk = self.inner.sort_key();
 
         let mut table_entry =
-            TableEntry::new_with_attributes(pk.clone(), sk, None, self.unsealed.unprotected());
+            TableEntry::new_with_attributes(sk, None, self.unsealed.unprotected());
 
         let protected = T::protected_attributes()
             .iter()
-            .map(|name| self.unsealed.protected_with_descriptor(name))
-            .collect::<Result<Vec<(&Plaintext, &str)>, _>>()?;
+            .map(|name| {
+                let (plaintext, descriptor) = self.unsealed.protected_with_descriptor(name)?;
+
+                let iv = if name == &T::partition_key_field() {
+                    Some(encrypt_partition_key(plaintext, cipher)?)
+                } else {
+                    None
+                };
+
+                Ok::<_, SealError>((plaintext, descriptor, iv).into_encryption_material())
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
         cipher
             .encrypt(protected)
@@ -130,6 +141,13 @@ impl<T> Sealer<T> {
             })
             .chain(once(Sealed(table_entry.clone())))
             .collect();
+
+        // todo: no unwrap
+        let pk = table_entry
+            .get_attribute(T::partition_key_field())
+            .and_then(|x| x.as_ciphertext())
+            .unwrap()
+            .to_string();
 
         Ok((pk, table_entries))
     }

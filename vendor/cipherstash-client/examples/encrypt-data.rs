@@ -31,10 +31,10 @@ async fn main() -> Result<()> {
     let vitur = vitur_config.create_vitur();
 
     let record = vitur
-        .encrypt_single(vitur_client::EncryptPayload {
-            msg: args.message.as_bytes(),
-            descriptor: &args.descriptor,
-        })
+        .encrypt_single(vitur_client::EncryptPayload::new(
+            args.message.as_bytes(),
+            &args.descriptor,
+        ))
         .await?;
 
     println!("Vitur: {}", vitur_config.base_url());

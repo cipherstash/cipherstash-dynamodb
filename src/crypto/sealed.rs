@@ -83,12 +83,12 @@ impl TryFrom<HashMap<String, AttributeValue>> for Sealed {
 
     fn try_from(item: HashMap<String, AttributeValue>) -> Result<Self, Self::Error> {
         // FIXME: pk and sk should be AttributeValue and term
-        let pk = item
-            .get("pk")
-            .ok_or(ReadConversionError::NoSuchAttribute("pk".to_string()))?
-            .as_s()
-            .unwrap()
-            .to_string();
+        // let pk = item
+        //     .get("pk")
+        //     .ok_or(ReadConversionError::NoSuchAttribute("pk".to_string()))?
+        //     .as_s()
+        //     .unwrap()
+        //     .to_string();
 
         let sk = item
             .get("sk")
@@ -97,10 +97,10 @@ impl TryFrom<HashMap<String, AttributeValue>> for Sealed {
             .unwrap()
             .to_string();
 
-        let mut table_entry = TableEntry::new(pk, sk);
+        let mut table_entry = TableEntry::new(sk);
 
         item.into_iter()
-            .filter(|(k, _)| k != "pk" && k != "sk" && k != "term")
+            .filter(|(k, _)| k != "sk" && k != "term")
             .for_each(|(k, v)| {
                 table_entry.add_attribute(&k, v.into());
             });
@@ -115,7 +115,6 @@ impl TryFrom<Sealed> for HashMap<String, AttributeValue> {
     fn try_from(item: Sealed) -> Result<Self, Self::Error> {
         let mut map = HashMap::new();
 
-        map.insert("pk".to_string(), AttributeValue::S(item.0.pk));
         map.insert("sk".to_string(), AttributeValue::S(item.0.sk));
 
         if let Some(term) = item.0.term {

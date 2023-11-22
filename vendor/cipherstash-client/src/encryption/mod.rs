@@ -4,15 +4,15 @@ pub mod match_indexer;
 mod ore_indexer;
 mod plaintext;
 mod text;
+mod traits;
 pub mod unique_indexer;
-
-use std::ops::Not;
 
 use self::{
     compound_indexer::{Accumulator, ComposableIndex, ComposablePlaintext, CompoundIndex},
     ore_indexer::OreIndexer,
     unique_indexer::UniqueIndexer,
 };
+
 use crate::{
     credentials::{
         vitur_credentials::{ViturCredentials, ViturToken},
@@ -30,6 +30,8 @@ pub use self::{
     plaintext::Plaintext,
 };
 
+pub use traits::IntoEncryptionMaterial;
+
 pub struct Encryption<C: Credentials<Token = ViturToken> = ViturCredentials> {
     // This field is public in order for the Driver to be able to cache
     // configuration and avoid a round trip to Vitur for every database
@@ -43,22 +45,23 @@ impl<Creds: Credentials<Token = ViturToken>> Encryption<Creds> {
         Self { root_key, client }
     }
 
-    pub async fn encrypt(
+    pub async fn encrypt<I: IntoEncryptionMaterial<'static>>(
         &self,
-        items: impl IntoIterator<Item = (&Plaintext, &str)>,
+        items: impl IntoIterator<Item = I>,
     ) -> Result<Vec<Option<String>>, EncryptionError> {
         let items = items
             .into_iter()
-            .map(|(pt, d)| (pt.is_null().not().then(|| pt.to_vec()), d.to_string()))
+            .map(|x| x.into_encryption_material())
             .collect::<Vec<_>>();
 
-        let mut output: Vec<Option<String>> = vec![None; items.len()];
-        let mut payloads: Vec<EncryptPayload> = Vec::new();
-        let mut payloads_index: Vec<usize> = Vec::new();
+        let payload_count = items.iter().filter(|x| x.is_some()).count();
 
-        for (i, (plaintext, descriptor)) in items.iter().enumerate() {
-            if let Some(msg) = plaintext {
-                let payload = EncryptPayload { msg, descriptor };
+        let mut output: Vec<Option<String>> = vec![None; items.len()];
+        let mut payloads: Vec<EncryptPayload> = Vec::with_capacity(payload_count);
+        let mut payloads_index: Vec<usize> = Vec::with_capacity(payload_count);
+
+        for (i, payload) in items.into_iter().enumerate() {
+            if let Some(payload) = payload {
                 payloads.push(payload);
                 payloads_index.push(i);
             } else {
@@ -77,24 +80,16 @@ impl<Creds: Credentials<Token = ViturToken>> Encryption<Creds> {
 
     pub async fn encrypt_single(
         &self,
-        plaintext: &Plaintext,
-        descriptor: &str,
+        item: impl IntoEncryptionMaterial<'_>,
     ) -> Result<Option<String>, EncryptionError> {
-        if plaintext.is_null() {
-            Ok(None)
-        } else {
-            let plaintext = plaintext.to_vec();
+        let payload = item.into_encryption_material();
 
-            let ciphertext = self
-                .client
-                .encrypt_single(EncryptPayload {
-                    msg: &plaintext,
-                    // TODO: This should be a field_id + record_id before launch
-                    descriptor,
-                })
-                .await?;
+        if let Some(payload) = payload {
+            let ciphertext = self.client.encrypt_single(payload).await?;
 
             Ok(Some(hex::encode(ciphertext.to_vec()?)))
+        } else {
+            Ok(None)
         }
     }
 
@@ -377,7 +372,7 @@ mod tests {
     async fn test_round_trip_single() -> Result<(), Box<dyn std::error::Error>> {
         let encryption = create_test_encryption();
         let value = "hello cipher".into();
-        let ciphertext = encryption.encrypt_single(&value, "desc").await?;
+        let ciphertext = encryption.encrypt_single((&value, "desc")).await?;
         assert_eq!(
             value,
             encryption.decrypt_single(&ciphertext.unwrap()).await?
@@ -398,7 +393,7 @@ mod tests {
         for (i, plaintext) in plaintexts.iter().enumerate() {
             ciphertexts.push(
                 encryption
-                    .encrypt_single(plaintext, &format!("value-{i}"))
+                    .encrypt_single((plaintext, format!("value-{i}")))
                     .await?
                     .unwrap(),
             );
@@ -423,7 +418,7 @@ mod tests {
         for (i, plaintext) in vec![&p1, &p2, &p3].into_iter().enumerate() {
             ciphertexts.push(Some(
                 encryption
-                    .encrypt_single(plaintext, &format!("value-{i}"))
+                    .encrypt_single((plaintext, format!("value-{i}")))
                     .await?
                     .unwrap(),
             ));

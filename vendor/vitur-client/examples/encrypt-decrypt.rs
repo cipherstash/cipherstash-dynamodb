@@ -17,10 +17,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let encrypted = vitur
         .encrypt_single(
-            EncryptPayload {
-                msg: &data,
-                descriptor: "foo",
-            },
+            EncryptPayload::new(&data, "foo"),
             &key,
             "access_token",
         )
