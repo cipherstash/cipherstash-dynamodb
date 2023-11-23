@@ -92,19 +92,26 @@ impl SettingsBuilder {
                     let ident = &field.ident;
                     let mut attr_mode = AttributeMode::Protected;
 
+                    let field_name = ident
+                        .as_ref()
+                        .ok_or_else(|| {
+                            syn::Error::new_spanned(
+                                field,
+                                "internal error: identifier was not Some",
+                            )
+                        })?
+                        .to_string();
+
+                    if field_name.starts_with("__") {
+                        return Err(syn::Error::new_spanned(
+                            field,
+                            format!("Invalid field '{field_name}': fields must not be prefixed with __")
+                        ));
+                    }
+
                     // Parse the meta for the field
                     for attr in &field.attrs {
                         if attr.path().is_ident("sort_key") {
-                            let field_name = ident
-                                .as_ref()
-                                .ok_or_else(|| {
-                                    syn::Error::new_spanned(
-                                        field,
-                                        "internal error: identifier was not Some",
-                                    )
-                                })?
-                                .to_string();
-
                             if let Some(f) = &self.sort_key_field {
                                 return Err(syn::Error::new_spanned(
                                     field,
@@ -112,20 +119,10 @@ impl SettingsBuilder {
                                 ));
                             }
 
-                            self.sort_key_field = Some(field_name);
+                            self.sort_key_field = Some(field_name.clone());
                         }
 
                         if attr.path().is_ident("partition_key") {
-                            let field_name = ident
-                                .as_ref()
-                                .ok_or_else(|| {
-                                    syn::Error::new_spanned(
-                                        field,
-                                        "internal error: identifier was not Some",
-                                    )
-                                })?
-                                .to_string();
-
                             if let Some(f) = &self.partition_key_field {
                                 return Err(syn::Error::new_spanned(
                                     field,
@@ -133,7 +130,7 @@ impl SettingsBuilder {
                                 ));
                             }
 
-                            self.partition_key_field = Some(field_name);
+                            self.partition_key_field = Some(field_name.clone());
                         }
 
                         if attr.path().is_ident("cryptonamo") {

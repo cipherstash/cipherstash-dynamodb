@@ -1,0 +1,5 @@
+error: Invalid field '__name': fields must not be prefixed with __
+ --> tests/ui/invalid-field-name.rs:8:5
+  |
+8 |     __name: String
+  |     ^^^^^^^^^^^^^^
