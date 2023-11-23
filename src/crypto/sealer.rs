@@ -59,16 +59,23 @@ impl<T> Sealer<T> {
         C: Credentials<Token = ViturToken>,
         T: Searchable,
     {
-        let pk = encrypt_partition_key(&self.inner.partition_key(), cipher).unwrap(); // FIXME
+        let mut pk = self.inner.partition_key();
+
+        if T::is_partition_key_encrypted() {
+            pk = encrypt_partition_key(&self.inner.partition_key(), cipher).unwrap(); // FIXME
+        }
+
         let sk = self.inner.sort_key();
 
         let mut table_entry =
-            TableEntry::new_with_attributes(pk.clone(), sk, None, self.unsealed.unprotected());
+            TableEntry::new_with_attributes(sk, None, self.unsealed.unprotected());
 
         let protected = T::protected_attributes()
             .iter()
             .map(|name| self.unsealed.protected_with_descriptor(name))
             .collect::<Result<Vec<(&Plaintext, &str)>, _>>()?;
+
+        table_entry.add_attribute(T::partition_key_field(), pk.clone().into());
 
         cipher
             .encrypt(protected)
@@ -77,7 +84,11 @@ impl<T> Sealer<T> {
             .zip(T::protected_attributes().into_iter())
             .for_each(|(enc, name)| {
                 if let Some(e) = enc {
-                    table_entry.add_attribute(name, e.into());
+                    if name == T::partition_key_field() {
+                        table_entry.add_attribute(format!("__{name}"), e.into());
+                    } else {
+                        table_entry.add_attribute(name, e.into());
+                    }
                 }
             });
 

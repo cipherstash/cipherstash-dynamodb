@@ -45,7 +45,7 @@ async fn run_test<F: Future<Output = ()>>(mut f: impl FnMut(EncryptedTable) -> F
 
     let table = "test-users-tenant";
 
-    common::create_table(&client, table).await;
+    common::create_table(&client, table, "tenant_id").await;
 
     let table = EncryptedTable::init(client, table)
         .await

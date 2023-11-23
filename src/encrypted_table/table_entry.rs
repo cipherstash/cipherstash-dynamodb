@@ -6,10 +6,6 @@ use std::collections::HashMap;
 //#[skip_serializing_none]
 #[derive(Debug, Clone)]
 pub struct TableEntry {
-    // Everything hex strings for now
-    //#[serde(with = "hex")]
-    //pk: Vec<u8>,
-    pub(crate) pk: String,
     //#[serde(with = "hex")]
     pub(crate) sk: String,
 
@@ -22,9 +18,8 @@ pub struct TableEntry {
 }
 
 impl TableEntry {
-    pub fn new(pk: String, sk: String) -> Self {
+    pub fn new(sk: String) -> Self {
         Self {
-            pk,
             sk,
             term: None,
             attributes: HashMap::new(),
@@ -32,13 +27,11 @@ impl TableEntry {
     }
 
     pub fn new_with_attributes(
-        pk: String,
         sk: String,
         term: Option<String>,
         attributes: HashMap<String, TableAttribute>,
     ) -> Self {
         Self {
-            pk,
             sk,
             term,
             attributes,
