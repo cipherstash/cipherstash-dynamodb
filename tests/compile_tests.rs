@@ -8,6 +8,7 @@ fn ui_tests() {
     t.compile_fail("tests/ui/index-unsupported.rs");
     t.compile_fail("tests/ui/compound-index-unsupported.rs");
     t.compile_fail("tests/ui/using-pk-instead-of-pk-sk.rs");
+    t.compile_fail("tests/ui/invalid-field-name.rs");
 
     t.pass("tests/ui/pass.rs");
 }
