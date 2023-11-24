@@ -62,21 +62,19 @@ impl<T> Sealer<T> {
         let mut pk = self.inner.partition_key();
 
         if T::is_partition_key_encrypted() {
-            pk = encrypt_partition_key(&self.inner.partition_key(), cipher).unwrap();
             // FIXME
+            pk = encrypt_partition_key(&self.inner.partition_key(), cipher).unwrap();
         }
 
         let sk = self.inner.sort_key();
 
         let mut table_entry =
-            TableEntry::new_with_attributes(sk, None, self.unsealed.unprotected());
+            TableEntry::new_with_attributes(pk.clone(), sk, None, self.unsealed.unprotected());
 
         let protected = T::protected_attributes()
             .iter()
             .map(|name| self.unsealed.protected_with_descriptor(name))
             .collect::<Result<Vec<(&Plaintext, &str)>, _>>()?;
-
-        table_entry.add_attribute("pk", pk.clone().into());
 
         cipher
             .encrypt(protected)
