@@ -3,10 +3,28 @@ use proc_macro2::{Ident, Span};
 use std::collections::HashMap;
 use syn::{Data, DeriveInput, Fields, LitStr};
 
+enum SortKeyPrefix {
+    Default,
+    Value(String),
+    None,
+}
+
+impl SortKeyPrefix {
+    fn into_prefix(self, default: &str) -> Option<String> {
+        match self {
+            Self::Default => Some(default.to_string()),
+            Self::Value(v) => Some(v),
+            Self::None => None,
+        }
+    }
+}
+
+const RESERVED_FIELD_NAMES: &'static [&'static str] = &["term", "sk"];
+
 pub(crate) struct SettingsBuilder {
     ident: Ident,
     type_name: String,
-    sort_key_prefix: Option<String>,
+    sort_key_prefix: SortKeyPrefix,
     sort_key_field: Option<String>,
     partition_key_field: Option<String>,
     protected_attributes: Vec<String>,
@@ -33,7 +51,7 @@ impl SettingsBuilder {
         Self {
             ident: input.ident.clone(),
             type_name,
-            sort_key_prefix: None,
+            sort_key_prefix: SortKeyPrefix::Default,
             sort_key_field: None,
             partition_key_field: None,
             protected_attributes: Vec::new(),
@@ -54,9 +72,22 @@ impl SettingsBuilder {
                     match ident.as_deref() {
                         Some("sort_key_prefix") => {
                             let value = meta.value()?;
-                            let t: LitStr = value.parse()?;
-                            let v = t.value().to_string();
-                            self.set_sort_key_prefix(v)
+
+                            if let Ok(t) = value.parse::<LitStr>() {
+                                let v = t.value().to_string();
+                                self.set_sort_key_prefix(v)?;
+                                return Ok(());
+                            }
+
+                            if let Ok(t) = value.parse::<Ident>() {
+                                let v = t.to_string();
+
+                                if v == "None" {
+                                    self.sort_key_prefix = SortKeyPrefix::None;
+                                }
+                            }
+
+                            Ok(())
                         }
                         Some("partition_key") => {
                             let value = meta.value()?;
@@ -105,7 +136,18 @@ impl SettingsBuilder {
                     if field_name.starts_with("__") {
                         return Err(syn::Error::new_spanned(
                             field,
-                            format!("Invalid field '{field_name}': fields must not be prefixed with __")
+                            format!(
+                                "Invalid field '{field_name}': fields must not be prefixed with __"
+                            ),
+                        ));
+                    }
+
+                    if RESERVED_FIELD_NAMES.contains(&field_name.as_str()) {
+                        return Err(syn::Error::new_spanned(
+                            field,
+                            format!(
+                                "Invalid field '{field_name}': name is reserved for internal use"
+                            ),
                         ));
                     }
 
@@ -252,7 +294,7 @@ impl SettingsBuilder {
             indexes,
         } = self;
 
-        let sort_key_prefix = sort_key_prefix.unwrap_or(type_name);
+        let sort_key_prefix = sort_key_prefix.into_prefix(&type_name);
 
         let partition_key = partition_key.ok_or_else(|| {
             syn::Error::new(
@@ -264,6 +306,7 @@ impl SettingsBuilder {
         Ok(Settings {
             ident,
             sort_key_prefix,
+            type_name,
             sort_key_field,
             partition_key_field: Some(partition_key), // TODO: Remove the Some
             protected_attributes,
@@ -274,7 +317,7 @@ impl SettingsBuilder {
     }
 
     pub(crate) fn set_sort_key_prefix(&mut self, value: String) -> Result<(), syn::Error> {
-        self.sort_key_prefix = Some(value);
+        self.sort_key_prefix = SortKeyPrefix::Value(value);
         Ok(())
     }
 

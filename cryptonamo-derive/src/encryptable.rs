@@ -11,7 +11,13 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
 
     let partition_key_field = settings.get_partition_key()?;
     let partition_key = format_ident!("{partition_key_field}");
-    let type_name = settings.sort_key_prefix.to_string();
+    let type_name = settings.type_name.clone();
+
+    let sort_key_prefix = settings
+        .sort_key_prefix
+        .as_ref()
+        .map(|x| quote! { Some(#x) })
+        .unwrap_or_else(|| quote! { None });
 
     let protected_attributes = settings.protected_attributes();
     let plaintext_attributes = settings.plaintext_attributes();
@@ -38,7 +44,14 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
 
     let sort_key_impl = if let Some(sort_key_field) = &settings.sort_key_field {
         let sort_key_attr = format_ident!("{sort_key_field}");
-        quote! { format!("{}#{}", Self::type_name(), self.#sort_key_attr) }
+
+        quote! {
+            if let Some(prefix) = Self::sort_key_prefix() {
+                format!("{}#{}", prefix, self.#sort_key_attr)
+            } else {
+                self.#sort_key_attr.clone()
+            }
+        }
     } else {
         quote! { Self::type_name().into() }
     };
@@ -60,6 +73,10 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
 
             fn sort_key(&self) -> String {
                 #sort_key_impl
+            }
+
+            fn sort_key_prefix() -> Option<&'static str> {
+                #sort_key_prefix
             }
 
             fn partition_key_field() -> &'static str {

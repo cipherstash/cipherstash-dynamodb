@@ -120,7 +120,7 @@ impl EncryptedTable {
         &self,
         k: impl Into<T::PrimaryKey>,
     ) -> Result<PrimaryKeyParts, EncryptionError> {
-        let PrimaryKeyParts { mut pk, sk } = k.into().into_parts(T::type_name());
+        let PrimaryKeyParts { mut pk, sk } = k.into().into_parts::<T>();
 
         if T::is_partition_key_encrypted() {
             pk = encrypt_partition_key(&pk, &self.cipher)?;

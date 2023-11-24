@@ -1,10 +1,12 @@
+use crate::Encryptable;
+
 pub struct PrimaryKeyParts {
     pub(crate) pk: String,
     pub(crate) sk: String,
 }
 
 pub trait PrimaryKey: private::Sealed {
-    fn into_parts(self, sk_prefix: &str) -> PrimaryKeyParts;
+    fn into_parts<E: Encryptable>(self) -> PrimaryKeyParts;
 }
 
 pub struct Pk(String);
@@ -45,19 +47,23 @@ mod private {
 }
 
 impl PrimaryKey for Pk {
-    fn into_parts(self, sk_prefix: &str) -> PrimaryKeyParts {
+    fn into_parts<E: Encryptable>(self) -> PrimaryKeyParts {
         PrimaryKeyParts {
             pk: self.0,
-            sk: sk_prefix.to_string(),
+            sk: E::sort_key_prefix().unwrap_or(E::type_name()).to_string(),
         }
     }
 }
 
 impl PrimaryKey for PkSk {
-    fn into_parts(self, sk_prefix: &str) -> PrimaryKeyParts {
+    fn into_parts<E: Encryptable>(self) -> PrimaryKeyParts {
+        let sk = self.1;
+
         PrimaryKeyParts {
             pk: self.0,
-            sk: format!("{}#{}", sk_prefix, self.1),
+            sk: E::sort_key_prefix()
+                .map(|x| format!("{x}#{sk}"))
+                .unwrap_or_else(|| sk.to_string()),
         }
     }
 }
