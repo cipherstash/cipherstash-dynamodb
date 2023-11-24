@@ -79,10 +79,6 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
                 #sort_key_prefix
             }
 
-            fn partition_key_field() -> &'static str {
-                #partition_key_field
-            }
-
             fn is_partition_key_encrypted() -> bool {
                 #is_partition_key_encrypted
             }

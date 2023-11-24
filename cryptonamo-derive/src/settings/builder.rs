@@ -116,6 +116,9 @@ impl SettingsBuilder {
                     .flat_map(|x| x.ident.as_ref().map(|x| x.to_string()))
                     .collect();
 
+                let explicit_pk = all_field_names.contains(&String::from("pk"));
+                // let explicit_sk = all_field_names.contains(&String::from("sk"));
+
                 let mut compound_indexes: HashMap<String, Vec<(String, String, Span)>> =
                     Default::default();
 
@@ -151,6 +154,21 @@ impl SettingsBuilder {
                         ));
                     }
 
+                    if field_name == "pk" {
+                        let has_partition_key_attr = field
+                            .attrs
+                            .iter()
+                            .find(|x| x.path().is_ident("partition_key"))
+                            .is_some();
+
+                        if !has_partition_key_attr {
+                            return Err(syn::Error::new_spanned(
+                                field,
+                                format!("field named 'pk' must be annotated with #[partition_key]"),
+                            ));
+                        }
+                    }
+
                     // Parse the meta for the field
                     for attr in &field.attrs {
                         if attr.path().is_ident("sort_key") {
@@ -164,7 +182,14 @@ impl SettingsBuilder {
                             self.sort_key_field = Some(field_name.clone());
                         }
 
-                        if attr.path().is_ident("partition_key") {
+                        if attr.path().is_ident("partition_key"){
+                            if explicit_pk && field_name != "pk" {
+                                return Err(syn::Error::new_spanned(
+                                    field,
+                                    format!("field '{field_name}' cannot be used as partition key as struct contains field named 'pk' which must be used")
+                                ));
+                            }
+
                             if let Some(f) = &self.partition_key_field {
                                 return Err(syn::Error::new_spanned(
                                     field,
