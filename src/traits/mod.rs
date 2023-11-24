@@ -33,6 +33,8 @@ pub trait Encryptable: Debug + Sized {
     // TODO: Add a function indicating that the root should be stored
     fn type_name() -> &'static str;
 
+    fn sort_key_prefix() -> Option<&'static str>;
+
     fn partition_key_field() -> &'static str;
 
     fn is_partition_key_encrypted() -> bool;
