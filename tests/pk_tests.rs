@@ -9,12 +9,12 @@ mod common;
 #[derive(Encryptable, Decryptable, Searchable, Debug, PartialEq, Ord, PartialOrd, Eq)]
 #[cryptonamo(sort_key_prefix = "user")]
 pub struct User {
-    #[cryptonamo(query = "exact", compound = "email#name")]
+    #[cryptonamo(query = "exact", compound = "pk#name")]
     #[cryptonamo(query = "exact")]
     #[partition_key]
-    pub email: String,
+    pub pk: String,
 
-    #[cryptonamo(query = "prefix", compound = "email#name")]
+    #[cryptonamo(query = "prefix", compound = "pk#name")]
     #[cryptonamo(query = "prefix")]
     pub name: String,
 
@@ -29,7 +29,7 @@ impl User {
     pub fn new(email: impl Into<String>, name: impl Into<String>, tag: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            email: email.into(),
+            pk: email.into(),
             tag: tag.into(),
             temp: false,
         }
@@ -44,7 +44,7 @@ async fn run_test<F: Future<Output = ()>>(mut f: impl FnMut(EncryptedTable) -> F
 
     let client = aws_sdk_dynamodb::Client::new(&config);
 
-    let table_name = "test-users-pk";
+    let table_name = "test-users";
 
     common::create_table(&client, table_name).await;
 
@@ -76,7 +76,7 @@ async fn test_query_single_exact() {
     run_test(|table| async move {
         let res: Vec<User> = table
             .query()
-            .eq("email", "dan@coderdan.co")
+            .eq("pk", "dan@coderdan.co")
             .send()
             .await
             .expect("Failed to query");
@@ -121,7 +121,7 @@ async fn test_query_compound() {
         let res: Vec<User> = table
             .query()
             .starts_with("name", "Dan")
-            .eq("email", "dan@coderdan.co")
+            .eq("pk", "dan@coderdan.co")
             .send()
             .await
             .expect("Failed to query");
@@ -175,7 +175,7 @@ async fn test_delete() {
 
         let res = table
             .query::<User>()
-            .eq("email", "dan@coderdan.co")
+            .eq("pk", "dan@coderdan.co")
             .send()
             .await
             .expect("Failed to send");
@@ -183,7 +183,7 @@ async fn test_delete() {
 
         let res = table
             .query::<User>()
-            .eq("email", "dan@coderdan.co")
+            .eq("pk", "dan@coderdan.co")
             .starts_with("name", "Dan")
             .send()
             .await
