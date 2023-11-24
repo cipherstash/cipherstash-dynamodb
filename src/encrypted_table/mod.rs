@@ -204,7 +204,7 @@ impl EncryptedTable {
             .db
             .get_item()
             .table_name(&self.table_name)
-            .key(T::partition_key_field(), AttributeValue::S(pk))
+            .key("pk", AttributeValue::S(pk))
             .key("sk", AttributeValue::S(sk))
             .send()
             .await
@@ -232,7 +232,7 @@ impl EncryptedTable {
                 .delete(
                     Delete::builder()
                         .table_name(&self.table_name)
-                        .key(E::partition_key_field(), AttributeValue::S(pk.clone()))
+                        .key("pk", AttributeValue::S(pk.clone()))
                         .key("sk", AttributeValue::S(sk))
                         .build(),
                 )
@@ -291,7 +291,7 @@ impl EncryptedTable {
                     .delete(
                         Delete::builder()
                             .table_name(&self.table_name)
-                            .key(T::partition_key_field(), AttributeValue::S(pk.clone()))
+                            .key("pk", AttributeValue::S(pk.clone()))
                             .key("sk", AttributeValue::S(index_sk))
                             .build(),
                     )

@@ -6,7 +6,7 @@ use aws_sdk_dynamodb::{
     Client,
 };
 
-pub async fn create_table(client: &Client, table_name: &str, pk: &str) {
+pub async fn create_table(client: &Client, table_name: &str) {
     let _ = client.delete_table().table_name(table_name).send().await;
 
     client
@@ -14,7 +14,7 @@ pub async fn create_table(client: &Client, table_name: &str, pk: &str) {
         .table_name(table_name)
         .attribute_definitions(
             AttributeDefinition::builder()
-                .attribute_name(pk)
+                .attribute_name("pk")
                 .attribute_type(ScalarAttributeType::S)
                 .build(),
         )
@@ -32,7 +32,7 @@ pub async fn create_table(client: &Client, table_name: &str, pk: &str) {
         )
         .key_schema(
             KeySchemaElement::builder()
-                .attribute_name(pk)
+                .attribute_name("pk")
                 .key_type(KeyType::Hash)
                 .build(),
         )

@@ -35,8 +35,6 @@ pub trait Encryptable: Debug + Sized {
 
     fn sort_key_prefix() -> Option<&'static str>;
 
-    fn partition_key_field() -> &'static str;
-
     fn is_partition_key_encrypted() -> bool;
 
     fn sort_key(&self) -> String {

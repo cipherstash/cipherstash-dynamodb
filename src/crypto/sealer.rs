@@ -62,7 +62,8 @@ impl<T> Sealer<T> {
         let mut pk = self.inner.partition_key();
 
         if T::is_partition_key_encrypted() {
-            pk = encrypt_partition_key(&self.inner.partition_key(), cipher).unwrap(); // FIXME
+            pk = encrypt_partition_key(&self.inner.partition_key(), cipher).unwrap();
+            // FIXME
         }
 
         let sk = self.inner.sort_key();
@@ -75,7 +76,7 @@ impl<T> Sealer<T> {
             .map(|name| self.unsealed.protected_with_descriptor(name))
             .collect::<Result<Vec<(&Plaintext, &str)>, _>>()?;
 
-        table_entry.add_attribute(T::partition_key_field(), pk.clone().into());
+        table_entry.add_attribute("pk", pk.clone().into());
 
         cipher
             .encrypt(protected)
@@ -84,8 +85,8 @@ impl<T> Sealer<T> {
             .zip(T::protected_attributes().into_iter())
             .for_each(|(enc, name)| {
                 if let Some(e) = enc {
-                    if name == T::partition_key_field() {
-                        table_entry.add_attribute(format!("__{name}"), e.into());
+                    if name == "pk" {
+                        table_entry.add_attribute("__pk", e.into());
                     } else {
                         table_entry.add_attribute(name, e.into());
                     }

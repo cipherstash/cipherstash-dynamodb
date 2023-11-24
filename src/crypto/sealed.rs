@@ -40,8 +40,8 @@ impl Sealed {
         let ciphertexts = T::decryptable_attributes()
             .into_iter()
             .map(|name| {
-                let attribute = if name == T::partition_key_field() {
-                    self.inner().attributes.get(&format!("__{name}"))
+                let attribute = if name == "pk" {
+                    self.inner().attributes.get("__pk")
                 } else {
                     self.inner().attributes.get(name)
                 };
