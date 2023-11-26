@@ -2,7 +2,7 @@ use crate::Encryptable;
 
 pub struct PrimaryKeyParts {
     pub(crate) pk: String,
-    pub(crate) sk: String
+    pub(crate) sk: String,
 }
 
 pub trait PrimaryKey: private::Sealed {
@@ -17,19 +17,19 @@ impl Pk {
     }
 }
 
-impl From<String> for Pk {
-    fn from(value: String) -> Self {
-        Self(value)
-    }
-}
-
-impl From<&str> for Pk {
-    fn from(value: &str) -> Self {
+impl<P: Into<String>> From<P> for Pk {
+    fn from(value: P) -> Self {
         Self::new(value)
     }
 }
 
 pub struct PkSk(String, String);
+
+impl<Pk: Into<String>, Sk: Into<String>> From<(Pk, Sk)> for PkSk {
+    fn from(value: (Pk, Sk)) -> Self {
+        Self::new(value.0, value.1)
+    }
+}
 
 impl PkSk {
     pub fn new(pk: impl Into<String>, sk: impl Into<String>) -> Self {
