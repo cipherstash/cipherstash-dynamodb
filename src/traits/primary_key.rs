@@ -2,7 +2,7 @@ use crate::Encryptable;
 
 pub struct PrimaryKeyParts {
     pub(crate) pk: String,
-    pub(crate) sk: String,
+    pub(crate) sk: String
 }
 
 pub trait PrimaryKey: private::Sealed {
