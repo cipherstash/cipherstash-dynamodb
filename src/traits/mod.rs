@@ -37,6 +37,8 @@ pub trait Encryptable: Debug + Sized {
 
     fn is_partition_key_encrypted() -> bool;
 
+    fn is_sort_key_encrypted() -> bool;
+
     fn sort_key(&self) -> String {
         Self::type_name().into()
     }

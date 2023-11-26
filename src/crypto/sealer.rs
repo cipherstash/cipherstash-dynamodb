@@ -1,6 +1,7 @@
 use super::{encrypt_partition_key, SealError, Sealed, Unsealed, MAX_TERMS_PER_INDEX};
 use crate::{
     encrypted_table::{TableAttribute, TableEntry},
+    traits::PrimaryKeyParts,
     Searchable,
 };
 use cipherstash_client::{
@@ -54,22 +55,28 @@ impl<T> Sealer<T> {
         self,
         cipher: &Encryption<C>,
         term_length: usize, // TODO: SealError
-    ) -> Result<(String, Vec<Sealed>), SealError>
+    ) -> Result<(PrimaryKeyParts, Vec<Sealed>), SealError>
     where
         C: Credentials<Token = ViturToken>,
         T: Searchable,
     {
         let mut pk = self.inner.partition_key();
+        let mut sk = self.inner.sort_key();
 
         if T::is_partition_key_encrypted() {
-            // FIXME
-            pk = encrypt_partition_key(&self.inner.partition_key(), cipher).unwrap();
+            pk = encrypt_partition_key(&pk, cipher)?;
         }
 
-        let sk = self.inner.sort_key();
+        if T::is_sort_key_encrypted() {
+            sk = encrypt_partition_key(&sk, cipher)?;
+        }
 
-        let mut table_entry =
-            TableEntry::new_with_attributes(pk.clone(), sk, None, self.unsealed.unprotected());
+        let mut table_entry = TableEntry::new_with_attributes(
+            pk.clone(),
+            sk.clone(),
+            None,
+            self.unsealed.unprotected(),
+        );
 
         let protected = T::protected_attributes()
             .iter()
@@ -90,8 +97,6 @@ impl<T> Sealer<T> {
                     }
                 }
             });
-
-        let sort_key = self.inner.sort_key();
 
         let protected_indexes = T::protected_indexes();
         let terms: Vec<(&&str, Vec<u8>)> = protected_indexes
@@ -135,13 +140,13 @@ impl<T> Sealer<T> {
                         .clone()
                         .set_term(hex::encode(term))
                         // TODO: HMAC the sort key, too (users#index_name#pk)
-                        .set_sk(format!("{}#{}#{}", &sort_key, index_name, i)),
+                        .set_sk(format!("{}#{}#{}", &sk, index_name, i)),
                 )
             })
             .chain(once(Sealed(table_entry.clone())))
             .collect();
 
-        Ok((pk, table_entries))
+        Ok((PrimaryKeyParts { pk, sk }, table_entries))
     }
 
     #[allow(dead_code)]

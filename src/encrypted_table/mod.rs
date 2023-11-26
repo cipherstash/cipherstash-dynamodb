@@ -120,10 +120,14 @@ impl EncryptedTable {
         &self,
         k: impl Into<T::PrimaryKey>,
     ) -> Result<PrimaryKeyParts, EncryptionError> {
-        let PrimaryKeyParts { mut pk, sk } = k.into().into_parts::<T>();
+        let PrimaryKeyParts { mut pk, mut sk } = k.into().into_parts::<T>();
 
         if T::is_partition_key_encrypted() {
             pk = encrypt_partition_key(&pk, &self.cipher)?;
+        }
+
+        if T::is_sort_key_encrypted() {
+            sk = encrypt_partition_key(&sk, &self.cipher)?;
         }
 
         Ok(PrimaryKeyParts { pk, sk })
@@ -160,7 +164,7 @@ impl EncryptedTable {
     ) -> Result<(), DeleteError> {
         let PrimaryKeyParts { pk, sk } = self.get_primary_key_parts::<E>(k)?;
 
-        let sk_to_delete = all_index_keys::<E>(&sk).into_iter().into_iter().chain([sk]);
+        let sk_to_delete = all_index_keys::<E>(&sk).into_iter().chain([sk]);
 
         let transact_items = sk_to_delete.map(|sk| {
             TransactWriteItem::builder()
@@ -194,9 +198,8 @@ impl EncryptedTable {
     {
         let mut seen_sk = HashSet::new();
 
-        let sk = record.sort_key();
         let sealer: Sealer<T> = record.into_sealer()?;
-        let (pk, sealed) = sealer.seal(&self.cipher, 12).await?;
+        let (PrimaryKeyParts { pk, sk }, sealed) = sealer.seal(&self.cipher, 12).await?;
 
         // TODO: Use a combinator
         let mut items: Vec<TransactWriteItem> = Vec::with_capacity(sealed.len());

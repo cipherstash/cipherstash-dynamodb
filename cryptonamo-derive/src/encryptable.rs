@@ -24,6 +24,11 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
     let ident = settings.ident();
 
     let is_partition_key_encrypted = protected_attributes.contains(&partition_key_field.as_str());
+    let is_sort_key_encrypted = settings
+        .sort_key_field
+        .as_ref()
+        .map(|x| protected_attributes.contains(&x.as_str()))
+        .unwrap_or(true);
 
     let into_unsealed_impl = protected_attributes
         .iter()
@@ -67,6 +72,7 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
         impl cryptonamo::traits::Encryptable for #ident {
             #primary_key_impl
 
+            #[inline]
             fn type_name() -> &'static str {
                 #type_name
             }
@@ -75,12 +81,19 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
                 #sort_key_impl
             }
 
+            #[inline]
             fn sort_key_prefix() -> Option<&'static str> {
                 #sort_key_prefix
             }
 
+            #[inline]
             fn is_partition_key_encrypted() -> bool {
                 #is_partition_key_encrypted
+            }
+
+            #[inline]
+            fn is_sort_key_encrypted() -> bool {
+                #is_sort_key_encrypted
             }
 
             fn partition_key(&self) -> String {
