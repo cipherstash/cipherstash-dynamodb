@@ -19,7 +19,7 @@ impl SortKeyPrefix {
     }
 }
 
-const RESERVED_FIELD_NAMES: &'static [&'static str] = &["term", "sk"];
+const RESERVED_FIELD_NAMES: &'static [&'static str] = &["term"];
 
 pub(crate) struct SettingsBuilder {
     ident: Ident,
@@ -117,7 +117,7 @@ impl SettingsBuilder {
                     .collect();
 
                 let explicit_pk = all_field_names.contains(&String::from("pk"));
-                // let explicit_sk = all_field_names.contains(&String::from("sk"));
+                let explicit_sk = all_field_names.contains(&String::from("sk"));
 
                 let mut compound_indexes: HashMap<String, Vec<(String, String, Span)>> =
                     Default::default();
@@ -172,6 +172,19 @@ impl SettingsBuilder {
                     // Parse the meta for the field
                     for attr in &field.attrs {
                         if attr.path().is_ident("sort_key") {
+                            if explicit_sk && field_name != "sk" {
+                                return Err(syn::Error::new_spanned(
+                                    field,
+                                    format!("field '{field_name}' cannot be used as sort key as struct contains field named 'sk' which must be used")
+                                ));
+                            }
+
+                            if explicit_sk {
+                                // if the 'sk' field is set then there should be no prefix
+                                // otherwise when deserialising the sk value would be incorrect
+                                self.sort_key_prefix = SortKeyPrefix::None;
+                            }
+
                             if let Some(f) = &self.sort_key_field {
                                 return Err(syn::Error::new_spanned(
                                     field,
@@ -182,7 +195,7 @@ impl SettingsBuilder {
                             self.sort_key_field = Some(field_name.clone());
                         }
 
-                        if attr.path().is_ident("partition_key"){
+                        if attr.path().is_ident("partition_key") {
                             if explicit_pk && field_name != "pk" {
                                 return Err(syn::Error::new_spanned(
                                     field,

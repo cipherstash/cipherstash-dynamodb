@@ -7,31 +7,27 @@ use std::future::Future;
 mod common;
 
 #[derive(Encryptable, Decryptable, Searchable, Debug, PartialEq, Ord, PartialOrd, Eq)]
-#[cryptonamo(sort_key_prefix = "user")]
 pub struct User {
-    #[cryptonamo(query = "exact", compound = "pk#name")]
+    #[cryptonamo(query = "exact", compound = "pk#sk")]
     #[cryptonamo(query = "exact")]
     #[partition_key]
     pub pk: String,
 
-    #[cryptonamo(query = "prefix", compound = "pk#name")]
+    #[cryptonamo(query = "prefix", compound = "pk#sk")]
     #[cryptonamo(query = "prefix")]
-    pub name: String,
+    #[sort_key]
+    pub sk: String,
 
     #[cryptonamo(plaintext)]
     pub tag: String,
-
-    #[cryptonamo(skip)]
-    pub temp: bool,
 }
 
 impl User {
     pub fn new(email: impl Into<String>, name: impl Into<String>, tag: impl Into<String>) -> Self {
         Self {
-            name: name.into(),
             pk: email.into(),
+            sk: name.into(),
             tag: tag.into(),
-            temp: false,
         }
     }
 }
@@ -44,7 +40,7 @@ async fn run_test<F: Future<Output = ()>>(mut f: impl FnMut(EncryptedTable) -> F
 
     let client = aws_sdk_dynamodb::Client::new(&config);
 
-    let table_name = "test-users";
+    let table_name = "pk-sk-users";
 
     common::create_table(&client, table_name).await;
 
@@ -95,7 +91,7 @@ async fn test_query_single_prefix() {
     run_test(|table| async move {
         let res: Vec<User> = table
             .query()
-            .starts_with("name", "Dan")
+            .starts_with("sk", "Dan")
             .send()
             .await
             .expect("Failed to query")
@@ -120,7 +116,7 @@ async fn test_query_compound() {
     run_test(|table| async move {
         let res: Vec<User> = table
             .query()
-            .starts_with("name", "Dan")
+            .starts_with("sk", "Dan")
             .eq("pk", "dan@coderdan.co")
             .send()
             .await
@@ -138,7 +134,10 @@ async fn test_query_compound() {
 #[serial]
 async fn test_get_by_partition_key() {
     run_test(|table| async move {
-        let res: Option<User> = table.get("dan@coderdan.co").await.expect("Failed to send");
+        let res: Option<User> = table
+            .get(("dan@coderdan.co", "Dan Draper"))
+            .await
+            .expect("Failed to send");
         assert_eq!(
             res,
             Some(User::new("dan@coderdan.co", "Dan Draper", "blue"))
@@ -152,19 +151,19 @@ async fn test_get_by_partition_key() {
 async fn test_delete() {
     run_test(|table| async move {
         table
-            .delete::<User>("dan@coderdan.co")
+            .delete::<User>(("dan@coderdan.co", "Dan Draper"))
             .await
             .expect("Failed to send");
 
         let res = table
-            .get::<User>("dan@coderdan.co")
+            .get::<User>(("dan@coderdan.co", "Dan Draper"))
             .await
             .expect("Failed to send");
         assert_eq!(res, None);
 
         let res = table
             .query::<User>()
-            .starts_with("name", "Dan")
+            .starts_with("sk", "Dan")
             .send()
             .await
             .expect("Failed to send");
@@ -184,7 +183,7 @@ async fn test_delete() {
         let res = table
             .query::<User>()
             .eq("pk", "dan@coderdan.co")
-            .starts_with("name", "Dan")
+            .starts_with("sk", "Dan")
             .send()
             .await
             .expect("Failed to send");

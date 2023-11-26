@@ -40,11 +40,11 @@ impl Sealed {
         let ciphertexts = T::decryptable_attributes()
             .into_iter()
             .map(|name| {
-                let attribute = if name == "pk" {
-                    self.inner().attributes.get("__pk")
-                } else {
-                    self.inner().attributes.get(name)
-                };
+                let attribute = self.inner().attributes.get(match name {
+                    "pk" => "__pk",
+                    "sk" => "__sk",
+                    _ => name,
+                });
 
                 attribute
                     .ok_or_else(|| SealError::MissingAttribute(name.to_string()))?

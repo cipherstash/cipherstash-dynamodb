@@ -90,11 +90,14 @@ impl<T> Sealer<T> {
             .zip(T::protected_attributes().into_iter())
             .for_each(|(enc, name)| {
                 if let Some(e) = enc {
-                    if name == "pk" {
-                        table_entry.add_attribute("__pk", e.into());
-                    } else {
-                        table_entry.add_attribute(name, e.into());
-                    }
+                    table_entry.add_attribute(
+                        match name {
+                            "pk" => "__pk",
+                            "sk" => "__sk",
+                            _ => name,
+                        },
+                        e.into(),
+                    );
                 }
             });
 
