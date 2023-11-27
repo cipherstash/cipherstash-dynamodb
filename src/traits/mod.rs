@@ -17,6 +17,8 @@ use thiserror::Error;
 pub enum ReadConversionError {
     #[error("Missing attribute: {0}")]
     NoSuchAttribute(String),
+    #[error("Invalid format: {0}")]
+    InvalidFormat(String),
     #[error("Failed to convert attribute: {0} from Plaintext")]
     ConversionFailed(String),
 }
