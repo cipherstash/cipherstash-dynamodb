@@ -1,4 +1,4 @@
-use super::{encrypt_partition_key, SealError, Sealed, Unsealed, MAX_TERMS_PER_INDEX};
+use super::{hmac, SealError, Sealed, Unsealed, MAX_TERMS_PER_INDEX};
 use crate::{
     encrypted_table::{TableAttribute, TableEntry},
     traits::PrimaryKeyParts,
@@ -64,11 +64,11 @@ impl<T> Sealer<T> {
         let mut sk = self.inner.sort_key();
 
         if T::is_partition_key_encrypted() {
-            pk = encrypt_partition_key(&pk, cipher)?;
+            pk = hmac(&pk, cipher)?;
         }
 
         if T::is_sort_key_encrypted() {
-            sk = encrypt_partition_key(&sk, cipher)?;
+            sk = hmac(&sk, cipher)?;
         }
 
         let mut table_entry = TableEntry::new_with_attributes(
@@ -112,15 +112,14 @@ impl<T> Sealer<T> {
                     })
                     .ok_or(SealError::MissingAttribute(index_name.to_string()))
                     .and_then(|(attr, index, index_name)| {
-                        cipher
-                            .compound_index(
-                                &CompoundIndex::new(index),
-                                attr,
-                                Some(format!("{}#{}", T::type_name(), index_name)),
-                                term_length,
-                            )
-                            .map_err(SealError::CryptoError)
-                            .map(|result| (index_name, result))
+                        let term = cipher.compound_index(
+                            &CompoundIndex::new(index),
+                            attr,
+                            Some(format!("{}#{}", T::type_name(), index_name)),
+                            term_length,
+                        )?;
+
+                        Ok::<_, SealError>((index_name, term))
                     })
             })
             .map(|index_term| match index_term {
@@ -138,16 +137,16 @@ impl<T> Sealer<T> {
             .enumerate()
             .take(MAX_TERMS_PER_INDEX)
             .map(|(i, (index_name, term))| {
-                Sealed(
+                Ok(Sealed(
                     table_entry
                         .clone()
                         .set_term(hex::encode(term))
                         // TODO: HMAC the sort key, too (users#index_name#pk)
-                        .set_sk(format!("{}#{}#{}", &sk, index_name, i)),
-                )
+                        .set_sk(hmac(&format!("{}#{}#{}", &sk, index_name, i), &cipher)?),
+                ))
             })
-            .chain(once(Sealed(table_entry.clone())))
-            .collect();
+            .chain(once(Ok(Sealed(table_entry.clone()))))
+            .collect::<Result<_, SealError>>()?;
 
         Ok((PrimaryKeyParts { pk, sk }, table_entries))
     }

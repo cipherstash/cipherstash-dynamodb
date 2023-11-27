@@ -44,6 +44,8 @@ pub enum PutError {
     Seal(#[from] SealError),
     #[error("CryptoError: {0}")]
     Crypto(#[from] CryptoError),
+    #[error("Encryption Error: {0}")]
+    Encryption(#[from] EncryptionError),
 }
 
 #[derive(Error, Debug)]
@@ -188,11 +190,11 @@ impl EncryptedTable {
         let PrimaryKeyParts { mut pk, mut sk } = k.into().into_parts::<T>();
 
         if T::is_partition_key_encrypted() {
-            pk = encrypt_partition_key(&pk, &self.cipher)?;
+            pk = hmac(&pk, &self.cipher)?;
         }
 
         if T::is_sort_key_encrypted() {
-            sk = encrypt_partition_key(&sk, &self.cipher)?;
+            sk = hmac(&sk, &self.cipher)?;
         }
 
         Ok(PrimaryKeyParts { pk, sk })
@@ -229,9 +231,13 @@ impl EncryptedTable {
     ) -> Result<(), DeleteError> {
         let PrimaryKeyParts { pk, sk } = self.get_primary_key_parts::<E>(k)?;
 
-        let sk_to_delete = all_index_keys::<E>(&sk).into_iter().chain([sk]);
+        let sk_to_delete = all_index_keys::<E>(&sk)
+            .into_iter()
+            .map(|x| hmac(&x, &self.cipher))
+            .chain([Ok(sk)])
+            .collect::<Result<Vec<_>, _>>()?;
 
-        let transact_items = sk_to_delete.map(|sk| {
+        let transact_items = sk_to_delete.into_iter().map(|sk| {
             TransactWriteItem::builder()
                 .delete(
                     Delete::builder()
@@ -285,6 +291,8 @@ impl EncryptedTable {
         }
 
         for index_sk in all_index_keys::<T>(&sk) {
+            let index_sk = hmac(&index_sk, &self.cipher)?;
+
             if seen_sk.contains(&index_sk) {
                 continue;
             }
