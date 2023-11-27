@@ -15,6 +15,7 @@ pub struct User {
 
     #[cryptonamo(query = "prefix", compound = "pk#sk")]
     #[cryptonamo(query = "prefix")]
+    #[cryptonamo(plaintext)]
     #[sort_key]
     pub sk: String,
 
