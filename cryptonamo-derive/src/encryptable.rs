@@ -108,6 +108,7 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
                 vec![#(#plaintext_attributes,)*]
             }
 
+            #[allow(clippy::needless_question_mark)]
             fn into_sealer(self) -> Result<cryptonamo::crypto::Sealer<Self>, cryptonamo::crypto::SealError> {
                 Ok(cryptonamo::crypto::Sealer::new_with_descriptor(self, Self::type_name())
                     #(#into_unsealed_impl?)*)

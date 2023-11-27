@@ -142,7 +142,7 @@ impl<T> Sealer<T> {
                         .clone()
                         .set_term(hex::encode(term))
                         // TODO: HMAC the sort key, too (users#index_name#pk)
-                        .set_sk(hmac(&format!("{}#{}#{}", &sk, index_name, i), &cipher)?),
+                        .set_sk(hmac(&format!("{}#{}#{}", &sk, index_name, i), cipher)?),
                 ))
             })
             .chain(once(Ok(Sealed(table_entry.clone()))))
