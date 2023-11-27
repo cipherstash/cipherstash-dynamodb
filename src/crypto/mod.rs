@@ -5,8 +5,10 @@ mod unsealed;
 use crate::traits::{Encryptable, ReadConversionError, Searchable, WriteConversionError};
 use cipherstash_client::{
     credentials::{vitur_credentials::ViturToken, Credentials},
-    encryption::{Encryption, EncryptionError, Plaintext, TypeParseError},
-    schema::column::Index,
+    encryption::{
+        compound_indexer::{CompoundIndex, ExactIndex},
+        Encryption, EncryptionError, Plaintext, TypeParseError,
+    },
 };
 use thiserror::Error;
 
@@ -56,15 +58,26 @@ pub(crate) fn all_index_keys<E: Searchable + Encryptable>(sort_key: &str) -> Vec
         .collect()
 }
 
-pub(crate) fn hmac<C>(value: &str, cipher: &Encryption<C>) -> Result<String, EncryptionError>
+pub(crate) fn hmac<C>(
+    field: &str,
+    value: &str,
+    salt: Option<&str>,
+    cipher: &Encryption<C>,
+) -> Result<String, EncryptionError>
 where
     C: Credentials<Token = ViturToken>,
 {
     let plaintext = Plaintext::Utf8Str(Some(value.to_string()));
-    let index_type = Index::new_unique().index_type;
+    let index = CompoundIndex::new(ExactIndex::new(field, vec![]));
 
     cipher
-        .index(&plaintext, &index_type)?
+        .compound_index(
+            &index,
+            plaintext,
+            // passing None here results in no terms so pass an empty string
+            Some(salt.unwrap_or("")),
+            16,
+        )?
         .as_binary()
         .map(hex::encode)
         .ok_or(EncryptionError::IndexingError(

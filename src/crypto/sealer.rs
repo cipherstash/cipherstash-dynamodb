@@ -64,11 +64,11 @@ impl<T> Sealer<T> {
         let mut sk = self.inner.sort_key();
 
         if T::is_partition_key_encrypted() {
-            pk = hmac(&pk, cipher)?;
+            pk = hmac("pk", &pk, None, cipher)?;
         }
 
         if T::is_sort_key_encrypted() {
-            sk = hmac(&sk, cipher)?;
+            sk = hmac("sk", &sk, Some(pk.as_str()), cipher)?;
         }
 
         let mut table_entry = TableEntry::new_with_attributes(
@@ -142,7 +142,12 @@ impl<T> Sealer<T> {
                         .clone()
                         .set_term(hex::encode(term))
                         // TODO: HMAC the sort key, too (users#index_name#pk)
-                        .set_sk(hmac(&format!("{}#{}#{}", &sk, index_name, i), cipher)?),
+                        .set_sk(hmac(
+                            "sk",
+                            &format!("{}#{}#{}", &sk, index_name, i),
+                            Some(pk.as_str()),
+                            cipher,
+                        )?),
                 ))
             })
             .chain(once(Ok(Sealed(table_entry.clone()))))
