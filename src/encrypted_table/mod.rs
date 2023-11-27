@@ -190,11 +190,11 @@ impl EncryptedTable {
         let PrimaryKeyParts { mut pk, mut sk } = k.into().into_parts::<T>();
 
         if T::is_partition_key_encrypted() {
-            pk = hmac(&pk, &self.cipher)?;
+            pk = hmac("pk", &pk, None, &self.cipher)?;
         }
 
         if T::is_sort_key_encrypted() {
-            sk = hmac(&sk, &self.cipher)?;
+            sk = hmac("sk", &sk, Some(pk.as_str()), &self.cipher)?;
         }
 
         Ok(PrimaryKeyParts { pk, sk })
@@ -233,7 +233,7 @@ impl EncryptedTable {
 
         let sk_to_delete = all_index_keys::<E>(&sk)
             .into_iter()
-            .map(|x| hmac(&x, &self.cipher))
+            .map(|x| hmac("sk", &x, Some(pk.as_str()), &self.cipher))
             .chain([Ok(sk)])
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -291,7 +291,7 @@ impl EncryptedTable {
         }
 
         for index_sk in all_index_keys::<T>(&sk) {
-            let index_sk = hmac(&index_sk, &self.cipher)?;
+            let index_sk = hmac("sk", &index_sk, Some(pk.as_str()), &self.cipher)?;
 
             if seen_sk.contains(&index_sk) {
                 continue;
