@@ -1,5 +1,5 @@
 error: Unsupported index type: blah
- --> tests/ui/compound-index-unsupported.rs:8:26
+ --> tests/./ui/compound-index-unsupported.rs:8:26
   |
 8 |     #[cryptonamo(query = "blah", compound = "email#name")]
   |                          ^^^^^^
