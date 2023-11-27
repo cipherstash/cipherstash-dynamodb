@@ -96,14 +96,14 @@ impl TryFrom<HashMap<String, AttributeValue>> for Sealed {
             .get("pk")
             .ok_or(ReadConversionError::NoSuchAttribute("pk".to_string()))?
             .as_s()
-            .unwrap()
+            .map_err(|_| ReadConversionError::InvalidFormat("pk".to_string()))?
             .to_string();
 
         let sk = item
             .get("sk")
             .ok_or(ReadConversionError::NoSuchAttribute("sk".to_string()))?
             .as_s()
-            .unwrap()
+            .map_err(|_| ReadConversionError::InvalidFormat("sk".to_string()))?
             .to_string();
 
         let mut table_entry = TableEntry::new(pk, sk);
