@@ -1,5 +1,5 @@
 error[E0277]: the trait bound `PkSk: From<&str>` is not satisfied
-  --> tests/ui/using-pk-instead-of-pk-sk.rs:25:40
+  --> tests/./ui/using-pk-instead-of-pk-sk.rs:25:40
    |
 25 |     let user: Option<User> = table.get("user@example.com").await?;
    |                                    --- ^^^^^^^^^^^^^^^^^^ the trait `From<&str>` is not implemented for `PkSk`

@@ -1,5 +1,5 @@
 error: field 'email' cannot be used as partition key as struct contains field named 'pk' which must be used
- --> tests/ui/pk-field-wrong-partition.rs:5:5
+ --> tests/./ui/pk-field-wrong-partition.rs:5:5
   |
 5 | /     #[partition_key]
 6 | |     #[cryptonamo(query = "exact", compound = "email#name")]

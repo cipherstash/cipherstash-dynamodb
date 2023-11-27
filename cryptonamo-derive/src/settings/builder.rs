@@ -169,6 +169,21 @@ impl SettingsBuilder {
                         }
                     }
 
+                    if field_name == "sk" {
+                        let has_partition_key_attr = field
+                            .attrs
+                            .iter()
+                            .find(|x| x.path().is_ident("sort_key"))
+                            .is_some();
+
+                        if !has_partition_key_attr {
+                            return Err(syn::Error::new_spanned(
+                                field,
+                                format!("field named 'sk' must be annotated with #[sort_key]"),
+                            ));
+                        }
+                    }
+
                     // Parse the meta for the field
                     for attr in &field.attrs {
                         if attr.path().is_ident("sort_key") {
