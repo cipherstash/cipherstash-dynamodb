@@ -231,7 +231,7 @@ impl From<TableAttribute> for AttributeValue {
 
             TableAttribute::Bytes(x) => AttributeValue::B(Blob::new(x)),
             TableAttribute::ByteVec(x) => {
-                AttributeValue::Bs(x.into_iter().map(|x| Blob::new(x)).collect())
+                AttributeValue::Bs(x.into_iter().map(Blob::new).collect())
             }
 
             TableAttribute::Bool(x) => AttributeValue::Bool(x),
