@@ -56,7 +56,7 @@ pub(crate) fn all_index_keys<E: Searchable + Encryptable>(sort_key: &str) -> Vec
         .collect()
 }
 
-pub(crate) fn encrypt_partition_key<C>(
+pub(crate) fn hmac<C>(
     value: &str,
     cipher: &Encryption<C>,
 ) -> Result<String, EncryptionError>
