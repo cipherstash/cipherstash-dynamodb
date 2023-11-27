@@ -76,7 +76,7 @@ where
             plaintext,
             // passing None here results in no terms so pass an empty string
             Some(salt.unwrap_or("")),
-            16,
+            32,
         )?
         .as_binary()
         .map(hex::encode)
