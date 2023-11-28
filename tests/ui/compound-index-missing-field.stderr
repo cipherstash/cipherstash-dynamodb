@@ -1,5 +1,5 @@
 error: Not all fields were annotated with the #[cryptonamo(compound)] attribute. Missing fields: name
- --> tests/ui/compound-index-missing-field.rs:3:10
+ --> tests/./ui/compound-index-missing-field.rs:3:10
   |
 3 | #[derive(Encryptable)]
   |          ^^^^^^^^^^^

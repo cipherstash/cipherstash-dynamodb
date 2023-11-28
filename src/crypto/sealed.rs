@@ -40,9 +40,13 @@ impl Sealed {
         let ciphertexts = T::decryptable_attributes()
             .into_iter()
             .map(|name| {
-                self.inner()
-                    .attributes
-                    .get(name)
+                let attribute = self.inner().attributes.get(match name {
+                    "pk" => "__pk",
+                    "sk" => "__sk",
+                    _ => name,
+                });
+
+                attribute
                     .ok_or_else(|| SealError::MissingAttribute(name.to_string()))?
                     .as_ciphertext()
                     .ok_or_else(|| SealError::InvalidCiphertext(name.to_string()))
@@ -52,10 +56,15 @@ impl Sealed {
         let unprotected = T::plaintext_attributes()
             .into_iter()
             .map(|name| {
+                let attr = match name {
+                    "sk" => "__sk",
+                    _ => name,
+                };
+
                 self.inner()
                     .attributes
-                    .get(name)
-                    .ok_or(SealError::MissingAttribute(name.to_string()))
+                    .get(attr)
+                    .ok_or(SealError::MissingAttribute(attr.to_string()))
             })
             .collect::<Result<Vec<&TableAttribute>, SealError>>()?;
 
@@ -87,14 +96,14 @@ impl TryFrom<HashMap<String, AttributeValue>> for Sealed {
             .get("pk")
             .ok_or(ReadConversionError::NoSuchAttribute("pk".to_string()))?
             .as_s()
-            .unwrap()
+            .map_err(|_| ReadConversionError::InvalidFormat("pk".to_string()))?
             .to_string();
 
         let sk = item
             .get("sk")
             .ok_or(ReadConversionError::NoSuchAttribute("sk".to_string()))?
             .as_s()
-            .unwrap()
+            .map_err(|_| ReadConversionError::InvalidFormat("sk".to_string()))?
             .to_string();
 
         let mut table_entry = TableEntry::new(pk, sk);
@@ -123,7 +132,13 @@ impl TryFrom<Sealed> for HashMap<String, AttributeValue> {
         }
 
         item.0.attributes.into_iter().for_each(|(k, v)| {
-            map.insert(k.to_string(), v.into());
+            map.insert(
+                match k.as_str() {
+                    "sk" => "__sk".to_string(),
+                    _ => k,
+                },
+                v.into(),
+            );
         });
 
         Ok(map)

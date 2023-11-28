@@ -17,6 +17,8 @@ use thiserror::Error;
 pub enum ReadConversionError {
     #[error("Missing attribute: {0}")]
     NoSuchAttribute(String),
+    #[error("Invalid format: {0}")]
+    InvalidFormat(String),
     #[error("Failed to convert attribute: {0} from Plaintext")]
     ConversionFailed(String),
 }
@@ -32,6 +34,12 @@ pub trait Encryptable: Debug + Sized {
 
     // TODO: Add a function indicating that the root should be stored
     fn type_name() -> &'static str;
+
+    fn sort_key_prefix() -> Option<&'static str>;
+
+    fn is_partition_key_encrypted() -> bool;
+
+    fn is_sort_key_encrypted() -> bool;
 
     fn sort_key(&self) -> String {
         Self::type_name().into()

@@ -1,5 +1,5 @@
 error: Unsupported index type: blah
- --> tests/ui/index-unsupported.rs:5:26
+ --> tests/./ui/index-unsupported.rs:5:26
   |
 5 |     #[cryptonamo(query = "blah")]
   |                          ^^^^^^

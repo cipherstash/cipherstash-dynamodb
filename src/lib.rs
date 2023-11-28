@@ -135,6 +135,27 @@
 //!
 //! Sort keys will contain that value and will be prefixed by the sort key prefix.
 //!
+//! #### Explicit `pk` and `sk` fields
+//!
+//! It's common in DynamoDB to use fields on your records called `pk` and `sk` for your partition
+//! and sort keys. To support this behaviour these are treated as special keywords in Cryptanomo.
+//! If your field contains a `pk` or an `sk` field they must be annotated with the `#[partition_key]` and `#[sort_key]` attributes respectively.
+//!
+//! ```rust
+//! use cryptonamo::Encryptable;
+//!
+//! #[derive(Debug, Encryptable)]
+//! struct User {
+//!     #[partition_key]
+//!     pk: String,
+//!     #[sort_key]
+//!     sk: String,
+//!
+//!     #[cryptonamo(skip)]
+//!     not_required: String,
+//! }
+//! ```
+//!
 //! ## Indexing
 //!
 //! Cryptanomo supports indexing of encrypted fields for searching.

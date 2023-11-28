@@ -6,10 +6,9 @@ use std::collections::HashMap;
 //#[skip_serializing_none]
 #[derive(Debug, Clone)]
 pub struct TableEntry {
-    // Everything hex strings for now
     //#[serde(with = "hex")]
-    //pk: Vec<u8>,
     pub(crate) pk: String,
+
     //#[serde(with = "hex")]
     pub(crate) sk: String,
 
@@ -232,7 +231,7 @@ impl From<TableAttribute> for AttributeValue {
 
             TableAttribute::Bytes(x) => AttributeValue::B(Blob::new(x)),
             TableAttribute::ByteVec(x) => {
-                AttributeValue::Bs(x.into_iter().map(|x| Blob::new(x)).collect())
+                AttributeValue::Bs(x.into_iter().map(Blob::new).collect())
             }
 
             TableAttribute::Bool(x) => AttributeValue::Bool(x),

@@ -9,12 +9,26 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
         .field_attributes(&input)?
         .build()?;
 
-    let partition_key = format_ident!("{}", settings.get_partition_key()?);
-    let type_name = settings.sort_key_prefix.to_string();
+    let partition_key_field = settings.get_partition_key()?;
+    let partition_key = format_ident!("{partition_key_field}");
+    let type_name = settings.type_name.clone();
+
+    let sort_key_prefix = settings
+        .sort_key_prefix
+        .as_ref()
+        .map(|x| quote! { Some(#x) })
+        .unwrap_or_else(|| quote! { None });
 
     let protected_attributes = settings.protected_attributes();
     let plaintext_attributes = settings.plaintext_attributes();
     let ident = settings.ident();
+
+    let is_partition_key_encrypted = protected_attributes.contains(&partition_key_field.as_str());
+    let is_sort_key_encrypted = settings
+        .sort_key_field
+        .as_ref()
+        .map(|x| protected_attributes.contains(&x.as_str()))
+        .unwrap_or(true);
 
     let into_unsealed_impl = protected_attributes
         .iter()
@@ -35,7 +49,14 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
 
     let sort_key_impl = if let Some(sort_key_field) = &settings.sort_key_field {
         let sort_key_attr = format_ident!("{sort_key_field}");
-        quote! { format!("{}#{}", Self::type_name(), self.#sort_key_attr) }
+
+        quote! {
+            if let Some(prefix) = Self::sort_key_prefix() {
+                format!("{}#{}", prefix, self.#sort_key_attr)
+            } else {
+                self.#sort_key_attr.clone()
+            }
+        }
     } else {
         quote! { Self::type_name().into() }
     };
@@ -51,12 +72,28 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
         impl cryptonamo::traits::Encryptable for #ident {
             #primary_key_impl
 
+            #[inline]
             fn type_name() -> &'static str {
                 #type_name
             }
 
             fn sort_key(&self) -> String {
                 #sort_key_impl
+            }
+
+            #[inline]
+            fn sort_key_prefix() -> Option<&'static str> {
+                #sort_key_prefix
+            }
+
+            #[inline]
+            fn is_partition_key_encrypted() -> bool {
+                #is_partition_key_encrypted
+            }
+
+            #[inline]
+            fn is_sort_key_encrypted() -> bool {
+                #is_sort_key_encrypted
             }
 
             fn partition_key(&self) -> String {
@@ -71,6 +108,7 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
                 vec![#(#plaintext_attributes,)*]
             }
 
+            #[allow(clippy::needless_question_mark)]
             fn into_sealer(self) -> Result<cryptonamo::crypto::Sealer<Self>, cryptonamo::crypto::SealError> {
                 Ok(cryptonamo::crypto::Sealer::new_with_descriptor(self, Self::type_name())
                     #(#into_unsealed_impl?)*)

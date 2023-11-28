@@ -15,7 +15,8 @@ pub(crate) enum AttributeMode {
 
 pub(crate) struct Settings {
     ident: Ident,
-    pub(crate) sort_key_prefix: String,
+    pub(crate) sort_key_prefix: Option<String>,
+    pub(crate) type_name: String,
     pub(crate) sort_key_field: Option<String>,
     pub(crate) partition_key_field: Option<String>,
     protected_attributes: Vec<String>,

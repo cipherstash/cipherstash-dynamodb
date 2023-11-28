@@ -3,10 +3,28 @@ use proc_macro2::{Ident, Span};
 use std::collections::HashMap;
 use syn::{Data, DeriveInput, Fields, LitStr};
 
+enum SortKeyPrefix {
+    Default,
+    Value(String),
+    None,
+}
+
+impl SortKeyPrefix {
+    fn into_prefix(self, default: &str) -> Option<String> {
+        match self {
+            Self::Default => Some(default.to_string()),
+            Self::Value(v) => Some(v),
+            Self::None => None,
+        }
+    }
+}
+
+const RESERVED_FIELD_NAMES: &'static [&'static str] = &["term"];
+
 pub(crate) struct SettingsBuilder {
     ident: Ident,
     type_name: String,
-    sort_key_prefix: Option<String>,
+    sort_key_prefix: SortKeyPrefix,
     sort_key_field: Option<String>,
     partition_key_field: Option<String>,
     protected_attributes: Vec<String>,
@@ -33,7 +51,7 @@ impl SettingsBuilder {
         Self {
             ident: input.ident.clone(),
             type_name,
-            sort_key_prefix: None,
+            sort_key_prefix: SortKeyPrefix::Default,
             sort_key_field: None,
             partition_key_field: None,
             protected_attributes: Vec::new(),
@@ -54,9 +72,22 @@ impl SettingsBuilder {
                     match ident.as_deref() {
                         Some("sort_key_prefix") => {
                             let value = meta.value()?;
-                            let t: LitStr = value.parse()?;
-                            let v = t.value().to_string();
-                            self.set_sort_key_prefix(v)
+
+                            if let Ok(t) = value.parse::<LitStr>() {
+                                let v = t.value().to_string();
+                                self.set_sort_key_prefix(v)?;
+                                return Ok(());
+                            }
+
+                            if let Ok(t) = value.parse::<Ident>() {
+                                let v = t.to_string();
+
+                                if v == "None" {
+                                    self.sort_key_prefix = SortKeyPrefix::None;
+                                }
+                            }
+
+                            Ok(())
                         }
                         Some("partition_key") => {
                             let value = meta.value()?;
@@ -85,6 +116,9 @@ impl SettingsBuilder {
                     .flat_map(|x| x.ident.as_ref().map(|x| x.to_string()))
                     .collect();
 
+                let explicit_pk = all_field_names.contains(&String::from("pk"));
+                let explicit_sk = all_field_names.contains(&String::from("sk"));
+
                 let mut compound_indexes: HashMap<String, Vec<(String, String, Span)>> =
                     Default::default();
 
@@ -92,18 +126,79 @@ impl SettingsBuilder {
                     let ident = &field.ident;
                     let mut attr_mode = AttributeMode::Protected;
 
+                    let field_name = ident
+                        .as_ref()
+                        .ok_or_else(|| {
+                            syn::Error::new_spanned(
+                                field,
+                                "internal error: identifier was not Some",
+                            )
+                        })?
+                        .to_string();
+
+                    if field_name.starts_with("__") {
+                        return Err(syn::Error::new_spanned(
+                            field,
+                            format!(
+                                "Invalid field '{field_name}': fields must not be prefixed with __"
+                            ),
+                        ));
+                    }
+
+                    if RESERVED_FIELD_NAMES.contains(&field_name.as_str()) {
+                        return Err(syn::Error::new_spanned(
+                            field,
+                            format!(
+                                "Invalid field '{field_name}': name is reserved for internal use"
+                            ),
+                        ));
+                    }
+
+                    if field_name == "pk" {
+                        let has_partition_key_attr = field
+                            .attrs
+                            .iter()
+                            .find(|x| x.path().is_ident("partition_key"))
+                            .is_some();
+
+                        if !has_partition_key_attr {
+                            return Err(syn::Error::new_spanned(
+                                field,
+                                format!("field named 'pk' must be annotated with #[partition_key]"),
+                            ));
+                        }
+                    }
+
+                    if field_name == "sk" {
+                        let has_partition_key_attr = field
+                            .attrs
+                            .iter()
+                            .find(|x| x.path().is_ident("sort_key"))
+                            .is_some();
+
+                        if !has_partition_key_attr {
+                            return Err(syn::Error::new_spanned(
+                                field,
+                                format!("field named 'sk' must be annotated with #[sort_key]"),
+                            ));
+                        }
+                    }
+
                     // Parse the meta for the field
                     for attr in &field.attrs {
                         if attr.path().is_ident("sort_key") {
-                            let field_name = ident
-                                .as_ref()
-                                .ok_or_else(|| {
-                                    syn::Error::new_spanned(
-                                        field,
-                                        "internal error: identifier was not Some",
-                                    )
-                                })?
-                                .to_string();
+                            if explicit_sk && field_name != "sk" {
+                                return Err(syn::Error::new_spanned(
+                                    field,
+                                    format!("field '{field_name}' cannot be used as sort key as struct contains field named 'sk' which must be used")
+                                ));
+                            }
+
+                            if explicit_sk {
+                                // if the 'sk' field is set then there should be no prefix
+                                // otherwise when deserialising the sk value would be incorrect
+                                self.sort_key_prefix = SortKeyPrefix::None;
+                            }
 
                             if let Some(f) = &self.sort_key_field {
                                 return Err(syn::Error::new_spanned(
@@ -112,19 +207,16 @@ impl SettingsBuilder {
                                 ));
                             }
 
-                            self.sort_key_field = Some(field_name);
+                            self.sort_key_field = Some(field_name.clone());
                         }
 
                         if attr.path().is_ident("partition_key") {
-                            let field_name = ident
-                                .as_ref()
-                                .ok_or_else(|| {
-                                    syn::Error::new_spanned(
-                                        field,
-                                        "internal error: identifier was not Some",
-                                    )
-                                })?
-                                .to_string();
+                            if explicit_pk && field_name != "pk" {
+                                return Err(syn::Error::new_spanned(
+                                    field,
+                                    format!("field '{field_name}' cannot be used as partition key as struct contains field named 'pk' which must be used")
+                                ));
+                            }
 
                             if let Some(f) = &self.partition_key_field {
                                 return Err(syn::Error::new_spanned(
@@ -133,7 +225,7 @@ impl SettingsBuilder {
                                 ));
                             }
 
-                            self.partition_key_field = Some(field_name);
+                            self.partition_key_field = Some(field_name.clone());
                         }
 
                         if attr.path().is_ident("cryptonamo") {
@@ -255,7 +347,7 @@ impl SettingsBuilder {
             indexes,
         } = self;
 
-        let sort_key_prefix = sort_key_prefix.unwrap_or(type_name);
+        let sort_key_prefix = sort_key_prefix.into_prefix(&type_name);
 
         let partition_key = partition_key.ok_or_else(|| {
             syn::Error::new(
@@ -267,6 +359,7 @@ impl SettingsBuilder {
         Ok(Settings {
             ident,
             sort_key_prefix,
+            type_name,
             sort_key_field,
             partition_key_field: Some(partition_key), // TODO: Remove the Some
             protected_attributes,
@@ -277,7 +370,7 @@ impl SettingsBuilder {
     }
 
     pub(crate) fn set_sort_key_prefix(&mut self, value: String) -> Result<(), syn::Error> {
-        self.sort_key_prefix = Some(value);
+        self.sort_key_prefix = SortKeyPrefix::Value(value);
         Ok(())
     }
 

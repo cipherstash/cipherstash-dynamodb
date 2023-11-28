@@ -6,7 +6,7 @@ use std::future::Future;
 mod common;
 
 #[derive(Encryptable, Decryptable, Searchable, Debug, PartialEq, Ord, PartialOrd, Eq)]
-#[cryptonamo(sort_key_prefix = "user-something")]
+#[cryptonamo(sort_key_prefix = None)]
 pub struct User {
     #[partition_key]
     pub tenant_id: String,

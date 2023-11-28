@@ -10,6 +10,7 @@ use crate::{
         Decryptable, PrimaryKey, PrimaryKeyParts, ReadConversionError, Searchable,
         WriteConversionError,
     },
+    Encryptable,
 };
 use aws_sdk_dynamodb::{
     types::{AttributeValue, Delete, Put, TransactWriteItem},
@@ -44,6 +45,8 @@ pub enum PutError {
     Seal(#[from] SealError),
     #[error("CryptoError: {0}")]
     Crypto(#[from] CryptoError),
+    #[error("Encryption Error: {0}")]
+    Encryption(#[from] EncryptionError),
 }
 
 #[derive(Error, Debug)]
@@ -115,13 +118,28 @@ impl EncryptedTable {
         QueryBuilder::new(self)
     }
 
+    fn get_primary_key_parts<T: Encryptable>(
+        &self,
+        k: impl Into<T::PrimaryKey>,
+    ) -> Result<PrimaryKeyParts, EncryptionError> {
+        let PrimaryKeyParts { mut pk, mut sk } = k.into().into_parts::<T>();
+
+        if T::is_partition_key_encrypted() {
+            pk = hmac("pk", &pk, None, &self.cipher)?;
+        }
+
+        if T::is_sort_key_encrypted() {
+            sk = hmac("sk", &sk, Some(pk.as_str()), &self.cipher)?;
+        }
+
+        Ok(PrimaryKeyParts { pk, sk })
+    }
+
     pub async fn get<T>(&self, k: impl Into<T::PrimaryKey>) -> Result<Option<T>, GetError>
     where
         T: Decryptable,
     {
-        let PrimaryKeyParts { pk, sk } = k.into().into_parts(T::type_name());
-
-        let pk = encrypt_partition_key(&pk, &self.cipher)?;
+        let PrimaryKeyParts { pk, sk } = self.get_primary_key_parts::<T>(k)?;
 
         let result = self
             .db
@@ -131,7 +149,7 @@ impl EncryptedTable {
             .key("sk", AttributeValue::S(sk))
             .send()
             .await
-            .map_err(|e| GetError::Aws(e.to_string()))?;
+            .map_err(|e| GetError::Aws(format!("{e:?}")))?;
 
         let sealed: Option<Sealed> = result.item.map(Sealed::try_from).transpose()?;
 
@@ -146,18 +164,20 @@ impl EncryptedTable {
         &self,
         k: impl Into<E::PrimaryKey>,
     ) -> Result<(), DeleteError> {
-        let PrimaryKeyParts { pk, sk } = k.into().into_parts(E::type_name());
+        let PrimaryKeyParts { pk, sk } = self.get_primary_key_parts::<E>(k)?;
 
-        let pk = AttributeValue::S(encrypt_partition_key(&pk, &self.cipher)?);
+        let sk_to_delete = all_index_keys::<E>(&sk)
+            .into_iter()
+            .map(|x| hmac("sk", &x, Some(pk.as_str()), &self.cipher))
+            .chain([Ok(sk)])
+            .collect::<Result<Vec<_>, _>>()?;
 
-        let sk_to_delete = all_index_keys::<E>(&sk).into_iter().into_iter().chain([sk]);
-
-        let transact_items = sk_to_delete.map(|sk| {
+        let transact_items = sk_to_delete.into_iter().map(|sk| {
             TransactWriteItem::builder()
                 .delete(
                     Delete::builder()
                         .table_name(&self.table_name)
-                        .key("pk", pk.clone())
+                        .key("pk", AttributeValue::S(pk.clone()))
                         .key("sk", AttributeValue::S(sk))
                         .build(),
                 )
@@ -171,7 +191,7 @@ impl EncryptedTable {
                 .set_transact_items(Some(items.collect()))
                 .send()
                 .await
-                .map_err(|e| DeleteError::Aws(e.to_string()))?;
+                .map_err(|e| DeleteError::Aws(format!("{e:?}")))?;
         }
 
         Ok(())
@@ -184,9 +204,8 @@ impl EncryptedTable {
     {
         let mut seen_sk = HashSet::new();
 
-        let sk = record.sort_key();
         let sealer: Sealer<T> = record.into_sealer()?;
-        let (pk, sealed) = sealer.seal(&self.cipher, 12).await?;
+        let (PrimaryKeyParts { pk, sk }, sealed) = sealer.seal(&self.cipher, 12).await?;
 
         // TODO: Use a combinator
         let mut items: Vec<TransactWriteItem> = Vec::with_capacity(sealed.len());
@@ -207,6 +226,8 @@ impl EncryptedTable {
         }
 
         for index_sk in all_index_keys::<T>(&sk) {
+            let index_sk = hmac("sk", &index_sk, Some(pk.as_str()), &self.cipher)?;
+
             if seen_sk.contains(&index_sk) {
                 continue;
             }
@@ -231,7 +252,7 @@ impl EncryptedTable {
                 .set_transact_items(Some(items.to_vec()))
                 .send()
                 .await
-                .map_err(|e| PutError::Aws(e.to_string()))?;
+                .map_err(|e| PutError::Aws(format!("{e:?}")))?;
         }
 
         Ok(())

@@ -1,6 +1,7 @@
-use super::{encrypt_partition_key, SealError, Sealed, Unsealed, MAX_TERMS_PER_INDEX};
+use super::{hmac, SealError, Sealed, Unsealed, MAX_TERMS_PER_INDEX};
 use crate::{
     encrypted_table::{TableAttribute, TableEntry},
+    traits::PrimaryKeyParts,
     Searchable,
 };
 use cipherstash_client::{
@@ -54,16 +55,28 @@ impl<T> Sealer<T> {
         self,
         cipher: &Encryption<C>,
         term_length: usize, // TODO: SealError
-    ) -> Result<(String, Vec<Sealed>), SealError>
+    ) -> Result<(PrimaryKeyParts, Vec<Sealed>), SealError>
     where
         C: Credentials<Token = ViturToken>,
         T: Searchable,
     {
-        let pk = encrypt_partition_key(&self.inner.partition_key(), cipher).unwrap(); // FIXME
-        let sk = self.inner.sort_key();
+        let mut pk = self.inner.partition_key();
+        let mut sk = self.inner.sort_key();
 
-        let mut table_entry =
-            TableEntry::new_with_attributes(pk.clone(), sk, None, self.unsealed.unprotected());
+        if T::is_partition_key_encrypted() {
+            pk = hmac("pk", &pk, None, cipher)?;
+        }
+
+        if T::is_sort_key_encrypted() {
+            sk = hmac("sk", &sk, Some(pk.as_str()), cipher)?;
+        }
+
+        let mut table_entry = TableEntry::new_with_attributes(
+            pk.clone(),
+            sk.clone(),
+            None,
+            self.unsealed.unprotected(),
+        );
 
         let protected = T::protected_attributes()
             .iter()
@@ -77,11 +90,16 @@ impl<T> Sealer<T> {
             .zip(T::protected_attributes().into_iter())
             .for_each(|(enc, name)| {
                 if let Some(e) = enc {
-                    table_entry.add_attribute(name, e.into());
+                    table_entry.add_attribute(
+                        match name {
+                            "pk" => "__pk",
+                            "sk" => "__sk",
+                            _ => name,
+                        },
+                        e.into(),
+                    );
                 }
             });
-
-        let sort_key = self.inner.sort_key();
 
         let protected_indexes = T::protected_indexes();
         let terms: Vec<(&&str, Vec<u8>)> = protected_indexes
@@ -94,15 +112,14 @@ impl<T> Sealer<T> {
                     })
                     .ok_or(SealError::MissingAttribute(index_name.to_string()))
                     .and_then(|(attr, index, index_name)| {
-                        cipher
-                            .compound_index(
-                                &CompoundIndex::new(index),
-                                attr,
-                                Some(format!("{}#{}", T::type_name(), index_name)),
-                                term_length,
-                            )
-                            .map_err(SealError::CryptoError)
-                            .map(|result| (index_name, result))
+                        let term = cipher.compound_index(
+                            &CompoundIndex::new(index),
+                            attr,
+                            Some(format!("{}#{}", T::type_name(), index_name)),
+                            term_length,
+                        )?;
+
+                        Ok::<_, SealError>((index_name, term))
                     })
             })
             .map(|index_term| match index_term {
@@ -120,18 +137,23 @@ impl<T> Sealer<T> {
             .enumerate()
             .take(MAX_TERMS_PER_INDEX)
             .map(|(i, (index_name, term))| {
-                Sealed(
+                Ok(Sealed(
                     table_entry
                         .clone()
                         .set_term(hex::encode(term))
                         // TODO: HMAC the sort key, too (users#index_name#pk)
-                        .set_sk(format!("{}#{}#{}", &sort_key, index_name, i)),
-                )
+                        .set_sk(hmac(
+                            "sk",
+                            &format!("{}#{}#{}", &sk, index_name, i),
+                            Some(pk.as_str()),
+                            cipher,
+                        )?),
+                ))
             })
-            .chain(once(Sealed(table_entry.clone())))
-            .collect();
+            .chain(once(Ok(Sealed(table_entry.clone()))))
+            .collect::<Result<_, SealError>>()?;
 
-        Ok((pk, table_entries))
+        Ok((PrimaryKeyParts { pk, sk }, table_entries))
     }
 
     #[allow(dead_code)]

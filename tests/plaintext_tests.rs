@@ -11,6 +11,7 @@ mod common;
 pub struct User {
     #[cryptonamo(query = "exact", compound = "email#name")]
     #[cryptonamo(query = "exact")]
+    #[cryptonamo(plaintext)]
     #[partition_key]
     pub email: String,
 
@@ -44,10 +45,9 @@ async fn run_test<F: Future<Output = ()>>(mut f: impl FnMut(EncryptedTable) -> F
 
     let client = aws_sdk_dynamodb::Client::new(&config);
 
-    let table_name = "test-users-pk";
+    let table_name = "test-users-plaintext-email";
 
     common::create_table(&client, table_name).await;
-
     let table = EncryptedTable::init(client, table_name)
         .await
         .expect("Failed to init table");
