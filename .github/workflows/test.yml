@@ -1,0 +1,91 @@
+name: "Test Rust"
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash -l {0}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      dynamo:
+        image: amazon/dynamodb-local
+        ports: 8000:8000
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: rust-cargo-${{ hashFiles('**/Cargo.lock') }}-test
+          restore-keys: |
+            rust-cargo-${{ hashFiles('**/Cargo.lock') }}-test
+            rust-cargo-${{ hashFiles('**/Cargo.lock') }}-
+            rust-cargo-
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: rust-cargo-${{ hashFiles('**/Cargo.lock') }}-format
+          restore-keys: |
+            rust-cargo-${{ hashFiles('**/Cargo.lock') }}-format
+            rust-cargo-${{ hashFiles('**/Cargo.lock') }}-
+            rust-cargo-
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: rust-cargo-${{ hashFiles('**/Cargo.lock') }}-format
+          restore-keys: |
+            rust-cargo-${{ hashFiles('**/Cargo.lock') }}-format
+            rust-cargo-${{ hashFiles('**/Cargo.lock') }}-
+            rust-cargo-
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --all --no-deps --all-features --tests
