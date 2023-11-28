@@ -208,6 +208,21 @@ impl ViturConfigBuilder {
 
         self
     }
+
+    pub fn with_config(
+        mut self,
+        client_id: &str,
+        client_secret: &str,
+        workspace_id: &str,
+        client_access_key: &str,
+    ) -> Self {
+        self.client_id = Some(client_id.to_owned());
+        self.client_key = Some(client_secret.to_owned());
+        self.workspace_id = Some(workspace_id.to_owned());
+        self.access_key = Some(client_access_key.to_owned());
+
+        self
+    }
 }
 
 #[derive(Clone)]

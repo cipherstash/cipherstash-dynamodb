@@ -116,7 +116,7 @@ pub enum SupportedOperators {
 }
 
 impl SupportedOperators {
-    fn to_vec(self) -> Vec<(String, Vec<Operator>)> {
+    fn into_vec(self) -> Vec<(String, Vec<Operator>)> {
         match self {
             Self::Simple(field, operators) => vec![(field, operators)],
             Self::Compound(fields) => fields,
@@ -124,7 +124,12 @@ impl SupportedOperators {
     }
 
     fn add(self, other: Self) -> Self {
-        Self::Compound(self.to_vec().into_iter().chain(other.to_vec()).collect())
+        Self::Compound(
+            self.into_vec()
+                .into_iter()
+                .chain(other.into_vec())
+                .collect(),
+        )
     }
 }
 
@@ -273,14 +278,10 @@ impl ComposableIndex for PrefixIndex {
             Accumulator::Terms(terms) => {
                 terms
                     .into_iter()
-                    .fold(Ok(Accumulator::empty()), |acc, term| {
-                        if let Ok(acc) = acc {
-                            indexer
-                                .index_with_salt(&plaintext, term)
-                                .map(|out| acc.add(out))
-                        } else {
-                            acc
-                        }
+                    .try_fold(Accumulator::empty(), |acc, term| {
+                        indexer
+                            .index_with_salt(&plaintext, term)
+                            .map(|out| acc.add(out))
                     })
             }
         }

@@ -163,7 +163,7 @@ mod tests {
         let result =
             indexer.query_with_salt(&Plaintext::Utf8Str(Some("Hello".to_string())), &[])?;
 
-        assert_eq!(result.exactly_one()?.term().len(), 32);
+        assert_eq!(result.exactly_one()?.term()?.len(), 32);
 
         Ok(())
     }

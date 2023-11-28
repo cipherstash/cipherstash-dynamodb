@@ -46,8 +46,7 @@ impl UniqueIndexer {
                     .token_filters
                     .iter()
                     .fold(utf_str.to_string(), |s, filter| filter.process_single(s));
-                let plaintext = Plaintext::Utf8Str(Some(filtered_string));
-                plaintext.to_vec()
+                Plaintext::from(filtered_string).to_vec()
             }
 
             x => x.to_vec(),
@@ -78,10 +77,10 @@ mod tests {
         let indexer = UniqueIndexer::new([1; 32], vec![TokenFilter::Downcase]);
 
         let first = indexer
-            .encrypt(&Plaintext::Utf8Str(Some("hello WORLD".into())))
+            .encrypt(&"hello WORLD".into())
             .expect("Failed to encrypt");
         let second = indexer
-            .encrypt(&Plaintext::Utf8Str(Some("HELLO world".into())))
+            .encrypt(&"HELLO world".into())
             .expect("Failed to encrypt");
 
         assert_eq!(first, second);

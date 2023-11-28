@@ -830,6 +830,7 @@ dependencies = [
  "vitur-client",
  "vitur-config",
  "vitur-protocol",
+ "zeroize",
 ]
 
 [[package]]
@@ -2000,6 +2001,7 @@ dependencies = [
 [[package]]
 name = "ore-rs"
 version = "0.7.0"
+source = "git+https://github.com/cipherstash/ore.rs#602baccc86d417184fbb1db6b7d6a47237e8fede"
 dependencies = [
  "aes",
  "block-modes",
