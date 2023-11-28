@@ -19,7 +19,7 @@ jobs:
     services:
       dynamo:
         image: amazon/dynamodb-local
-        ports: 8000:8000
+        ports: "8000:8000"
 
     steps:
       - uses: actions/checkout@v2
