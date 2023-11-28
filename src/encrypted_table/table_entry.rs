@@ -217,7 +217,8 @@ impl_simple_conversions! {
     String => String,
     Bytes => Vec<u8>,
     StringVec => Vec<String>,
-    ByteVec => Vec<Vec<u8>>
+    ByteVec => Vec<Vec<u8>>,
+    Bool => bool
 }
 
 impl From<TableAttribute> for AttributeValue {
