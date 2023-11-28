@@ -25,7 +25,10 @@ use schema::{column::IndexType, operator::Operator, ColumnType};
 use vitur_client::{EncryptPayload, EncryptedRecord};
 
 // Re-exports
-pub use self::{errors::{EncryptionError, TypeParseError}, plaintext::Plaintext};
+pub use self::{
+    errors::{EncryptionError, TypeParseError},
+    plaintext::Plaintext,
+};
 
 pub struct Encryption<C: Credentials<Token = ViturToken> = ViturCredentials> {
     // This field is public in order for the Driver to be able to cache
@@ -225,7 +228,7 @@ impl<Creds: Credentials<Token = ViturToken>> Encryption<Creds> {
             .compose_query(self.root_key, input.into(), acc)?
             .exactly_one()?
             .truncate(term_length)?
-            .into())
+            .try_into()?)
     }
 
     pub fn index(
@@ -305,11 +308,13 @@ impl IndexTerm {
         }
     }
 
+    /// Get the index term as a vector of binary terms.
+    /// If the term is a single binary term, it will be wrapped in a vec.
     pub fn as_binary_vec(self) -> Option<Vec<Vec<u8>>> {
-        if let Self::BinaryVec(x) = self {
-            Some(x)
-        } else {
-            None
+        match self {
+            Self::BinaryVec(x) => Some(x),
+            Self::Binary(x) => Some(vec![x]),
+            _ => None,
         }
     }
 }
@@ -371,7 +376,7 @@ mod tests {
     #[tokio::test]
     async fn test_round_trip_single() -> Result<(), Box<dyn std::error::Error>> {
         let encryption = create_test_encryption();
-        let value = Plaintext::Utf8Str(Some("hello cipher".to_string()));
+        let value = "hello cipher".into();
         let ciphertext = encryption.encrypt_single(&value, "desc").await?;
         assert_eq!(
             value,
@@ -387,11 +392,7 @@ mod tests {
     async fn test_round_trip_bulk_decrypt() -> Result<(), Box<dyn std::error::Error>> {
         let encryption = create_test_encryption();
 
-        let plaintexts = vec![
-            Plaintext::Utf8Str(Some("a".to_string())),
-            Plaintext::Utf8Str(Some("b".to_string())),
-            Plaintext::Utf8Str(Some("c".to_string())),
-        ];
+        let plaintexts = vec!["a".into(), "b".into(), "c".into()];
 
         let mut ciphertexts: Vec<String> = Default::default();
         for (i, plaintext) in plaintexts.iter().enumerate() {
@@ -414,9 +415,9 @@ mod tests {
     async fn test_round_trip_bulk_maybe_decrypt() -> Result<(), Box<dyn std::error::Error>> {
         let encryption = create_test_encryption();
 
-        let p1 = Plaintext::Utf8Str(Some("a".to_string()));
-        let p2 = Plaintext::Utf8Str(Some("b".to_string()));
-        let p3 = Plaintext::Utf8Str(Some("c".to_string()));
+        let p1 = "a".into();
+        let p2 = "b".into();
+        let p3 = "c".into();
 
         let mut ciphertexts: Vec<Option<String>> = Default::default();
         for (i, plaintext) in vec![&p1, &p2, &p3].into_iter().enumerate() {

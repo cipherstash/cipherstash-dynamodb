@@ -2,9 +2,10 @@ use super::errors::TypeParseError;
 use chrono::{DateTime, Datelike, NaiveDate, TimeZone, Utc};
 use rust_decimal::Decimal;
 use schema::ColumnType;
+use zeroize::Zeroize;
 
-pub mod from_conversion;
-pub mod to_conversion;
+mod from_conversion;
+mod to_conversion;
 
 const VERSION: u8 = 1;
 
@@ -21,6 +22,7 @@ const NAIVE_DATE_TYPE: u8 = 9;
 const NULL_FLAGS_MASK: u8 = 0b10000000;
 const VARIANT_FLAGS_MASK: u8 = NULL_FLAGS_MASK ^ 0b11111111;
 
+// TODO: Implement Zeroize for Plaintext
 #[derive(Debug, PartialEq, Clone)]
 pub enum Plaintext {
     BigInt(Option<i64>),
@@ -32,6 +34,58 @@ pub enum Plaintext {
     SmallInt(Option<i16>),
     Timestamp(Option<DateTime<Utc>>),
     Utf8Str(Option<String>),
+}
+
+/// Lifted directly from the `zeroize` crate.
+///
+/// This method is used to make sure the compiler will correctly order operations so that
+/// non-zeroes don't get read when something is being zeroized.
+#[inline(always)]
+fn atomic_fence() {
+    std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
+}
+
+impl Zeroize for Plaintext {
+    fn zeroize(&mut self) {
+        match self {
+            Self::Timestamp(x) => unsafe {
+                // DatTime<Utc> is completely stack allocated so safe to just write zeroes
+                std::ptr::write_volatile(x, std::mem::zeroed());
+                std::ptr::write_volatile(x, None);
+                atomic_fence();
+            },
+
+            Self::NaiveDate(x) => unsafe {
+                // NaiveDate is completely stack allocated so safe to just write zeroes
+                std::ptr::write_volatile(x, std::mem::zeroed());
+                std::ptr::write_volatile(x, None);
+                atomic_fence();
+            },
+
+            Self::Decimal(x) => unsafe {
+                // Decimal is completely stack allocated so safe to just write zeroes
+                std::ptr::write_volatile(x, std::mem::zeroed());
+                std::ptr::write_volatile(x, None);
+                atomic_fence();
+            },
+
+            // The following have existing zeroize impls
+            Self::BigInt(x) => x.zeroize(),
+            Self::Boolean(x) => x.zeroize(),
+            Self::Float(x) => x.zeroize(),
+            Self::Int(x) => x.zeroize(),
+            Self::SmallInt(x) => x.zeroize(),
+            Self::Utf8Str(x) => x.zeroize(),
+        }
+    }
+}
+
+impl Drop for Plaintext {
+    // ZeroizeOnDrop only works when all branches implement Zeroize.
+    // Since we manually implement Zeroize it's easier to just zerize on drop manually.
+    fn drop(&mut self) {
+        self.zeroize();
+    }
 }
 
 impl Plaintext {
@@ -295,8 +349,45 @@ mod tests {
     fn test_round_trip_utf8str() -> Result<(), Box<dyn std::error::Error>> {
         let result =
             Plaintext::from_slice(&Plaintext::Utf8Str(Some("John Doe".to_string())).to_vec())?;
-        assert!(matches!(result, Plaintext::Utf8Str(val) if val == Some("John Doe".to_string())));
+        assert!(
+            matches!(result, Plaintext::Utf8Str(ref val) if val == &Some("John Doe".to_string()))
+        );
 
         Ok(())
+    }
+
+    #[test]
+    fn test_zeroize_should_not_panic() {
+        let mut x = Plaintext::from(false);
+        x.zeroize();
+        assert_eq!(x, Plaintext::Boolean(None));
+
+        let mut x = Plaintext::from(10_i16);
+        x.zeroize();
+        assert_eq!(x, Plaintext::SmallInt(None));
+
+        let mut x = Plaintext::from(10_i32);
+        x.zeroize();
+        assert_eq!(x, Plaintext::Int(None));
+
+        let mut x = Plaintext::from(10_i64);
+        x.zeroize();
+        assert_eq!(x, Plaintext::BigInt(None));
+
+        let mut x = Plaintext::from(10_f64);
+        x.zeroize();
+        assert_eq!(x, Plaintext::Float(None));
+
+        let mut x = Plaintext::from(DateTime::<Utc>::MAX_UTC);
+        x.zeroize();
+        assert_eq!(x, Plaintext::Timestamp(None));
+
+        let mut x = Plaintext::from(NaiveDate::MAX);
+        x.zeroize();
+        assert_eq!(x, Plaintext::NaiveDate(None));
+
+        let mut x = Plaintext::from("Hello!");
+        x.zeroize();
+        assert_eq!(x, Plaintext::Utf8Str(None));
     }
 }

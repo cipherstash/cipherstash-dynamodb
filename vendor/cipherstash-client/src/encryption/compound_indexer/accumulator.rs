@@ -20,11 +20,15 @@ pub enum Accumulator {
 pub struct ExactlyOneAccumulator(Accumulator);
 
 impl ExactlyOneAccumulator {
-    pub fn term(self) -> Vec<u8> {
+    pub fn term(self) -> Result<Vec<u8>, AccumulatorError> {
         match self.0 {
-            Accumulator::Term(term) => term,
+            Accumulator::Term(term) => Ok(term),
             Accumulator::Terms(terms) => {
-                unreachable!("Expected exactly one term, found {:?}", terms)
+                if terms.is_empty() {
+                    Err(AccumulatorError::EmptyAccumulator)
+                } else {
+                    Err(AccumulatorError::MultipleTermsFound)
+                }
             }
         }
     }
@@ -101,8 +105,10 @@ impl From<Accumulator> for IndexTerm {
     }
 }
 
-impl From<ExactlyOneAccumulator> for IndexTerm {
-    fn from(acc: ExactlyOneAccumulator) -> Self {
-        IndexTerm::Binary(acc.term())
+impl TryFrom<ExactlyOneAccumulator> for IndexTerm {
+    type Error = AccumulatorError;
+
+    fn try_from(acc: ExactlyOneAccumulator) -> Result<Self, Self::Error> {
+        Ok(IndexTerm::Binary(acc.term()?))
     }
 }

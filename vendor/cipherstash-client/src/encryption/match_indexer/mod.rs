@@ -119,7 +119,7 @@ mod tests {
             let index_key = [0u8; 32];
             let indexer =
                 MatchIndexer::new(index_key, tokenizer.clone(), token_filters.to_vec(), *k, *m);
-            let term = indexer.encrypt(&Plaintext::Utf8Str(Some("Dan Draper".to_string())))?;
+            let term = indexer.encrypt(&"Dan Draper".into())?;
             assert!(matches!(term, IndexTerm::BitMap(_)));
         } else {
             panic!()
