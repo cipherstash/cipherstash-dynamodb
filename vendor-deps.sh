@@ -15,7 +15,6 @@ cargo vendor
     grep -xv "vitur-client" |\
     grep -xv "vitur-config" |\
     grep -xv "vitur-protocol" |\
-    grep -xv "ore-rs" |\
     grep -xv "recipher" |\
     xargs rm -r
 )
