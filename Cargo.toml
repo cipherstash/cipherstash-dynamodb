@@ -25,12 +25,9 @@ cipherstash-client = { path = "./vendor/cipherstash-client/", features = [ "toki
 # cipherstash-client = { git = "ssh://git@github.com/cipherstash/cipherstash-suite.git", branch = "feat/compound-spike", package = "cipherstash-client", features = [ "tokio" ] }
 
 async-trait = "0.1.73"
-serde_with = "3.3.0"
 log = "0.4.20"
-env_logger = "0.10.0"
 itertools = "0.11.0"
 thiserror = "1.0.50"
-tokio-stream = "0.1.14"
 
 [dev-dependencies]
 serial_test = "2.0.0"
@@ -38,3 +35,4 @@ trybuild = "1.0.85"
 tracing = { version = "0.1", features = ["log"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
 aws-config = { version = "1.0.1", features = [ "behavior-version-latest" ] }
+env_logger = "0.10.0"
