@@ -22,7 +22,6 @@ use cipherstash_client::{
     encryption::{Encryption, EncryptionError},
     vitur::{errors::LoadConfigError, DatasetConfigWithIndexRootKey, Vitur},
 };
-use itertools::Itertools;
 use log::info;
 use std::collections::HashSet;
 use thiserror::Error;
@@ -39,6 +38,8 @@ pub struct EncryptedTable {
 pub enum PutError {
     #[error("AwsError: {0}")]
     Aws(String),
+    #[error("AwsBuildError: {0}")]
+    AwsBuildError(#[from] aws_sdk_dynamodb::error::BuildError),
     #[error("Write Conversion Error: {0}")]
     WriteConversion(#[from] WriteConversionError),
     #[error("SealError: {0}")]
@@ -65,6 +66,8 @@ pub enum GetError {
 pub enum DeleteError {
     #[error("Encryption Error: {0}")]
     Encryption(#[from] EncryptionError),
+    #[error("AwsBuildError: {0}")]
+    AwsBuildError(#[from] aws_sdk_dynamodb::error::BuildError),
     #[error("AwsError: {0}")]
     Aws(String),
 }
@@ -166,29 +169,32 @@ impl EncryptedTable {
     ) -> Result<(), DeleteError> {
         let PrimaryKeyParts { pk, sk } = self.get_primary_key_parts::<E>(k)?;
 
-        let sk_to_delete = all_index_keys::<E>(&sk)
+        let transact_items = all_index_keys::<E>(&sk)
             .into_iter()
-            .map(|x| hmac("sk", &x, Some(pk.as_str()), &self.cipher))
+            .map(|x| Ok::<_, DeleteError>(hmac("sk", &x, Some(pk.as_str()), &self.cipher)?))
             .chain([Ok(sk)])
+            .map(|sk| {
+                sk.and_then(|sk| {
+                    Ok::<_, DeleteError>(
+                        TransactWriteItem::builder()
+                            .delete(
+                                Delete::builder()
+                                    .table_name(&self.table_name)
+                                    .key("pk", AttributeValue::S(pk.clone()))
+                                    .key("sk", AttributeValue::S(sk))
+                                    .build()?,
+                            )
+                            .build(),
+                    )
+                })
+            })
             .collect::<Result<Vec<_>, _>>()?;
-
-        let transact_items = sk_to_delete.into_iter().map(|sk| {
-            TransactWriteItem::builder()
-                .delete(
-                    Delete::builder()
-                        .table_name(&self.table_name)
-                        .key("pk", AttributeValue::S(pk.clone()))
-                        .key("sk", AttributeValue::S(sk))
-                        .build(),
-                )
-                .build()
-        });
 
         // Dynamo has a limit of 100 items per transaction
         for items in transact_items.chunks(100).into_iter() {
             self.db
                 .transact_write_items()
-                .set_transact_items(Some(items.collect()))
+                .set_transact_items(Some(items.to_vec()))
                 .send()
                 .await
                 .map_err(|e| DeleteError::Aws(format!("{e:?}")))?;
@@ -219,7 +225,7 @@ impl EncryptedTable {
                         Put::builder()
                             .table_name(&self.table_name)
                             .set_item(Some(entry.try_into()?))
-                            .build(),
+                            .build()?,
                     )
                     .build(),
             );
@@ -239,7 +245,7 @@ impl EncryptedTable {
                             .table_name(&self.table_name)
                             .key("pk", AttributeValue::S(pk.clone()))
                             .key("sk", AttributeValue::S(index_sk))
-                            .build(),
+                            .build()?,
                     )
                     .build(),
             );

@@ -16,37 +16,43 @@ pub async fn create_table(client: &Client, table_name: &str) {
             AttributeDefinition::builder()
                 .attribute_name("pk")
                 .attribute_type(ScalarAttributeType::S)
-                .build(),
+                .build()
+                .expect("Failed to build attribute definition"),
         )
         .attribute_definitions(
             AttributeDefinition::builder()
                 .attribute_name("sk")
                 .attribute_type(ScalarAttributeType::S)
-                .build(),
+                .build()
+                .expect("Failed to build attribute definition"),
         )
         .attribute_definitions(
             AttributeDefinition::builder()
                 .attribute_name("term")
                 .attribute_type(ScalarAttributeType::S)
-                .build(),
+                .build()
+                .expect("Failed to build attribute definition"),
         )
         .key_schema(
             KeySchemaElement::builder()
                 .attribute_name("pk")
                 .key_type(KeyType::Hash)
-                .build(),
+                .build()
+                .expect("Failed to build key schema element"),
         )
         .key_schema(
             KeySchemaElement::builder()
                 .attribute_name("sk")
                 .key_type(KeyType::Range)
-                .build(),
+                .build()
+                .expect("Failed to build key schema element"),
         )
         .provisioned_throughput(
             ProvisionedThroughput::builder()
                 .read_capacity_units(5)
                 .write_capacity_units(5)
-                .build(),
+                .build()
+                .expect("Failed to build provisioned throughput"),
         )
         .global_secondary_indexes(
             GlobalSecondaryIndex::builder()
@@ -55,7 +61,8 @@ pub async fn create_table(client: &Client, table_name: &str) {
                     KeySchemaElement::builder()
                         .attribute_name("term")
                         .key_type(KeyType::Hash)
-                        .build(),
+                        .build()
+                        .expect("Failed to build key schema element"),
                 )
                 .projection(
                     Projection::builder()
@@ -66,9 +73,11 @@ pub async fn create_table(client: &Client, table_name: &str) {
                     ProvisionedThroughput::builder()
                         .read_capacity_units(5)
                         .write_capacity_units(5)
-                        .build(),
+                        .build()
+                        .expect("Failed to build provisioned throughput"),
                 )
-                .build(),
+                .build()
+                .expect("Failed to build index"),
         )
         .send()
         .await
