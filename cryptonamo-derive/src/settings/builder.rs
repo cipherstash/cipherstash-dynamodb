@@ -352,7 +352,7 @@ impl SettingsBuilder {
         let partition_key = partition_key.ok_or_else(|| {
             syn::Error::new(
                 proc_macro2::Span::call_site(),
-                "Missing required attribute: #[cryptonamo(partition_key = \"...\")]",
+                "Missing required attribute: #[partition_key]",
             )
         })?;
 
