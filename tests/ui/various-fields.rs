@@ -21,11 +21,7 @@ struct Crazy {
     #[cryptonamo(query = "exact")]
     ct_e: bool,
     #[cryptonamo(query = "exact")]
-    ct_f: u64,
-    #[cryptonamo(query = "exact")]
-    ct_g: u32,
-    #[cryptonamo(query = "exact")]
-    ct_h: u16,
+    ct_h: u64,
 
     #[cryptonamo(plaintext)]
     pt_a: i64,
