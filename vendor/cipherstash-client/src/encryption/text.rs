@@ -56,10 +56,7 @@ fn process_standard(text: String) -> Vec<String> {
 
 #[allow(dead_code)]
 pub(super) fn split_on_whitespace(text: String) -> Vec<String> {
-    text.split_whitespace()
-        .into_iter()
-        .map(|s| s.to_string())
-        .collect()
+    text.split_whitespace().map(|s| s.to_string()).collect()
 }
 
 /// Simpler version of an edgegram which does not perform any filtering on the text

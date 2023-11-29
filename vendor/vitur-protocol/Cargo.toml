@@ -25,7 +25,7 @@ version = "1.0.150"
 features = ["derive"]
 
 [dependencies.vitur-config]
-path = "../vitur-config/"
+path = "../vitur-config"
 
 [dev-dependencies]
 serde_json = "1.0.89"
