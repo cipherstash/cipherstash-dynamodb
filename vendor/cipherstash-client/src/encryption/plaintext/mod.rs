@@ -18,6 +18,7 @@ const SMALLINT_TYPE: u8 = 6;
 const TIMESTAMP_TYPE: u8 = 7;
 const UTF8STR_TYPE: u8 = 8;
 const NAIVE_DATE_TYPE: u8 = 9;
+const BIGUINT_TYPE: u8 = 10;
 
 const NULL_FLAGS_MASK: u8 = 0b10000000;
 const VARIANT_FLAGS_MASK: u8 = NULL_FLAGS_MASK ^ 0b11111111;
@@ -26,6 +27,7 @@ const VARIANT_FLAGS_MASK: u8 = NULL_FLAGS_MASK ^ 0b11111111;
 #[derive(Debug, PartialEq, Clone)]
 pub enum Plaintext {
     BigInt(Option<i64>),
+    BigUInt(Option<u64>),
     Boolean(Option<bool>),
     Decimal(Option<Decimal>),
     Float(Option<f64>),
@@ -71,6 +73,7 @@ impl Zeroize for Plaintext {
 
             // The following have existing zeroize impls
             Self::BigInt(x) => x.zeroize(),
+            Self::BigUInt(x) => x.zeroize(),
             Self::Boolean(x) => x.zeroize(),
             Self::Float(x) => x.zeroize(),
             Self::Int(x) => x.zeroize(),
@@ -110,6 +113,7 @@ impl Plaintext {
         // Append
         match self {
             Self::BigInt(Some(value)) => out.append(&mut value.to_be_bytes().to_vec()),
+            Self::BigUInt(Some(value)) => out.append(&mut value.to_be_bytes().to_vec()),
             Self::Boolean(Some(value)) => out.push(u8::from(*value)),
             Self::Decimal(Some(value)) => out.append(&mut value.serialize().to_vec()),
             Self::Float(Some(value)) => out.append(&mut value.to_be_bytes().to_vec()),
@@ -217,6 +221,7 @@ impl Plaintext {
     pub fn flags(&self) -> u8 {
         match self {
             Self::BigInt(Some(_)) => BIGINT_TYPE,
+            Self::BigUInt(Some(_)) => BIGUINT_TYPE,
             Self::Boolean(Some(_)) => BOOLEAN_TYPE,
             Self::Decimal(Some(_)) => DECIMAL_TYPE,
             Self::Float(Some(_)) => FLOAT_TYPE,
@@ -227,6 +232,7 @@ impl Plaintext {
             Self::Utf8Str(Some(_)) => UTF8STR_TYPE,
 
             Self::BigInt(None) => NULL_FLAGS_MASK | BIGINT_TYPE,
+            Self::BigUInt(None) => NULL_FLAGS_MASK | BIGUINT_TYPE,
             Self::Boolean(None) => NULL_FLAGS_MASK | BOOLEAN_TYPE,
             Self::Decimal(None) => NULL_FLAGS_MASK | DECIMAL_TYPE,
             Self::Float(None) => NULL_FLAGS_MASK | FLOAT_TYPE,

@@ -1,5 +1,3 @@
-use std::num::TryFromIntError;
-
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 
@@ -14,7 +12,7 @@ macro_rules! impl_try_from_plaintext {
 
                 fn try_from(value: Plaintext) -> Result<Self, Self::Error> {
                     match value {
-                        Plaintext::$variant(Some(ref v)) => Ok(v.to_owned()),
+                        Plaintext::$variant(Some(ref v)) => Ok(v.to_owned().into()),
                         _ => Err(TypeParseError(concat!("Cannot convert type to ", stringify!($ty)).to_string())),
                     }
                 }
@@ -25,7 +23,7 @@ macro_rules! impl_try_from_plaintext {
 
                 fn try_from(value: Plaintext) -> Result<Self, Self::Error> {
                     match value {
-                        Plaintext::$variant(ref x) => Ok(x.clone()),
+                        Plaintext::$variant(ref x) => Ok(x.clone().into()),
                         _ => Err(TypeParseError(concat!("Cannot convert type to ", stringify!($ty)).to_string())),
                     }
                 }
@@ -38,46 +36,15 @@ impl_try_from_plaintext! {
     i64 => BigInt,
     i32 => Int,
     i16 => SmallInt,
+
+    u64 => BigUInt,
+
     f64 => Float,
     Decimal => Decimal,
     NaiveDate => NaiveDate,
     DateTime<Utc> => Timestamp,
     bool => Boolean,
     String => Utf8Str
-}
-
-macro_rules! impl_try_from_int {
-    ($($ty:ty => ($($variant:ident),*)),*) => {
-        $(
-            impl TryFrom<Plaintext> for $ty {
-                type Error = TypeParseError;
-
-                fn try_from(value: Plaintext) -> Result<Self, Self::Error> {
-                    match value {
-                        $(Plaintext::$variant(Some(x)) => x.try_into().map_err(|e: TryFromIntError| TypeParseError(e.to_string())),)*
-                        _ => Err(TypeParseError(concat!("Cannot convert type to ", stringify!($ty)).to_string())),
-                    }
-                }
-            }
-
-            impl TryFrom<Plaintext> for Option<$ty> {
-                type Error = TypeParseError;
-
-                fn try_from(value: Plaintext) -> Result<Self, Self::Error> {
-                    match value {
-                        $(Plaintext::$variant(x) => x.map(|y| y.try_into().map_err(|e: TryFromIntError| TypeParseError(e.to_string()))).transpose(),)*
-                        _ => Err(TypeParseError(concat!("Cannot convert type to ", stringify!($ty)).to_string())),
-                    }
-                }
-            }
-        )*
-    }
-}
-
-impl_try_from_int! {
-    u64 => (BigInt, Int, SmallInt),
-    u32 => (BigInt, Int, SmallInt),
-    u16 => (BigInt, Int, SmallInt)
 }
 
 #[cfg(test)]

@@ -40,10 +40,7 @@ impl_from! {
     Decimal => Decimal,
     NaiveDate => NaiveDate,
     DateTime<Utc> => Timestamp,
-    // These are a not particularly nice because u64 could overflow a BigInt
-    u64 => BigInt,
-    u32 => BigInt,
-    u16 => Int
+    u64 => BigUInt
 }
 
 impl From<&str> for Plaintext {
