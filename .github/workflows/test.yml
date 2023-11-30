@@ -63,11 +63,10 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: rust-cargo-${{ hashFiles('**/Cargo.lock') }}-format
+          key: format-rust-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            rust-cargo-${{ hashFiles('**/Cargo.lock') }}-format
-            rust-cargo-${{ hashFiles('**/Cargo.lock') }}-
-            rust-cargo-
+            format-rust-cargo-${{ hashFiles('**/Cargo.lock') }}
+            format-rust-cargo-
 
       - uses: actions-rs/cargo@v1
         with:
@@ -87,9 +86,9 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: rust-cargo-${{ hashFiles('**/Cargo.lock') }}-format
+          key: rust-cargo-${{ hashFiles('**/Cargo.lock') }}-clippy
           restore-keys: |
-            rust-cargo-${{ hashFiles('**/Cargo.lock') }}-format
+            rust-cargo-${{ hashFiles('**/Cargo.lock') }}-clippy
             rust-cargo-${{ hashFiles('**/Cargo.lock') }}-
             rust-cargo-
 
