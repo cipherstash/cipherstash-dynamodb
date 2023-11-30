@@ -1,3 +1,5 @@
+use std::num::TryFromIntError;
+
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 
