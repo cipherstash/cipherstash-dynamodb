@@ -148,6 +148,7 @@ impl Plaintext {
         match is_null {
             true => match variant {
                 BIGINT_TYPE => Ok(Self::BigInt(None)),
+                BIGUINT_TYPE => Ok(Self::BigUInt(None)),
                 BOOLEAN_TYPE => Ok(Self::Boolean(None)),
                 DECIMAL_TYPE => Ok(Self::Decimal(None)),
                 FLOAT_TYPE => Ok(Self::Float(None)),
@@ -166,6 +167,14 @@ impl Plaintext {
                             .map_err(|_| TypeParseError::make(bytes, variant))?,
                     );
                     Ok(Self::BigInt(Some(val)))
+                }
+                BIGUINT_TYPE => {
+                    let val = u64::from_be_bytes(
+                        bytes
+                            .try_into()
+                            .map_err(|_| TypeParseError::make(bytes, variant))?,
+                    );
+                    Ok(Self::BigUInt(Some(val)))
                 }
                 BOOLEAN_TYPE => {
                     if bytes.len() != 1 || bytes[0] > 1 {
@@ -286,6 +295,14 @@ mod tests {
     fn test_round_trip_bigint() -> Result<(), Box<dyn std::error::Error>> {
         let result = Plaintext::from_slice(&Plaintext::BigInt(Some(1234567)).to_vec())?;
         assert!(matches!(result, Plaintext::BigInt(Some(1234567))));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_round_trip_uint() -> Result<(), Box<dyn std::error::Error>> {
+        let result = Plaintext::from_slice(&Plaintext::BigUInt(Some(1234567)).to_vec())?;
+        assert!(matches!(result, Plaintext::BigUInt(Some(1234567))));
 
         Ok(())
     }
