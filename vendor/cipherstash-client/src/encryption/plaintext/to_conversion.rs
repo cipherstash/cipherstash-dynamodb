@@ -2,18 +2,12 @@ use super::{Plaintext, PlaintextNullVariant};
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 
-/// Trait for converting `Self` into `Plaintext`
-pub trait ToPlaintext: super::PlaintextNullVariant {
-    /// Converts `Self` into `Plaintext`
-    fn to_plaintext(self) -> Plaintext;
-}
-
 macro_rules! impl_from {
     ($($ty:ty => $variant:ident),*) => {
         $(
-            impl ToPlaintext for $ty {
-                fn to_plaintext(self) -> Plaintext {
-                    Plaintext::$variant(Some(self as _))
+            impl From<$ty> for Plaintext {
+                fn from(value: $ty) -> Self {
+                    Plaintext::$variant(Some(value as _))
                 }
             }
         )*
@@ -33,48 +27,22 @@ impl_from! {
     u64 => BigUInt
 }
 
-impl ToPlaintext for &str {
-    fn to_plaintext(self) -> Plaintext {
-        self.to_owned().to_plaintext()
+impl From<&str> for Plaintext {
+    fn from(value: &str) -> Self {
+        Plaintext::Utf8Str(Some(value.to_owned()))
     }
 }
 
-/// Blanket implementation for all references
-/// where the referenced type is clonable and implements `ToPlaintext`.
-impl<T> ToPlaintext for &T
+impl<T> From<Option<T>> for Plaintext
 where
-    T: ToPlaintext + Clone,
-    for<'r> &'r T: super::PlaintextNullVariant,
+    T: Into<Plaintext> + PlaintextNullVariant,
 {
-    fn to_plaintext(self) -> Plaintext {
-        self.clone().to_plaintext()
-    }
-}
-
-/// Blanket implementation for `Option<T>` where
-/// `T` implements `ToPlaintext`.
-impl<T> ToPlaintext for Option<T>
-where
-    T: ToPlaintext,
-    Option<T>: PlaintextNullVariant,
-{
-    fn to_plaintext(self) -> Plaintext {
-        if let Some(value) = self {
-            value.to_plaintext()
+    fn from(value: Option<T>) -> Self {
+        if let Some(value) = value {
+            value.into()
         } else {
-            Self::null()
+            T::null()
         }
-    }
-}
-
-/// Blanket implementation of `From<T>` for all
-/// `T` that implements `ToPlaintext`
-impl<T> From<T> for Plaintext
-where
-    T: ToPlaintext,
-{
-    fn from(value: T) -> Self {
-        value.to_plaintext()
     }
 }
 

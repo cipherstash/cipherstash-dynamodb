@@ -36,7 +36,7 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                .add_protected(#attr, |x| cryptonamo::traits::Plaintext::from(&x.#attr_ident))
+                .add_protected(#attr, |x| cryptonamo::traits::Plaintext::from(x.#attr_ident.to_owned()))
             }
         })
         .chain(plaintext_attributes.iter().map(|attr| {
