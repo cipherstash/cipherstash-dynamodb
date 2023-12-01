@@ -2,10 +2,9 @@ use super::{Plaintext, PlaintextNullVariant};
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 
-/// This trait works as a proxy for implementing `From<T> for Plaintext`.
-/// TODO Bla bla blanket impl on Option<T> and implementing From<T> for generic container types
+/// Trait for converting `Self` into `Plaintext`
 pub trait ToPlaintext: super::PlaintextNullVariant {
-    /// Converts Self into Plaintext
+    /// Converts `Self` into `Plaintext`
     fn to_plaintext(self) -> Plaintext;
 }
 
@@ -41,7 +40,7 @@ impl ToPlaintext for &str {
 }
 
 /// Blanket implementation for all references
-/// where the referenced type is clonable and implements ToPlaintext.
+/// where the referenced type is clonable and implements `ToPlaintext`.
 impl<T> ToPlaintext for &T
 where
     T: ToPlaintext + Clone,
@@ -52,8 +51,8 @@ where
     }
 }
 
-/// Blanket implementation for Option<T> where
-/// T implements ToPlaintext.
+/// Blanket implementation for `Option<T>` where
+/// `T` implements `ToPlaintext`.
 impl<T> ToPlaintext for Option<T>
 where
     T: ToPlaintext,
@@ -68,8 +67,8 @@ where
     }
 }
 
-/// Blanket implementation of From<T> for all
-/// T that implements ToPlaintext
+/// Blanket implementation of `From<T>` for all
+/// `T` that implements `ToPlaintext`
 impl<T> From<T> for Plaintext
 where
     T: ToPlaintext,

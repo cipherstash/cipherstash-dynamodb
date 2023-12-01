@@ -6,7 +6,9 @@ use rust_decimal::Decimal;
 use super::{Plaintext, PlaintextNullVariant};
 use crate::encryption::errors::TypeParseError;
 
+/// Trait for converting `Plaintext` to `Self`
 pub trait TryFromPlaintext: Sized {
+    /// Try to convert `value` to `Self`
     fn try_from_plaintext(value: &Plaintext) -> Result<Self, TypeParseError>;
 }
 
@@ -40,10 +42,15 @@ impl_try_from_plaintext! {
     String => Utf8Str
 }
 
+/// Blanket implementation of `Option<T>` for all `T` that implements `TryFromPlaintext`.
 impl<T> TryFromPlaintext for Option<T>
 where
     T: TryFromPlaintext + PlaintextNullVariant,
 {
+    /// Returns an error if the `Plaintext` variant of `value` and `<T as PlaintextNullVariant>::null()` doesn't match
+    /// or if `TryFromPlaintext::try_from_plaintext` returns an error.
+    /// Returns `None` if the inner `Option` in `value` is `None`
+    /// Returns `Ok(Some(Self))` if `Plaintext` value could successfully be converted
     fn try_from_plaintext(value: &Plaintext) -> Result<Self, TypeParseError> {
         match (value, T::null()) {
             // Return OK(None) if the inner value is None
