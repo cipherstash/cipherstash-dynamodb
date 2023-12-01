@@ -27,7 +27,7 @@ use vitur_client::{EncryptPayload, EncryptedRecord};
 // Re-exports
 pub use self::{
     errors::{EncryptionError, TypeParseError},
-    plaintext::Plaintext,
+    plaintext::{Plaintext, PlaintextNullVariant, ToPlaintext, TryFromPlaintext},
 };
 
 pub struct Encryption<C: Credentials<Token = ViturToken> = ViturCredentials> {
