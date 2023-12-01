@@ -10,6 +10,12 @@ macro_rules! impl_from {
                     Plaintext::$variant(Some(value as _))
                 }
             }
+
+            impl From<&$ty> for Plaintext {
+                fn from(value: &$ty) -> Self {
+                    Plaintext::$variant(Some(value.to_owned() as _))
+                }
+            }
         )*
     };
 }
