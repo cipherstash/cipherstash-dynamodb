@@ -321,17 +321,6 @@ impl PlaintextNullVariant for &str {
     }
 }
 
-/// Blanket implementation for all references
-/// where the referenced type implements `ToPlaintext`.
-impl<T> PlaintextNullVariant for &T
-where
-    T: PlaintextNullVariant,
-{
-    fn null() -> Plaintext {
-        T::null()
-    }
-}
-
 /// Blanket implementation for `Option<T>` where
 /// `T` implements `PlaintextNullVariant`.
 impl<T> PlaintextNullVariant for Option<T>
