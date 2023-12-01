@@ -7,7 +7,6 @@ use zeroize::Zeroize;
 mod from_conversion;
 mod to_conversion;
 pub use from_conversion::TryFromPlaintext;
-pub use to_conversion::ToPlaintext;
 
 const VERSION: u8 = 1;
 
