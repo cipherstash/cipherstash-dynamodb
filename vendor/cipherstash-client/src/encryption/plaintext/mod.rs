@@ -6,6 +6,8 @@ use zeroize::Zeroize;
 
 mod from_conversion;
 mod to_conversion;
+pub use from_conversion::TryFromPlaintext;
+pub use to_conversion::ToPlaintext;
 
 const VERSION: u8 = 1;
 
@@ -280,6 +282,64 @@ impl Plaintext {
 
     pub fn to_inner_from_ref<T: TryFrom<Plaintext>>(&self) -> Result<T, T::Error> {
         self.clone().to_inner()
+    }
+}
+
+pub trait PlaintextNullVariant {
+    /// Returns Self's corresponding Plaintext variant with None
+    fn null() -> Plaintext;
+}
+
+macro_rules! impl_null_variant {
+    ($($ty:ty => $variant:ident),*) => {
+        $(
+            impl PlaintextNullVariant for $ty {
+                fn null() -> Plaintext {
+                    Plaintext::$variant(None)
+                }
+            }
+        )*
+    };
+}
+
+impl_null_variant! {
+    String => Utf8Str,
+    bool => Boolean,
+    i64 => BigInt,
+    i32 => Int,
+    i16 => SmallInt,
+    f64 => Float,
+    Decimal => Decimal,
+    NaiveDate => NaiveDate,
+    DateTime<Utc> => Timestamp,
+    u64 => BigUInt
+}
+
+impl PlaintextNullVariant for &str {
+    fn null() -> Plaintext {
+        Plaintext::Utf8Str(None)
+    }
+}
+
+/// Blanket implementation for all references
+/// where the referenced type is clonable and implements ToPlaintext.
+impl<T> PlaintextNullVariant for &T
+where
+    T: PlaintextNullVariant,
+{
+    fn null() -> Plaintext {
+        T::null()
+    }
+}
+
+/// Blanket implementation for Option<T> where
+/// T implements ToPlaintext.
+impl<T> PlaintextNullVariant for Option<T>
+where
+    T: PlaintextNullVariant,
+{
+    fn null() -> Plaintext {
+        T::null()
     }
 }
 

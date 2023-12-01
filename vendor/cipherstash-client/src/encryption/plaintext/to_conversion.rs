@@ -1,29 +1,20 @@
-use super::Plaintext;
+use super::{Plaintext, PlaintextNullVariant};
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
+
+/// This trait works as a proxy for implementing `From<T> for Plaintext`.
+/// TODO Bla bla blanket impl on Option<T> and implementing From<T> for generic container types
+pub trait ToPlaintext: super::PlaintextNullVariant {
+    /// Converts Self into Plaintext
+    fn to_plaintext(self) -> Plaintext;
+}
 
 macro_rules! impl_from {
     ($($ty:ty => $variant:ident),*) => {
         $(
-            impl From<$ty> for Plaintext {
-                fn from(value: $ty) -> Self {
-                    Plaintext::$variant(Some(value as _))
-                }
-            }
-
-            impl From<&$ty> for Plaintext {
-                fn from(value: &$ty) -> Self {
-                    Plaintext::$variant(Some(value.to_owned() as _))
-                }
-            }
-
-            impl From<Option<$ty>> for Plaintext {
-                fn from(value: Option<$ty>) -> Self {
-                    if let Some(v) = value {
-                        v.into()
-                    } else {
-                        Plaintext::$variant(None)
-                    }
+            impl ToPlaintext for $ty {
+                fn to_plaintext(self) -> Plaintext {
+                    Plaintext::$variant(Some(self as _))
                 }
             }
         )*
@@ -43,9 +34,48 @@ impl_from! {
     u64 => BigUInt
 }
 
-impl From<&str> for Plaintext {
-    fn from(value: &str) -> Self {
-        value.to_string().into()
+impl ToPlaintext for &str {
+    fn to_plaintext(self) -> Plaintext {
+        self.to_owned().to_plaintext()
+    }
+}
+
+/// Blanket implementation for all references
+/// where the referenced type is clonable and implements ToPlaintext.
+impl<T> ToPlaintext for &T
+where
+    T: ToPlaintext + Clone,
+    for<'r> &'r T: super::PlaintextNullVariant,
+{
+    fn to_plaintext(self) -> Plaintext {
+        self.clone().to_plaintext()
+    }
+}
+
+/// Blanket implementation for Option<T> where
+/// T implements ToPlaintext.
+impl<T> ToPlaintext for Option<T>
+where
+    T: ToPlaintext,
+    Option<T>: PlaintextNullVariant,
+{
+    fn to_plaintext(self) -> Plaintext {
+        if let Some(value) = self {
+            value.to_plaintext()
+        } else {
+            Self::null()
+        }
+    }
+}
+
+/// Blanket implementation of From<T> for all
+/// T that implements ToPlaintext
+impl<T> From<T> for Plaintext
+where
+    T: ToPlaintext,
+{
+    fn from(value: T) -> Self {
+        value.to_plaintext()
     }
 }
 
@@ -62,6 +92,12 @@ mod test {
 
                 let plaintext_ref: Plaintext = Plaintext::from(&$value);
                 assert_eq!(plaintext_ref, Plaintext::$variant(Some($value.clone())));
+
+                let plaintext_opt_some: Plaintext = Some($value).into();
+                assert_eq!(plaintext_opt_some, Plaintext::$variant(Some($value)));
+
+                let plaintext_opt_none: Plaintext = None::<$ty>.into();
+                assert_eq!(plaintext_opt_none, Plaintext::$variant(None));
             }
         };
     }
