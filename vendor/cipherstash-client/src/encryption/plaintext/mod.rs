@@ -285,8 +285,9 @@ impl Plaintext {
     }
 }
 
+/// Trait that defines the `None` or `Null` `Plaintext` variant of the implementing type.
 pub trait PlaintextNullVariant {
-    /// Returns Self's corresponding Plaintext variant with None
+    /// Returns Self's corresponding `Plaintext` variant with None
     fn null() -> Plaintext;
 }
 
@@ -322,7 +323,7 @@ impl PlaintextNullVariant for &str {
 }
 
 /// Blanket implementation for all references
-/// where the referenced type is clonable and implements ToPlaintext.
+/// where the referenced type implements `ToPlaintext`.
 impl<T> PlaintextNullVariant for &T
 where
     T: PlaintextNullVariant,
@@ -332,8 +333,8 @@ where
     }
 }
 
-/// Blanket implementation for Option<T> where
-/// T implements ToPlaintext.
+/// Blanket implementation for `Option<T>` where
+/// `T` implements `PlaintextNullVariant`.
 impl<T> PlaintextNullVariant for Option<T>
 where
     T: PlaintextNullVariant,
