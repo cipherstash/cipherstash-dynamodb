@@ -1,0 +1,101 @@
+name: "Test Rust"
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash -l {0}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      dynamo:
+        image: amazon/dynamodb-local
+        ports:
+          - 8000:8000
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: rust-cargo-v1-${{ hashFiles('**/Cargo.lock') }}-test
+          restore-keys: |
+            rust-cargo-v1-${{ hashFiles('**/Cargo.lock') }}-test
+            rust-cargo-v1-${{ hashFiles('**/Cargo.lock') }}-
+            rust-cargo-v1-
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+        env:
+          CS_WORKSPACE_ID: ${{ secrets.CS_WORKSPACE_ID }}
+          CS_CLIENT_ACCESS_KEY: ${{ secrets.CS_CLIENT_ACCESS_KEY }}
+          CS_CLIENT_ID: ${{ secrets.CS_CLIENT_ID }}
+          CS_CLIENT_KEY: ${{ secrets.CS_CLIENT_KEY }}
+          CS_VITUR_IDP_HOST: "https://ap-southeast-2.aws.auth.viturhosted.net"
+          AWS_ACCESS_KEY_ID: cryptonamo
+          AWS_SECRET_ACCESS_KEY: cryptonamo
+          AWS_REGION: ap-southeast-2
+          RUST_BACKTRACE: full
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: format-rust-cargo-v1-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            format-rust-cargo-v1-${{ hashFiles('**/Cargo.lock') }}
+            format-rust-cargo-v1-
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: rust-cargo-v1-${{ hashFiles('**/Cargo.lock') }}-clippy
+          restore-keys: |
+            rust-cargo-v1-${{ hashFiles('**/Cargo.lock') }}-clippy
+            rust-cargo-v1-${{ hashFiles('**/Cargo.lock') }}-
+            rust-cargo-v1-
+
+      - uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --all --no-deps --all-features --tests
