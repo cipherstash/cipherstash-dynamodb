@@ -1,5 +1,4 @@
-use cryptonamo::{Encryptable, EncryptedTable};
-use cryptonamo_derive::{Decryptable, Searchable};
+use cryptonamo::{Encryptable, Decryptable, Searchable, EncryptedTable};
 use itertools::Itertools;
 use serial_test::serial;
 use std::future::Future;
