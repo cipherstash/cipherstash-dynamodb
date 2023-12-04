@@ -50,7 +50,7 @@ where
     /// Returns an error if the `Plaintext` variant of `value` and `<T as PlaintextNullVariant>::null()` doesn't match
     /// or if `TryFromPlaintext::try_from_plaintext` returns an error.
     /// Returns `None` if the inner `Option` in `value` is `None`
-    /// Returns `Ok(Some(Self))` if `Plaintext` value could successfully be converted
+    /// Returns `Ok(Some(Self))` if `Plaintext` value was successfully be converted
     fn try_from_plaintext(value: &Plaintext) -> Result<Self, TypeParseError> {
         match (value, T::null()) {
             // Return OK(None) if the inner value is None
