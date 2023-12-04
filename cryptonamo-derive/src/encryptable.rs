@@ -54,7 +54,7 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
             if let Some(prefix) = Self::sort_key_prefix() {
                 format!("{}#{}", prefix, self.#sort_key_attr)
             } else {
-                self.#sort_key_attr.clone()
+                self.#sort_key_attr.to_string()
             }
         }
     } else {
