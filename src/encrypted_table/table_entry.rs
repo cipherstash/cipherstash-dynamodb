@@ -59,6 +59,12 @@ impl TableEntry {
     }
 }
 
+/// Trait for converting `TableAttribute` to `Self`
+pub trait TryFromTableAttr: Sized {
+    /// Try to convert `value` to `Self`
+    fn try_from_table_attr(value: TableAttribute) -> Result<Self, ReadConversionError>;
+}
+
 #[derive(Debug, Clone)]
 pub enum TableAttribute {
     String(String),
@@ -69,7 +75,6 @@ pub enum TableAttribute {
     StringVec(Vec<String>),
     ByteVec(Vec<Vec<u8>>),
     NumberVec(Vec<String>),
-
     Map(HashMap<String, TableAttribute>),
     List(Vec<TableAttribute>),
 
@@ -86,139 +91,260 @@ impl TableAttribute {
     }
 }
 
-macro_rules! impl_option_conversion {
-    ($($type:ty),*) => {
-        $(
-            impl From<Option<$type>> for TableAttribute {
-                fn from(value: Option<$type>) -> Self {
-                    if let Some(value) = value {
-                        value.into()
-                    } else {
-                        TableAttribute::Null
-                    }
-                }
+macro_rules! impl_try_from_table_attr_helper {
+    (number_parse, $ty:ty, $value:ident) => {
+        $value
+            .parse()
+            .map_err(|_| ReadConversionError::ConversionFailed(stringify!($ty).to_string()))
+    };
+    (simple_parse, $_:ty, $value:ident) => {
+        Ok::<_, ReadConversionError>($value)
+    };
+    (number_from, $_:ident, $value:ident) => {
+        TableAttribute::Number($value.to_string())
+    };
+    (simple_from, $variant:ident, $value:ident) => {
+        TableAttribute::$variant($value)
+    };
+    (
+        body,
+        $ty:ty,
+        $variant:ident,
+        $from_impl:ident!($from_args:tt),
+        $try_from_impl:ident!($try_from_args:tt)
+    ) => {
+        impl From<$ty> for TableAttribute {
+            fn from(value: $ty) -> Self {
+                $from_impl!($from_args, $variant, value)
             }
+        }
 
-            impl TryFrom<TableAttribute> for Option<$type> {
-                type Error = ReadConversionError;
+        impl TryFromTableAttr for $ty {
+            fn try_from_table_attr(value: TableAttribute) -> Result<Self, ReadConversionError> {
+                let TableAttribute::$variant(value) = value else {
+                    return Err(ReadConversionError::ConversionFailed(
+                        stringify!($ty).to_string(),
+                    ));
+                };
 
-                fn try_from(value: TableAttribute) -> Result<Self, Self::Error> {
-                    if let TableAttribute::Null = value {
-                        return Ok(None);
-                    }
-
-                    value.try_into().map(Some)
-                }
+                $try_from_impl!($try_from_args, $ty, value)
             }
-        )*
+        }
     };
 }
 
-macro_rules! impl_number_conversions {
-    ($($type:ty),*) => {
-        $(
-            impl From<$type> for TableAttribute {
-                fn from(v: $type) -> Self {
-                    Self::Number(v.to_string())
-                }
-            }
+macro_rules! impl_try_from_table_attr {
+    () => {};
+    (, $($tail:tt)*) => {
+        impl_try_from_table_attr!($($tail)*);
+    };
+    ($ty:ty => Number $($tail:tt)*) => {
+        impl_try_from_table_attr_helper!(
+            body,
+            $ty,
+            Number,
+            impl_try_from_table_attr_helper!(
+                number_from
+            ),
+            impl_try_from_table_attr_helper!(
+                number_parse
+            )
+        );
 
-            impl From<Vec<$type>> for TableAttribute {
-                fn from(v: Vec<$type>) -> Self {
-                    Self::NumberVec(v.into_iter().map(|x| x.to_string()).collect())
-                }
-            }
+        impl_try_from_table_attr!($($tail)*);
+    };
+    ($ty:ty => $variant:ident $($tail:tt)*) => {
+        impl_try_from_table_attr_helper!(
+            body,
+            $ty,
+            $variant,
+            impl_try_from_table_attr_helper!(
+                simple_from
+            ),
+            impl_try_from_table_attr_helper!(
+                simple_parse
+            )
+        );
 
-            impl From<&$type> for TableAttribute {
-                fn from(v: &$type) -> Self {
-                    Self::Number(v.to_string())
-                }
-            }
-
-            impl TryFrom<TableAttribute> for Vec<$type> {
-                type Error = ReadConversionError;
-
-                fn try_from(value: TableAttribute) -> Result<Self, Self::Error> {
-                    if let TableAttribute::NumberVec(x) = value {
-                        x.into_iter().map(|x| x.parse().map_err(|_| ReadConversionError::ConversionFailed(stringify!($type).to_string()))).collect::<Result<_, _>>()
-                    } else {
-                        Err(ReadConversionError::ConversionFailed(stringify!($type).to_string()))
-                    }
-                }
-            }
-
-            impl TryFrom<TableAttribute> for $type {
-                type Error = ReadConversionError;
-
-                fn try_from(value: TableAttribute) -> Result<Self, Self::Error> {
-                    if let TableAttribute::Number(x) = value {
-                        x.parse().map_err(|_| ReadConversionError::ConversionFailed(stringify!($type).to_string()))
-                    } else {
-                        Err(ReadConversionError::ConversionFailed(stringify!($type).to_string()))
-                    }
-                }
-            }
-
-            impl_option_conversion! {
-                $type,
-                Vec<$type>
-            }
-        )*
-    }
+        impl_try_from_table_attr!($($tail)*);
+    };
 }
 
-macro_rules! impl_simple_conversions {
-    ($($variant:ident => $type:ty),*) => {
-            $(
-                impl From<$type> for TableAttribute {
-                    fn from(v: $type) -> Self {
-                        TableAttribute::$variant(v)
-                    }
-                }
-
-                impl From<&$type> for TableAttribute {
-                    fn from(v: &$type) -> Self {
-                        TableAttribute::$variant(v.to_owned())
-                    }
-                }
-
-                impl TryFrom<TableAttribute> for $type {
-                    type Error = ReadConversionError;
-
-                    fn try_from(v: TableAttribute) -> Result<Self, Self::Error> {
-                        if let TableAttribute::$variant(x) = v {
-                            Ok(x.into())
-                        } else {
-                            Err(ReadConversionError::ConversionFailed(stringify!($type).to_string()))
-                        }
-                    }
-                }
-
-                impl_option_conversion! {
-                    $type
-                }
-            )*
-    }
-}
-
-impl_number_conversions! {
-    i16,
-    i32,
-    i64,
-    u16,
-    u32,
-    u64,
-    usize,
-    f32,
-    f64
-}
-
-impl_simple_conversions! {
+// The following implementations are covered by the blanket implementation on Vec<T>
+// Vec<String> => StringVec,
+// Vec<some number type> => NumberVec,
+// Vec<Vec<u8>> => ByteVec,
+impl_try_from_table_attr!(
+    i16 => Number,
+    i32 => Number,
+    i64 => Number,
+    u16 => Number,
+    u32 => Number,
+    u64 => Number,
+    usize => Number,
+    f32 => Number,
+    f64  => Number,
     String => String,
-    Bytes => Vec<u8>,
-    StringVec => Vec<String>,
-    ByteVec => Vec<Vec<u8>>,
-    Bool => bool
+    Vec<u8> => Bytes,
+    bool => Bool
+);
+
+impl<T> TryFromTableAttr for Option<T>
+where
+    T: TryFromTableAttr,
+{
+    fn try_from_table_attr(value: TableAttribute) -> Result<Self, ReadConversionError> {
+        if matches!(value, TableAttribute::Null) {
+            Ok(None)
+        } else {
+            Ok(Some(T::try_from_table_attr(value)?))
+        }
+    }
+}
+
+impl<T> TryFromTableAttr for Vec<T>
+where
+    T: TryFromTableAttr,
+{
+    fn try_from_table_attr(value: TableAttribute) -> Result<Self, ReadConversionError> {
+        match value {
+            TableAttribute::StringVec(v) => v
+                .into_iter()
+                .map(TableAttribute::String)
+                .map(T::try_from_table_attr)
+                .collect(),
+            TableAttribute::ByteVec(v) => v
+                .into_iter()
+                .map(TableAttribute::Bytes)
+                .map(T::try_from_table_attr)
+                .collect(),
+            TableAttribute::NumberVec(v) => v
+                .into_iter()
+                .map(TableAttribute::Number)
+                .map(T::try_from_table_attr)
+                .collect(),
+            TableAttribute::List(v) => v.into_iter().map(T::try_from_table_attr).collect(),
+            _ => Err(ReadConversionError::ConversionFailed(
+                std::any::type_name::<Vec<T>>().to_string(),
+            )),
+        }
+    }
+}
+
+impl<T> From<Option<T>> for TableAttribute
+where
+    T: Into<TableAttribute>,
+{
+    fn from(value: Option<T>) -> Self {
+        match value {
+            Some(value) => value.into(),
+            None => TableAttribute::Null,
+        }
+    }
+}
+
+impl<T> From<Vec<T>> for TableAttribute
+where
+    T: Into<TableAttribute>,
+{
+    fn from(value: Vec<T>) -> Self {
+        // To determin whether we should produce a
+        // Ss, Ns, Bs or a regular list, we will iterate
+        // through the list and check if the all are the same
+        // variant.
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        enum IsVariant {
+            // base case, we haven't looked at any elements yet.
+            Empty,
+            // Is String list
+            IsSs,
+            // Is Number list
+            IsNs,
+            // Is byte list
+            IsBs,
+            // Is mixed list
+            IsList,
+        }
+
+        let len = value.len();
+        let (table_attributes, is_variant) = value.into_iter().fold(
+            (Vec::with_capacity(len), IsVariant::Empty),
+            |(mut acc, mut is_variant), item| {
+                let table_attr = item.into();
+
+                // Don't check the variant if we already know it is a mixed list
+                if is_variant != IsVariant::IsList {
+                    match (&table_attr, is_variant) {
+                        (TableAttribute::Bytes(_), IsVariant::Empty)
+                        | (TableAttribute::Bytes(_), IsVariant::IsBs) => {
+                            is_variant = IsVariant::IsBs
+                        }
+                        (TableAttribute::Number(_), IsVariant::Empty)
+                        | (TableAttribute::Number(_), IsVariant::IsNs) => {
+                            is_variant = IsVariant::IsNs
+                        }
+                        (TableAttribute::String(_), IsVariant::Empty)
+                        | (TableAttribute::String(_), IsVariant::IsSs) => {
+                            is_variant = IsVariant::IsSs
+                        }
+                        _ => is_variant = IsVariant::IsList,
+                    }
+                }
+
+                acc.push(table_attr);
+                (acc, is_variant)
+            },
+        );
+
+        match is_variant {
+            IsVariant::IsList | IsVariant::Empty => TableAttribute::List(table_attributes),
+            IsVariant::IsSs => {
+                let strings = table_attributes
+                    .into_iter()
+                    .map(|string| {
+                        let TableAttribute::String(string) = string else {
+                            // We already checked that all the items are strings
+                            unreachable!()
+                        };
+
+                        string
+                    })
+                    .collect();
+
+                TableAttribute::StringVec(strings)
+            }
+            IsVariant::IsNs => {
+                let numbers = table_attributes
+                    .into_iter()
+                    .map(|number| {
+                        let TableAttribute::Number(number) = number else {
+                            // We already checked that all the items are numbers
+                            unreachable!()
+                        };
+
+                        number
+                    })
+                    .collect();
+
+                TableAttribute::NumberVec(numbers)
+            }
+            IsVariant::IsBs => {
+                let bytes = table_attributes
+                    .into_iter()
+                    .map(|bytes| {
+                        let TableAttribute::Bytes(bytes) = bytes else {
+                            // We already checked that all the items are bytes
+                            unreachable!()
+                        };
+
+                        bytes
+                    })
+                    .collect();
+
+                TableAttribute::ByteVec(bytes)
+            }
+        }
+    }
 }
 
 impl From<TableAttribute> for AttributeValue {
@@ -227,7 +353,7 @@ impl From<TableAttribute> for AttributeValue {
             TableAttribute::String(s) => AttributeValue::S(s),
             TableAttribute::StringVec(s) => AttributeValue::Ss(s),
 
-            TableAttribute::Number(i) => AttributeValue::N(i.to_string()),
+            TableAttribute::Number(i) => AttributeValue::N(i),
             TableAttribute::NumberVec(x) => AttributeValue::Ns(x),
 
             TableAttribute::Bytes(x) => AttributeValue::B(Blob::new(x)),
@@ -240,7 +366,6 @@ impl From<TableAttribute> for AttributeValue {
             TableAttribute::Map(x) => {
                 AttributeValue::M(x.into_iter().map(|(k, v)| (k, v.into())).collect())
             }
-
             TableAttribute::Null => AttributeValue::Null(true),
         }
     }
@@ -270,5 +395,112 @@ impl From<AttributeValue> for TableAttribute {
 
             x => panic!("Unsupported Dynamo attribute value: {x:?}"),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum TestType {
+        SomeNumber,
+        SomeString,
+        SomeBytes,
+    }
+
+    impl From<TestType> for TableAttribute {
+        fn from(value: TestType) -> Self {
+            match value {
+                TestType::SomeNumber => TableAttribute::Number(42.to_string()),
+                TestType::SomeString => TableAttribute::String("fourty two".to_string()),
+                TestType::SomeBytes => TableAttribute::Bytes(b"101010".to_vec()),
+            }
+        }
+    }
+
+    impl TryFromTableAttr for TestType {
+        fn try_from_table_attr(value: TableAttribute) -> Result<Self, ReadConversionError> {
+            match value {
+                TableAttribute::Number(n) if n == "42" => Ok(Self::SomeNumber),
+                TableAttribute::String(s) if s == "fourty two" => Ok(Self::SomeString),
+                TableAttribute::Bytes(b) if b == b"101010" => Ok(Self::SomeBytes),
+                _ => Err(ReadConversionError::ConversionFailed("".to_string())),
+            }
+        }
+    }
+
+    #[test]
+    fn test_to_and_from_list() {
+        let test_vec = vec![
+            TestType::SomeNumber,
+            TestType::SomeNumber,
+            TestType::SomeString,
+            TestType::SomeBytes,
+        ];
+
+        let table_attribute = TableAttribute::from(test_vec.clone());
+
+        // Assert that we convert to the correct variant.
+        assert!(matches!(&table_attribute, TableAttribute::List(x) if x.len() == test_vec.len()));
+
+        let original = Vec::<TestType>::try_from_table_attr(table_attribute).unwrap();
+
+        assert_eq!(original, test_vec);
+    }
+
+    #[test]
+    fn test_string_vec() {
+        let test_vec = vec![
+            "String0".to_string(),
+            "String1".to_string(),
+            "String2".to_string(),
+        ];
+
+        let table_attribute = TableAttribute::from(test_vec.clone());
+
+        assert!(matches!(
+            &table_attribute,
+            TableAttribute::StringVec(x)
+            if x.len() == test_vec.len()
+        ));
+
+        let original = Vec::<String>::try_from_table_attr(table_attribute).unwrap();
+
+        assert_eq!(original, test_vec);
+    }
+
+    #[test]
+    fn test_number_vec() {
+        let test_vec = vec![2, 3, 5, 7, 13];
+
+        let table_attribute = TableAttribute::from(test_vec.clone());
+
+        assert!(matches!(
+            &table_attribute,
+            TableAttribute::NumberVec(x)
+            if x.len() == test_vec.len()
+        ));
+
+        let original = Vec::<i32>::try_from_table_attr(table_attribute).unwrap();
+
+        assert_eq!(original, test_vec);
+    }
+
+    #[test]
+    fn test_bytes_vec() {
+        let test_vec: Vec<Vec<u8>> = (0u8..5).map(|i| (i * 10..i * 10 + 10).collect()).collect();
+
+        let table_attribute = TableAttribute::from(test_vec.clone());
+
+        assert!(matches!(
+            &table_attribute,
+            TableAttribute::ByteVec(x)
+            if x.len() == test_vec.len()
+        ));
+
+        let original = Vec::<Vec<u8>>::try_from_table_attr(table_attribute).unwrap();
+
+        assert_eq!(original, test_vec);
     }
 }
