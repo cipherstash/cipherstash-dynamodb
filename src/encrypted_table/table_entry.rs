@@ -1,6 +1,9 @@
 use crate::traits::ReadConversionError;
 use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
-use std::collections::HashMap;
+use std::{
+    collections::{BTreeMap, HashMap},
+    str::FromStr,
+};
 
 // FIXME: Clean this up
 //#[skip_serializing_none]
@@ -398,6 +401,84 @@ impl From<AttributeValue> for TableAttribute {
     }
 }
 
+impl<K, V> From<HashMap<K, V>> for TableAttribute
+where
+    K: ToString,
+    V: Into<TableAttribute>,
+{
+    fn from(map: HashMap<K, V>) -> Self {
+        TableAttribute::Map(
+            map.into_iter()
+                .map(|(k, v)| (k.to_string(), v.into()))
+                .collect(),
+        )
+    }
+}
+
+impl<K, V> TryFromTableAttr for HashMap<K, V>
+where
+    K: FromStr + std::hash::Hash + std::cmp::Eq,
+    V: TryFromTableAttr,
+{
+    fn try_from_table_attr(value: TableAttribute) -> Result<Self, ReadConversionError> {
+        let TableAttribute::Map(map) = value else {
+            return Err(ReadConversionError::ConversionFailed(
+                std::any::type_name::<Self>().to_string(),
+            ));
+        };
+
+        map.into_iter()
+            .map(|(k, v)| {
+                let k = k.parse().map_err(|_| {
+                    ReadConversionError::ConversionFailed(std::any::type_name::<Self>().to_string())
+                })?;
+                let v = V::try_from_table_attr(v)?;
+
+                Ok((k, v))
+            })
+            .collect()
+    }
+}
+
+impl<K, V> From<BTreeMap<K, V>> for TableAttribute
+where
+    K: ToString,
+    V: Into<TableAttribute>,
+{
+    fn from(map: BTreeMap<K, V>) -> Self {
+        TableAttribute::Map(
+            map.into_iter()
+                .map(|(k, v)| (k.to_string(), v.into()))
+                .collect(),
+        )
+    }
+}
+
+impl<K, V> TryFromTableAttr for BTreeMap<K, V>
+where
+    K: FromStr + std::cmp::Ord,
+    V: TryFromTableAttr,
+{
+    fn try_from_table_attr(value: TableAttribute) -> Result<Self, ReadConversionError> {
+        let TableAttribute::Map(map) = value else {
+            return Err(ReadConversionError::ConversionFailed(
+                std::any::type_name::<Self>().to_string(),
+            ));
+        };
+
+        map.into_iter()
+            .map(|(k, v)| {
+                let k = k.parse().map_err(|_| {
+                    ReadConversionError::ConversionFailed(std::any::type_name::<Self>().to_string())
+                })?;
+                let v = V::try_from_table_attr(v)?;
+
+                Ok((k, v))
+            })
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -426,6 +507,38 @@ mod test {
                 TableAttribute::String(s) if s == "fourty two" => Ok(Self::SomeString),
                 TableAttribute::Bytes(b) if b == b"101010" => Ok(Self::SomeBytes),
                 _ => Err(ReadConversionError::ConversionFailed("".to_string())),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+    enum MapKeys {
+        A,
+        B,
+        C,
+    }
+
+    impl std::fmt::Display for MapKeys {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            let c = match self {
+                MapKeys::A => "A",
+                MapKeys::B => "B",
+                MapKeys::C => "C",
+            };
+
+            write!(f, "{c}")
+        }
+    }
+
+    impl FromStr for MapKeys {
+        type Err = ();
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "A" => Ok(MapKeys::A),
+                "B" => Ok(MapKeys::B),
+                "C" => Ok(MapKeys::C),
+                _ => Err(()),
             }
         }
     }
@@ -502,5 +615,51 @@ mod test {
         let original = Vec::<Vec<u8>>::try_from_table_attr(table_attribute).unwrap();
 
         assert_eq!(original, test_vec);
+    }
+
+    #[test]
+    fn test_hashmap() {
+        let map = [
+            (MapKeys::A, "Something in A".to_string()),
+            (MapKeys::A, "Something in B".to_string()),
+            (MapKeys::A, "Something in C".to_string()),
+        ]
+        .into_iter()
+        .collect::<HashMap<_, _>>();
+
+        let table_attribute = TableAttribute::from(map.clone());
+
+        assert!(matches!(
+            &table_attribute,
+            TableAttribute::Map(x)
+            if x.len() == map.len()
+        ));
+
+        let original = HashMap::<MapKeys, String>::try_from_table_attr(table_attribute).unwrap();
+
+        assert_eq!(original, map);
+    }
+
+    #[test]
+    fn test_btreemap() {
+        let map = [
+            (MapKeys::A, "Something in A".to_string()),
+            (MapKeys::A, "Something in B".to_string()),
+            (MapKeys::A, "Something in C".to_string()),
+        ]
+        .into_iter()
+        .collect::<BTreeMap<_, _>>();
+
+        let table_attribute = TableAttribute::from(map.clone());
+
+        assert!(matches!(
+            &table_attribute,
+            TableAttribute::Map(x)
+            if x.len() == map.len()
+        ));
+
+        let original = BTreeMap::<MapKeys, String>::try_from_table_attr(table_attribute).unwrap();
+
+        assert_eq!(original, map);
     }
 }
