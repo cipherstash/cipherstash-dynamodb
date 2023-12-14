@@ -27,7 +27,7 @@ pub(crate) fn derive_decryptable(input: DeriveInput) -> Result<TokenStream, syn:
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                #attr_ident: unsealed.from_plaintext(#attr)?.try_into()?
+                #attr_ident: ::cryptonamo::traits::TryFromTableAttr::try_from_table_attr(unsealed.from_plaintext(#attr)?)?
             }
         }))
         .chain(skipped_attributes.iter().map(|attr| {

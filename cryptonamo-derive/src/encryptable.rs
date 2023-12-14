@@ -43,7 +43,7 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                .add_plaintext(#attr, |x| cryptonamo::traits::TableAttribute::from(&x.#attr_ident))
+                .add_plaintext(#attr, |x| cryptonamo::traits::TableAttribute::from(x.#attr_ident.clone()))
             }
         }));
 

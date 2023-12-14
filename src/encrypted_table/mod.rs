@@ -2,7 +2,7 @@ pub mod query;
 mod table_entry;
 pub use self::{
     query::{QueryBuilder, QueryError},
-    table_entry::{TableAttribute, TableEntry},
+    table_entry::{TableAttribute, TableEntry, TryFromTableAttr},
 };
 use crate::{
     crypto::*,

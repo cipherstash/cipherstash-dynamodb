@@ -1,5 +1,5 @@
 use crate::crypto::{SealError, Sealer, Unsealed};
-pub use crate::encrypted_table::TableAttribute;
+pub use crate::encrypted_table::{TableAttribute, TryFromTableAttr};
 pub use cipherstash_client::encryption::{
     compound_indexer::{
         ComposableIndex, ComposablePlaintext, CompoundIndex, ExactIndex, PrefixIndex,
