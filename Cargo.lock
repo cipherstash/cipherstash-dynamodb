@@ -715,6 +715,7 @@ dependencies = [
 [[package]]
 name = "cipherstash-client"
 version = "0.6.0"
+source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#20e58774634cb336fd57accd8f4eebcb61ce70c6"
 dependencies = [
  "async-mutex",
  "async-once-cell",
@@ -753,6 +754,7 @@ dependencies = [
 [[package]]
 name = "cipherstash-core"
 version = "0.1.1"
+source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#20e58774634cb336fd57accd8f4eebcb61ce70c6"
 dependencies = [
  "hmac",
  "lazy_static",
@@ -2061,6 +2063,7 @@ dependencies = [
 [[package]]
 name = "recipher"
 version = "0.1.0"
+source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#20e58774634cb336fd57accd8f4eebcb61ce70c6"
 dependencies = [
  "aes",
  "async-trait",
@@ -3073,6 +3076,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vitur-client"
 version = "0.1.0"
+source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#20e58774634cb336fd57accd8f4eebcb61ce70c6"
 dependencies = [
  "aes-gcm-siv",
  "async-mutex",
@@ -3101,6 +3105,7 @@ dependencies = [
 [[package]]
 name = "vitur-config"
 version = "0.1.0"
+source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#20e58774634cb336fd57accd8f4eebcb61ce70c6"
 dependencies = [
  "serde",
  "thiserror",
@@ -3109,6 +3114,7 @@ dependencies = [
 [[package]]
 name = "vitur-protocol"
 version = "0.1.0"
+source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#20e58774634cb336fd57accd8f4eebcb61ce70c6"
 dependencies = [
  "async-trait",
  "base64 0.20.0",
