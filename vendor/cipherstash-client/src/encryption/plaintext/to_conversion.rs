@@ -1,4 +1,4 @@
-use super::Plaintext;
+use super::{Plaintext, PlaintextNullVariant};
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 
@@ -14,16 +14,6 @@ macro_rules! impl_from {
             impl From<&$ty> for Plaintext {
                 fn from(value: &$ty) -> Self {
                     Plaintext::$variant(Some(value.to_owned() as _))
-                }
-            }
-
-            impl From<Option<$ty>> for Plaintext {
-                fn from(value: Option<$ty>) -> Self {
-                    if let Some(v) = value {
-                        v.into()
-                    } else {
-                        Plaintext::$variant(None)
-                    }
                 }
             }
         )*
@@ -45,7 +35,20 @@ impl_from! {
 
 impl From<&str> for Plaintext {
     fn from(value: &str) -> Self {
-        value.to_string().into()
+        Plaintext::Utf8Str(Some(value.to_owned()))
+    }
+}
+
+impl<T> From<Option<T>> for Plaintext
+where
+    T: Into<Plaintext> + PlaintextNullVariant,
+{
+    fn from(value: Option<T>) -> Self {
+        if let Some(value) = value {
+            value.into()
+        } else {
+            T::null()
+        }
     }
 }
 
@@ -62,6 +65,12 @@ mod test {
 
                 let plaintext_ref: Plaintext = Plaintext::from(&$value);
                 assert_eq!(plaintext_ref, Plaintext::$variant(Some($value.clone())));
+
+                let plaintext_opt_some: Plaintext = Some($value).into();
+                assert_eq!(plaintext_opt_some, Plaintext::$variant(Some($value)));
+
+                let plaintext_opt_none: Plaintext = None::<$ty>.into();
+                assert_eq!(plaintext_opt_none, Plaintext::$variant(None));
             }
         };
     }
