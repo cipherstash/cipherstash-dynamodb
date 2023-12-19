@@ -36,14 +36,14 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                .add_protected(#attr, |x| cryptonamo::traits::Plaintext::from(&x.#attr_ident))
+                .add_protected(#attr, |x| cryptonamo::traits::Plaintext::from(x.#attr_ident.to_owned()))
             }
         })
         .chain(plaintext_attributes.iter().map(|attr| {
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                .add_plaintext(#attr, |x| cryptonamo::traits::TableAttribute::from(&x.#attr_ident))
+                .add_plaintext(#attr, |x| cryptonamo::traits::TableAttribute::from(x.#attr_ident.clone()))
             }
         }));
 
@@ -54,7 +54,7 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
             if let Some(prefix) = Self::sort_key_prefix() {
                 format!("{}#{}", prefix, self.#sort_key_attr)
             } else {
-                self.#sort_key_attr.clone()
+                self.#sort_key_attr.to_string()
             }
         }
     } else {
