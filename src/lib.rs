@@ -1,3 +1,4 @@
+#![doc(html_no_source)]
 #![doc(html_favicon_url = "https://cipherstash.com/favicon.ico")]
 //! ## Cryptonamo: Encrypted Tables for DynamoDB
 //!
