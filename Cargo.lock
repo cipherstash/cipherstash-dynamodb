@@ -715,7 +715,6 @@ dependencies = [
 [[package]]
 name = "cipherstash-client"
 version = "0.6.0"
-source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#20e58774634cb336fd57accd8f4eebcb61ce70c6"
 dependencies = [
  "async-mutex",
  "async-once-cell",
@@ -754,7 +753,6 @@ dependencies = [
 [[package]]
 name = "cipherstash-core"
 version = "0.1.1"
-source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#20e58774634cb336fd57accd8f4eebcb61ce70c6"
 dependencies = [
  "hmac",
  "lazy_static",
@@ -1611,9 +1609,9 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.8.9"
+version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3dce281c5e46beae905d4de1870d8b1509a9142b62eedf18b443b011ca8343d0"
+checksum = "a4a650543ca06a924e8b371db273b2756685faae30f8487da1b56505a8f78b0c"
 dependencies = [
  "libc",
  "wasi",
@@ -2063,7 +2061,6 @@ dependencies = [
 [[package]]
 name = "recipher"
 version = "0.1.0"
-source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#20e58774634cb336fd57accd8f4eebcb61ce70c6"
 dependencies = [
  "aes",
  "async-trait",
@@ -3076,7 +3073,6 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "vitur-client"
 version = "0.1.0"
-source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#20e58774634cb336fd57accd8f4eebcb61ce70c6"
 dependencies = [
  "aes-gcm-siv",
  "async-mutex",
@@ -3105,7 +3101,6 @@ dependencies = [
 [[package]]
 name = "vitur-config"
 version = "0.1.0"
-source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#20e58774634cb336fd57accd8f4eebcb61ce70c6"
 dependencies = [
  "serde",
  "thiserror",
@@ -3114,7 +3109,6 @@ dependencies = [
 [[package]]
 name = "vitur-protocol"
 version = "0.1.0"
-source = "git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike#20e58774634cb336fd57accd8f4eebcb61ce70c6"
 dependencies = [
  "async-trait",
  "base64 0.20.0",
