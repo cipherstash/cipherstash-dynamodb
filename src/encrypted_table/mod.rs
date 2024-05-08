@@ -1,7 +1,7 @@
 pub mod query;
 mod table_entry;
 pub use self::{
-    query::{QueryBuilder, QueryError},
+    query::QueryBuilder,
     table_entry::{TableAttribute, TableEntry, TryFromTableAttr},
 };
 use crate::{

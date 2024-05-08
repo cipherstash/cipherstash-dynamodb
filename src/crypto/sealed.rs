@@ -32,58 +32,110 @@ impl Sealed {
         &self.0
     }
 
+    /// Unseal a list of [`Sealed`] values in an efficient manner that optimizes for bulk
+    /// decryptions
+    ///
+    /// This should be used over [`Sealed::unseal`] when multiple values need to be unsealed.
+    pub(crate) async fn unseal_all<T, C>(
+        items: impl AsRef<[Sealed]>,
+        cipher: &Encryption<C>,
+    ) -> Result<Vec<T>, SealError>
+    where
+        C: Credentials<Token = ViturToken>,
+        T: Decryptable,
+    {
+        let items = items.as_ref();
+        let plaintext_attributes = T::plaintext_attributes();
+        let decryptable_attributes = T::decryptable_attributes();
+
+        let mut plaintext_items: Vec<Vec<&TableAttribute>> = Vec::with_capacity(items.len());
+        let mut decryptable_items: Vec<&str> =
+            Vec::with_capacity(items.len() * decryptable_attributes.len());
+
+        for item in items.iter() {
+            let ciphertexts = decryptable_attributes
+                .iter()
+                .map(|name| {
+                    let attribute = item.inner().attributes.get(match *name {
+                        "pk" => "__pk",
+                        "sk" => "__sk",
+                        _ => name,
+                    });
+
+                    attribute
+                        .ok_or_else(|| SealError::MissingAttribute(name.to_string()))?
+                        .as_ciphertext()
+                        .ok_or_else(|| SealError::InvalidCiphertext(name.to_string()))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+
+            let unprotected = plaintext_attributes
+                .iter()
+                .map(|name| {
+                    let attr = match *name {
+                        "sk" => "__sk",
+                        _ => name,
+                    };
+
+                    item.inner()
+                        .attributes
+                        .get(attr)
+                        .ok_or(SealError::MissingAttribute(attr.to_string()))
+                })
+                .collect::<Result<Vec<&TableAttribute>, SealError>>()?;
+
+            plaintext_items.push(unprotected);
+
+            // Create a list of all ciphertexts so that they can all be decrypted in one go.
+            // The decrypted version of this list will be chunked up and zipped with the plaintext
+            // fields once the decryption succeeds.
+            decryptable_items.extend(ciphertexts);
+        }
+
+        let decrypted = cipher.decrypt(decryptable_items).await?;
+
+        let unsealed = decrypted
+            .chunks_exact(decryptable_attributes.len())
+            .zip(plaintext_items)
+            .map(|(decrypted_plaintext, plaintext_items)| {
+                let mut unsealed = Unsealed::new();
+
+                for (name, plaintext) in decryptable_attributes.iter().zip(decrypted_plaintext) {
+                    unsealed.add_protected(*name, plaintext.clone());
+                }
+
+                for (name, plaintext) in
+                    plaintext_attributes.iter().zip(plaintext_items.into_iter())
+                {
+                    unsealed.add_unprotected(*name, plaintext.clone());
+                }
+
+                unsealed.into_value()
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(unsealed)
+    }
+
+    /// Unseal the current value and return it's plaintext representation
+    ///
+    /// If you need to unseal multiple values at once use [`Sealed::unseal_all`]
     pub(crate) async fn unseal<C, T>(self, cipher: &Encryption<C>) -> Result<T, SealError>
     where
         C: Credentials<Token = ViturToken>,
         T: Decryptable,
     {
-        let ciphertexts = T::decryptable_attributes()
-            .into_iter()
-            .map(|name| {
-                let attribute = self.inner().attributes.get(match name {
-                    "pk" => "__pk",
-                    "sk" => "__sk",
-                    _ => name,
-                });
+        let mut vec = Self::unseal_all([self], cipher).await?;
 
-                attribute
-                    .ok_or_else(|| SealError::MissingAttribute(name.to_string()))?
-                    .as_ciphertext()
-                    .ok_or_else(|| SealError::InvalidCiphertext(name.to_string()))
-            })
-            .collect::<Result<Vec<&str>, SealError>>()?;
+        if vec.len() != 1 {
+            let actual = vec.len();
 
-        let unprotected = T::plaintext_attributes()
-            .into_iter()
-            .map(|name| {
-                let attr = match name {
-                    "sk" => "__sk",
-                    _ => name,
-                };
+            return Err(SealError::AssertionFailed(format!(
+                "Expected unseal_all to return 1 result but got {actual}"
+            )));
+        }
 
-                self.inner()
-                    .attributes
-                    .get(attr)
-                    .ok_or(SealError::MissingAttribute(attr.to_string()))
-            })
-            .collect::<Result<Vec<&TableAttribute>, SealError>>()?;
-
-        let unsealed = T::decryptable_attributes()
-            .into_iter()
-            .zip(cipher.decrypt(ciphertexts).await?.into_iter())
-            .fold(Unsealed::new(), |mut unsealed, (name, plaintext)| {
-                unsealed.add_protected(name, plaintext);
-                unsealed
-            });
-
-        T::plaintext_attributes()
-            .into_iter()
-            .zip(unprotected)
-            .fold(unsealed, |mut unsealed, (name, table_attr)| {
-                unsealed.add_unprotected(name, table_attr.clone());
-                unsealed
-            })
-            .into_value()
+        Ok(vec.remove(0))
     }
 }
 

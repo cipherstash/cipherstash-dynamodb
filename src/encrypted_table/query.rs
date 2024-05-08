@@ -103,13 +103,7 @@ where
 
         let table_entries = Sealed::vec_from(items)?;
 
-        // TODO: Use a combinator for this
-        let mut results: Vec<T> = Vec::with_capacity(table_entries.len());
-
-        // TODO: Bulk Decrypt
-        for sealed in table_entries.into_iter() {
-            results.push(sealed.unseal(&builder.table.cipher).await?);
-        }
+        let results = Sealed::unseal_all(table_entries, &builder.table.cipher).await?;
 
         Ok(results)
     }
