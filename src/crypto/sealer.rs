@@ -138,15 +138,12 @@ impl<T> Sealer<T> {
             .take(MAX_TERMS_PER_INDEX)
             .map(|(i, (index_name, term))| {
                 Ok(Sealed(
-                    table_entry
-                        .clone()
-                        .set_term(hex::encode(term))
-                        .set_sk(hmac(
-                            "sk",
-                            &format!("{}#{}#{}", &sk, index_name, i),
-                            Some(pk.as_str()),
-                            cipher,
-                        )?),
+                    table_entry.clone().set_term(hex::encode(term)).set_sk(hmac(
+                        "sk",
+                        &format!("{}#{}#{}", &sk, index_name, i),
+                        Some(pk.as_str()),
+                        cipher,
+                    )?),
                 ))
             })
             .chain(once(Ok(Sealed(table_entry.clone()))))
