@@ -1,4 +1,4 @@
-use cryptonamo::Encryptable;
+use cipherstash_dynamodb::Encryptable;
 
 #[derive(Encryptable)]
 struct User {

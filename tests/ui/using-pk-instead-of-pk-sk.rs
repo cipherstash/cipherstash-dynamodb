@@ -1,5 +1,5 @@
-use cryptonamo::{Decryptable, Encryptable, Searchable};
-use cryptonamo::EncryptedTable;
+use cipherstash_dynamodb::{Decryptable, Encryptable, Searchable};
+use cipherstash_dynamodb::EncryptedTable;
 
 #[derive(Debug, Encryptable, Decryptable, Searchable)]
 struct User {

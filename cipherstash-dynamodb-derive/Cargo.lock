@@ -3,7 +3,7 @@
 version = 3
 
 [[package]]
-name = "cryptonamo-derive"
+name = "cipherstash-dynamodb-derive"
 version = "0.1.0"
 dependencies = [
  "indexmap",
