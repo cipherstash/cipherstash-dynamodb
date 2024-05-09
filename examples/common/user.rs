@@ -1,4 +1,4 @@
-use cryptonamo::{Decryptable, Encryptable, Searchable};
+use cipherstash_dynamodb::{Decryptable, Encryptable, Searchable};
 
 #[derive(Debug, Encryptable, Decryptable, Searchable)]
 #[cryptonamo(sort_key_prefix = "user")]

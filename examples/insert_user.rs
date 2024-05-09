@@ -1,6 +1,6 @@
 mod common;
 use crate::common::User;
-use cryptonamo::EncryptedTable;
+use cipherstash_dynamodb::EncryptedTable;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

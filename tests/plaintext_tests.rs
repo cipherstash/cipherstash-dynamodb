@@ -1,4 +1,4 @@
-use cryptonamo::{Decryptable, Encryptable, EncryptedTable, Searchable};
+use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Searchable};
 use itertools::Itertools;
 use serial_test::serial;
 use std::future::Future;
