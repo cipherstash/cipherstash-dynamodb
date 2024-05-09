@@ -71,12 +71,12 @@
 //!     email: String,
 //!     name: String,
 //!
-//!     #[cryptonamo(plaintext)]
+//!     #[cipherstash(plaintext)]
 //!     not_sensitive: String,
 //! }
 //! ```
 //!
-//! If you don't want a field stored in the the database at all, you can annotate the field with `#[cryptonamo(skip)]`.
+//! If you don't want a field stored in the the database at all, you can annotate the field with `#[cipherstash(skip)]`.
 //!
 //!```rust
 //! use cipherstash_dynamodb::{Searchable, Encryptable, Decryptable};
@@ -87,7 +87,7 @@
 //!     email: String,
 //!     name: String,
 //!
-//!     #[cryptonamo(skip)]
+//!     #[cipherstash(skip)]
 //!     not_required: String,
 //! }
 //! ```
@@ -103,13 +103,13 @@
 //! use cipherstash_dynamodb::Encryptable;
 //!
 //! #[derive(Debug, Encryptable)]
-//! #[cryptonamo(sort_key_prefix = "user")]
+//! #[cipherstash(sort_key_prefix = "user")]
 //! struct User {
 //!     #[partition_key]
 //!     email: String,
 //!     name: String,
 //!
-//!     #[cryptonamo(skip)]
+//!     #[cipherstash(skip)]
 //!     not_required: String,
 //! }
 //! ```
@@ -129,7 +129,7 @@
 //!     #[sort_key]
 //!     name: String,
 //!
-//!     #[cryptonamo(skip)]
+//!     #[cipherstash(skip)]
 //!     not_required: String,
 //! }
 //! ```
@@ -152,7 +152,7 @@
 //!     #[sort_key]
 //!     sk: String,
 //!
-//!     #[cryptonamo(skip)]
+//!     #[cipherstash(skip)]
 //!     not_required: String,
 //! }
 //! ```
@@ -168,11 +168,11 @@
 //!
 //! #[derive(Debug, Encryptable)]
 //! struct User {
-//!     #[cryptonamo(query = "exact")]
+//!     #[cipherstash(query = "exact")]
 //!     #[partition_key]
 //!     email: String,
 //!     
-//!    #[cryptonamo(query = "prefix")]
+//!    #[cipherstash(query = "prefix")]
 //!     name: String,
 //! }
 //! ```
@@ -189,11 +189,11 @@
 //!
 //! #[derive(Debug, Encryptable)]
 //! struct User {
-//!     #[cryptonamo(query = "exact", compound = "email#name")]
+//!     #[cipherstash(query = "exact", compound = "email#name")]
 //!     #[partition_key]
 //!     email: String,
 //!     
-//!    #[cryptonamo(query = "prefix", compound = "email#name")]
+//!    #[cipherstash(query = "prefix", compound = "email#name")]
 //!     name: String,
 //! }
 //! ```
@@ -207,14 +207,14 @@
 //!
 //! #[derive(Debug, Encryptable)]
 //! struct User {
-//!     #[cryptonamo(query = "exact")]
-//!     #[cryptonamo(query = "exact", compound = "email#name")]
+//!     #[cipherstash(query = "exact")]
+//!     #[cipherstash(query = "exact", compound = "email#name")]
 //!     #[partition_key]
 //!     email: String,
 //!     
-//!    #[cryptonamo(query = "prefix")]
-//!    #[cryptonamo(query = "exact")]
-//!    #[cryptonamo(query = "prefix", compound = "email#name")]
+//!    #[cipherstash(query = "prefix")]
+//!    #[cipherstash(query = "exact")]
+//!    #[cipherstash(query = "prefix", compound = "email#name")]
 //!     name: String,
 //! }
 //! ```
@@ -379,9 +379,9 @@
 //! # #[derive(Debug, Encryptable, Searchable, Decryptable)]
 //! # struct User {
 //! #    #[partition_key]
-//! #    #[cryptonamo(query = "exact")]
+//! #    #[cipherstash(query = "exact")]
 //! #    email: String,
-//! #    #[cryptonamo(query = "prefix")]
+//! #    #[cipherstash(query = "prefix")]
 //! #    name: String,
 //! # }
 //! # #[tokio::main]
@@ -417,14 +417,14 @@
 //!
 //! #[derive(Debug, Searchable, Encryptable, Decryptable)]
 //! struct License {
-//!     #[cryptonamo(query = "exact")]
+//!     #[cipherstash(query = "exact")]
 //!     #[partition_key]
 //!     user_email: String,
 //!
-//!     #[cryptonamo(plaintext)]
+//!     #[cipherstash(plaintext)]
 //!     license_type: String,
 //!
-//!     #[cryptonamo(query = "exact")]
+//!     #[cipherstash(query = "exact")]
 //!     license_number: String,
 //! }
 //! ```
@@ -439,11 +439,11 @@
 //!
 //! #[derive(Debug, Searchable, Encryptable, Decryptable)]
 //! pub struct UserView {
-//!     #[cryptonamo(skip)]
+//!     #[cipherstash(skip)]
 //!     #[partition_key]
 //!     email: String,
 //!     
-//!     #[cryptonamo(query = "prefix")]
+//!     #[cipherstash(query = "prefix")]
 //!     name: String,
 //! }
 //! ```
@@ -454,11 +454,11 @@
 //! # use cipherstash_dynamodb::{Searchable, Encryptable, Decryptable, EncryptedTable};
 //! # #[derive(Debug, Searchable, Encryptable, Decryptable)]
 //! # pub struct UserView {
-//! #     #[cryptonamo(skip)]
+//! #     #[cipherstash(skip)]
 //! #     #[partition_key]
 //! #     email: String,
 //! #     
-//! #     #[cryptonamo(query = "prefix")]
+//! #     #[cipherstash(query = "prefix")]
 //! #     name: String,
 //! # }
 //! # impl UserView {

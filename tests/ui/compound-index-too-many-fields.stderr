@@ -1,5 +1,5 @@
 error: Compound index 'email#name' does not include current field 'age'.
- --> tests/./ui/compound-index-too-many-fields.rs:9:35
+ --> tests/./ui/compound-index-too-many-fields.rs:9:36
   |
-9 |     #[cryptonamo(query = "exact", compound = "email#name")]
-  |                                   ^^^^^^^^^^^^^^^^^^^^^^^
+9 |     #[cipherstash(query = "exact", compound = "email#name")]
+  |                                    ^^^^^^^^^^^^^^^^^^^^^^^
