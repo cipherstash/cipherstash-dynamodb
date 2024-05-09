@@ -66,7 +66,7 @@ impl SettingsBuilder {
         DeriveInput { attrs, .. }: &DeriveInput,
     ) -> Result<Self, syn::Error> {
         for attr in attrs {
-            if attr.path().is_ident("cryptonamo") {
+            if attr.path().is_ident("cipherstash") {
                 attr.parse_nested_meta(|meta| {
                     let ident = meta.path.get_ident().map(|i| i.to_string());
                     match ident.as_deref() {
@@ -228,7 +228,7 @@ impl SettingsBuilder {
                             self.partition_key_field = Some(field_name.clone());
                         }
 
-                        if attr.path().is_ident("cryptonamo") {
+                        if attr.path().is_ident("cipherstash") {
                             let mut query: Option<(String, String, Span)> = None;
                             let mut compound_index_name: Option<(String, Span)> = None;
 
@@ -308,7 +308,7 @@ impl SettingsBuilder {
                                 }
 
                                 (None, Some((compound_index_name, span))) => {
-                                    return Err(syn::Error::new(span,  format!("Compound attribute was specified but no query options were. Specify how this field should be queried with the attribute #[cryptonamo(query = <option>, compound = \"{compound_index_name}\")]")));
+                                    return Err(syn::Error::new(span,  format!("Compound attribute was specified but no query options were. Specify how this field should be queried with the attribute #[cipherstash(query = <option>, compound = \"{compound_index_name}\")]")));
                                 }
 
                                 (None, None) => {}
@@ -423,7 +423,7 @@ impl SettingsBuilder {
             return Err(syn::Error::new(
                     Span::call_site(),
                     format!(
-                        "Not all fields were annotated with the #[cryptonamo(compound)] attribute. Missing fields: {}",
+                        "Not all fields were annotated with the #[cipherstash(compound)] attribute. Missing fields: {}",
                         missing_fields.join(",")
                     ),
                 ));
@@ -440,7 +440,7 @@ impl SettingsBuilder {
             return Err(syn::Error::new(
                     Span::call_site(),
                     format!(
-                        "Too many fields were annotated with the #[cryptonamo(compound)] attribute. Extra fields: {}",
+                        "Too many fields were annotated with the #[cipherstash(compound)] attribute. Extra fields: {}",
                         extra_fields.join(",")
                     ),
                 ));

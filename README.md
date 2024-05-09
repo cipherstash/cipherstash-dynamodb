@@ -1,4 +1,4 @@
-# cryptonamo
+# cipherstash-dynamodb
 
 ## CipherStash for DynamoDB: Encrypted Tables for DynamoDB
 
@@ -124,12 +124,12 @@ struct User {
     email: String,
     name: String,
 
-    #[cryptonamo(plaintext)]
+    #[cipherstash(plaintext)]
     not_sensitive: String,
 }
 ```
 
-If you don't want a field stored in the the database at all, you can annotate the field with `#[cryptonamo(skip)]`.
+If you don't want a field stored in the the database at all, you can annotate the field with `#[cipherstash(skip)]`.
 
 ```rust
 use cipherstash_dynamodb::{Searchable, Encryptable, Decryptable};
@@ -140,7 +140,7 @@ struct User {
     email: String,
     name: String,
 
-    #[cryptonamo(skip)]
+    #[cipherstash(skip)]
     not_required: String,
 }
 ```
@@ -156,13 +156,13 @@ However, if you want to specify your own, you can use the `sort_key_prefix` attr
 use cipherstash_dynamodb::Encryptable;
 
 #[derive(Debug, Encryptable)]
-#[cryptonamo(sort_key_prefix = "user")]
+#[cipherstash(sort_key_prefix = "user")]
 struct User {
     #[partition_key]
     email: String,
     name: String,
 
-    #[cryptonamo(skip)]
+    #[cipherstash(skip)]
     not_required: String,
 }
 ```
@@ -182,7 +182,7 @@ struct User {
     #[sort_key]
     name: String,
 
-    #[cryptonamo(skip)]
+    #[cipherstash(skip)]
     not_required: String,
 }
 ```
@@ -200,11 +200,11 @@ use cipherstash_dynamodb::Encryptable;
 
 #[derive(Debug, Encryptable)]
 struct User {
-    #[cryptonamo(query = "exact")]
+    #[cipherstash(query = "exact")]
     #[partition_key]
     email: String,
     
-   #[cryptonamo(query = "prefix")]
+   #[cipherstash(query = "prefix")]
     name: String,
 }
 ```
@@ -221,11 +221,11 @@ use cipherstash_dynamodb::Encryptable;
 
 #[derive(Debug, Encryptable)]
 struct User {
-    #[cryptonamo(query = "exact", compound = "email#name")]
+    #[cipherstash(query = "exact", compound = "email#name")]
     #[partition_key]
     email: String,
     
-   #[cryptonamo(query = "prefix", compound = "email#name")]
+   #[cipherstash(query = "prefix", compound = "email#name")]
     name: String,
 }
 ```
@@ -239,14 +239,14 @@ use cipherstash_dynamodb::Encryptable;
 
 #[derive(Debug, Encryptable)]
 struct User {
-    #[cryptonamo(query = "exact")]
-    #[cryptonamo(query = "exact", compound = "email#name")]
+    #[cipherstash(query = "exact")]
+    #[cipherstash(query = "exact", compound = "email#name")]
     #[partition_key]
     email: String,
     
-   #[cryptonamo(query = "prefix")]
-   #[cryptonamo(query = "exact")]
-   #[cryptonamo(query = "prefix", compound = "email#name")]
+   #[cipherstash(query = "prefix")]
+   #[cipherstash(query = "exact")]
+   #[cipherstash(query = "prefix", compound = "email#name")]
     name: String,
 }
 ```
@@ -352,14 +352,14 @@ use cipherstash_dynamodb::{ Searchable, Encryptable, Decryptable };
 
 #[derive(Debug, Searchable, Encryptable, Decryptable)]
 struct License {
-    #[cryptonamo(query = "exact")]
+    #[cipherstash(query = "exact")]
     #[partition_key]
     user_email: String,
 
-    #[cryptonamo(plaintext)]
+    #[cipherstash(plaintext)]
     license_type: String,
 
-    #[cryptonamo(query = "exact")]
+    #[cipherstash(query = "exact")]
     license_number: String,
 }
 ```
@@ -373,11 +373,11 @@ For example, you might want to query users by name using a prefix (say for using
 
 #[derive(Debug, Searchable, Encryptable, Decryptable)]
 pub struct UserView {
-    #[cryptonamo(skip)]
+    #[cipherstash(skip)]
     #[partition_key]
     email: String,
     
-    #[cryptonamo(query = "prefix")]
+    #[cipherstash(query = "prefix")]
     name: String,
 }
 ```

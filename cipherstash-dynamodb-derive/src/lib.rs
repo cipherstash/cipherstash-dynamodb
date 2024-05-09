@@ -10,21 +10,21 @@ mod settings;
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
-#[proc_macro_derive(Encryptable, attributes(cryptonamo, sort_key, partition_key))]
+#[proc_macro_derive(Encryptable, attributes(cipherstash, sort_key, partition_key))]
 pub fn derive_encryptable(input: TokenStream) -> TokenStream {
     encryptable::derive_encryptable(parse_macro_input!(input as DeriveInput))
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }
 
-#[proc_macro_derive(Decryptable, attributes(cryptonamo, sort_key, partition_key))]
+#[proc_macro_derive(Decryptable, attributes(cipherstash, sort_key, partition_key))]
 pub fn derive_decryptable(input: TokenStream) -> TokenStream {
     decryptable::derive_decryptable(parse_macro_input!(input as DeriveInput))
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }
 
-#[proc_macro_derive(Searchable, attributes(cryptonamo, sort_key, partition_key))]
+#[proc_macro_derive(Searchable, attributes(cipherstash, sort_key, partition_key))]
 pub fn derive_searchable(input: TokenStream) -> TokenStream {
     searchable::derive_searchable(parse_macro_input!(input as DeriveInput))
         .unwrap_or_else(syn::Error::into_compile_error)

@@ -2,7 +2,7 @@ use cipherstash_dynamodb::Encryptable;
 
 #[derive(Encryptable)]
 struct User {
-    #[cryptonamo(query = "blah")]
+    #[cipherstash(query = "blah")]
     email: String,
 }
 

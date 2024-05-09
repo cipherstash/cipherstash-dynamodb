@@ -3,11 +3,11 @@ use cipherstash_dynamodb::EncryptedTable;
 
 #[derive(Debug, Encryptable, Decryptable, Searchable)]
 struct User {
-    #[cryptonamo(query = "exact")]
+    #[cipherstash(query = "exact")]
     #[partition_key]
     email: String,
 
-    #[cryptonamo(query = "exact")]
+    #[cipherstash(query = "exact")]
     #[sort_key]
     name: String,
 }
