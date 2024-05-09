@@ -35,7 +35,7 @@ pub enum SealError {
     #[error("Invalid ciphertext value: {0}")]
     InvalidCiphertext(String),
     #[error("Assertion failed: {0}")]
-    AssertionFailed(String)
+    AssertionFailed(String),
 }
 
 #[derive(Error, Debug)]
