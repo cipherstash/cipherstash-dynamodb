@@ -1,6 +1,6 @@
 mod common;
-use common::License;
 use cipherstash_dynamodb::EncryptedTable;
+use common::License;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
