@@ -39,9 +39,11 @@ jobs:
             rust-cargo-v1-${{ hashFiles('**/Cargo.lock') }}-
             rust-cargo-v1-
 
-      - uses: actions-rs/cargo@v1
+      - uses: dtolnay/rust-toolchain@v1
         with:
-          command: test
+          toolchain: stable
+
+      - run: cargo test
         env:
           CS_WORKSPACE_ID: ${{ secrets.CS_WORKSPACE_ID }}
           CS_CLIENT_ACCESS_KEY: ${{ secrets.CS_CLIENT_ACCESS_KEY }}
@@ -71,10 +73,12 @@ jobs:
             format-rust-cargo-v1-${{ hashFiles('**/Cargo.lock') }}
             format-rust-cargo-v1-
 
-      - uses: actions-rs/cargo@v1
+      - uses: dtolnay/rust-toolchain@v1
         with:
-          command: fmt
-          args: --all -- --check
+          toolchain: stable
+          components: rustfmt
+
+      - run: cargo fmt --all -- --check
 
   clippy:
     runs-on: ubuntu-latest
@@ -95,7 +99,9 @@ jobs:
             rust-cargo-v1-${{ hashFiles('**/Cargo.lock') }}-
             rust-cargo-v1-
 
-      - uses: actions-rs/cargo@v1
+      - uses: dtolnay/rust-toolchain@v1
         with:
-          command: clippy
-          args: --all --no-deps --all-features --tests
+          toolchain: stable
+          components: rustfmt
+
+      - run: cargo clippy --all --no-deps --all-features --tests

@@ -34,6 +34,8 @@ pub enum SealError {
     MissingAttribute(String),
     #[error("Invalid ciphertext value: {0}")]
     InvalidCiphertext(String),
+    #[error("Assertion failed: {0}")]
+    AssertionFailed(String),
 }
 
 #[derive(Error, Debug)]

@@ -138,29 +138,17 @@ impl<T> Sealer<T> {
             .take(MAX_TERMS_PER_INDEX)
             .map(|(i, (index_name, term))| {
                 Ok(Sealed(
-                    table_entry
-                        .clone()
-                        .set_term(hex::encode(term))
-                        // TODO: HMAC the sort key, too (users#index_name#pk)
-                        .set_sk(hmac(
-                            "sk",
-                            &format!("{}#{}#{}", &sk, index_name, i),
-                            Some(pk.as_str()),
-                            cipher,
-                        )?),
+                    table_entry.clone().set_term(hex::encode(term)).set_sk(hmac(
+                        "sk",
+                        &format!("{}#{}#{}", &sk, index_name, i),
+                        Some(pk.as_str()),
+                        cipher,
+                    )?),
                 ))
             })
             .chain(once(Ok(Sealed(table_entry.clone()))))
             .collect::<Result<_, SealError>>()?;
 
         Ok((PrimaryKeyParts { pk, sk }, table_entries))
-    }
-
-    #[allow(dead_code)]
-    fn seal_iter<I>(_iter: I) -> Vec<Sealed>
-    where
-        I: IntoIterator<Item = Self>,
-    {
-        unimplemented!()
     }
 }

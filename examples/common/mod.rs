@@ -1,6 +1,7 @@
 pub mod license;
 pub mod user;
-pub mod user_result_by_name;
+
+#[allow(unused_imports)]
 pub use license::*;
+#[allow(unused_imports)]
 pub use user::*;
-pub use user_result_by_name::*;
