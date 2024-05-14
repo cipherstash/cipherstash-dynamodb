@@ -5,7 +5,7 @@ use crate::{
 };
 use aws_sdk_dynamodb::types::AttributeValue;
 use cipherstash_client::{
-    credentials::{vitur_credentials::ViturToken, Credentials},
+    credentials::{service_credentials::ServiceToken, Credentials},
     encryption::Encryption,
 };
 use std::collections::HashMap;
@@ -41,7 +41,7 @@ impl Sealed {
         cipher: &Encryption<C>,
     ) -> Result<Vec<T>, SealError>
     where
-        C: Credentials<Token = ViturToken>,
+        C: Credentials<Token = ServiceToken>,
         T: Decryptable,
     {
         let items = items.as_ref();
@@ -122,7 +122,7 @@ impl Sealed {
     /// If you need to unseal multiple values at once use [`Sealed::unseal_all`]
     pub(crate) async fn unseal<C, T>(self, cipher: &Encryption<C>) -> Result<T, SealError>
     where
-        C: Credentials<Token = ViturToken>,
+        C: Credentials<Token = ServiceToken>,
         T: Decryptable,
     {
         let mut vec = Self::unseal_all([self], cipher).await?;

@@ -21,7 +21,8 @@ tokio = { version = "1", features = ["full"] }
 hex = { version = "0.4.3", features = [ "serde" ] }
 cipherstash-dynamodb-derive = { path = "cipherstash-dynamodb-derive" }
 
-cipherstash-client = { path = "./vendor/cipherstash-client/", features = [ "tokio" ] }
+# cipherstash-client = { path = "../../cipherstash-suite/packages/cipherstash-client/", features = [ "tokio" ] }
+cipherstash-client = { path = "../cipherstash-suite/packages/cipherstash-client/", features = [ "tokio" ] }
 # cipherstash-client = { git = "ssh://git@github.com/cipherstash/cipherstash-suite.git", branch = "feat/compound-spike", package = "cipherstash-client", features = [ "tokio" ] }
 
 async-trait = "0.1.73"

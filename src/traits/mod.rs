@@ -4,7 +4,7 @@ pub use cipherstash_client::encryption::{
     compound_indexer::{
         ComposableIndex, ComposablePlaintext, CompoundIndex, ExactIndex, PrefixIndex,
     },
-    Plaintext, PlaintextNullVariant, TryFromPlaintext,
+    Plaintext, PlaintextNullVariant,
 };
 
 mod primary_key;
