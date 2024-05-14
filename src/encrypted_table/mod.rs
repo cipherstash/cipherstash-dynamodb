@@ -17,10 +17,10 @@ use aws_sdk_dynamodb::{
     Client,
 };
 use cipherstash_client::{
-    config::{console_config::ConsoleConfig, errors::ConfigError, vitur_config::ViturConfig},
-    credentials::{auto_refresh::AutoRefresh, vitur_credentials::ViturCredentials},
+    config::{console_config::ConsoleConfig, errors::ConfigError, zero_kms_config::ZeroKMSConfig},
+    credentials::{auto_refresh::AutoRefresh, service_credentials::ServiceCredentials},
     encryption::{Encryption, EncryptionError},
-    vitur::{errors::LoadConfigError, DatasetConfigWithIndexRootKey, Vitur},
+    zero_kms::{errors::LoadConfigError, DatasetConfigWithIndexRootKey, ZeroKMS},
 };
 use log::info;
 use std::collections::HashSet;
@@ -28,7 +28,7 @@ use thiserror::Error;
 
 pub struct EncryptedTable {
     db: Client,
-    cipher: Box<Encryption<AutoRefresh<ViturCredentials>>>,
+    cipher: Box<Encryption<AutoRefresh<ServiceCredentials>>>,
     // We may use this later but for now the config is in code
     _dataset_config: DatasetConfigWithIndexRootKey,
     table_name: String,
@@ -87,22 +87,25 @@ impl EncryptedTable {
     ) -> Result<EncryptedTable, InitError> {
         info!("Initializing...");
         let console_config = ConsoleConfig::builder().with_env().build()?;
-        let vitur_config = ViturConfig::builder()
+        let zero_kms_config = ZeroKMSConfig::builder()
             .decryption_log(true)
             .with_env()
             .console_config(&console_config)
             .build_with_client_key()?;
 
-        let vitur_client = Vitur::new_with_client_key(
-            &vitur_config.base_url(),
-            AutoRefresh::new(vitur_config.credentials()),
-            vitur_config.decryption_log_path().as_deref(),
-            vitur_config.client_key(),
+        let zero_kms_client = ZeroKMS::new_with_client_key(
+            &zero_kms_config.base_url(),
+            AutoRefresh::new(zero_kms_config.credentials()),
+            zero_kms_config.decryption_log_path().as_deref(),
+            zero_kms_config.client_key(),
         );
 
         info!("Fetching dataset config...");
-        let dataset_config = vitur_client.load_dataset_config().await?;
-        let cipher = Box::new(Encryption::new(dataset_config.index_root_key, vitur_client));
+        let dataset_config = zero_kms_client.load_dataset_config().await?;
+        let cipher = Box::new(Encryption::new(
+            dataset_config.index_root_key,
+            zero_kms_client,
+        ));
 
         info!("Ready!");
 

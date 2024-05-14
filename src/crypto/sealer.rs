@@ -5,7 +5,7 @@ use crate::{
     Searchable,
 };
 use cipherstash_client::{
-    credentials::{vitur_credentials::ViturToken, Credentials},
+    credentials::{service_credentials::ServiceToken, Credentials},
     encryption::{compound_indexer::CompoundIndex, Encryption, IndexTerm, Plaintext},
 };
 use itertools::Itertools;
@@ -57,7 +57,7 @@ impl<T> Sealer<T> {
         term_length: usize, // TODO: SealError
     ) -> Result<(PrimaryKeyParts, Vec<Sealed>), SealError>
     where
-        C: Credentials<Token = ViturToken>,
+        C: Credentials<Token = ServiceToken>,
         T: Searchable,
     {
         let mut pk = self.inner.partition_key();

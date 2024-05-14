@@ -4,7 +4,7 @@ mod unsealed;
 
 use crate::traits::{Encryptable, ReadConversionError, Searchable, WriteConversionError};
 use cipherstash_client::{
-    credentials::{vitur_credentials::ViturToken, Credentials},
+    credentials::{service_credentials::ServiceToken, Credentials},
     encryption::{
         compound_indexer::{CompoundIndex, ExactIndex},
         Encryption, EncryptionError, Plaintext, TypeParseError,
@@ -67,7 +67,7 @@ pub(crate) fn hmac<C>(
     cipher: &Encryption<C>,
 ) -> Result<String, EncryptionError>
 where
-    C: Credentials<Token = ViturToken>,
+    C: Credentials<Token = ServiceToken>,
 {
     let plaintext = Plaintext::Utf8Str(Some(value.to_string()));
     let index = CompoundIndex::new(ExactIndex::new(field, vec![]));
