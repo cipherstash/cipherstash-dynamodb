@@ -1,18 +1,18 @@
-use cryptonamo::{Decryptable, Encryptable, Searchable};
+use cipherstash_dynamodb::{Decryptable, Encryptable, Searchable};
 
 #[derive(Debug, Encryptable, Decryptable, Searchable)]
-#[cryptonamo(sort_key_prefix = "user")]
+#[cipherstash(sort_key_prefix = "user")]
 pub struct User {
-    #[cryptonamo(query = "exact", compound = "email#name")]
-    #[cryptonamo(query = "exact")]
+    #[cipherstash(query = "exact", compound = "email#name")]
+    #[cipherstash(query = "exact")]
     #[partition_key]
     pub email: String,
 
-    #[cryptonamo(query = "prefix", compound = "email#name")]
-    #[cryptonamo(query = "prefix")]
+    #[cipherstash(query = "prefix", compound = "email#name")]
+    #[cipherstash(query = "prefix")]
     pub name: String,
 
-    #[cryptonamo(plaintext)]
+    #[cipherstash(plaintext)]
     pub count: i32,
 }
 
@@ -35,24 +35,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_cryptonamo_typename() {
+    fn test_cipherstash_typename() {
         assert_eq!(User::type_name(), "user");
     }
 
     #[test]
-    fn test_cryptonamo_instance() {
+    fn test_cipherstash_instance() {
         let user = User::new("person@example.net", "Person Name");
         assert_eq!(user.partition_key(), "person@example.net");
     }
 
     #[test]
-    fn test_cryptonamo_attributes() {
+    fn test_cipherstash_attributes() {
         assert_eq!(User::protected_attributes(), vec!["email", "name"]);
         assert_eq!(User::plaintext_attributes(), vec!["count"]);
     }
 
     #[test]
-    fn test_cryptonamo_index_names() {
+    fn test_cipherstash_index_names() {
         assert_eq!(
             User::protected_indexes(),
             vec!["email", "email#name", "name"]

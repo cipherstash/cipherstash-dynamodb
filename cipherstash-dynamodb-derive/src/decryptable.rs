@@ -20,14 +20,14 @@ pub(crate) fn derive_decryptable(input: DeriveInput) -> Result<TokenStream, syn:
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                #attr_ident: ::cryptonamo::traits::TryFromPlaintext::try_from_plaintext(unsealed.from_protected(#attr)?)?
+                #attr_ident: ::cipherstash_dynamodb::traits::TryFromPlaintext::try_from_plaintext(unsealed.from_protected(#attr)?)?
             }
         })
         .chain(plaintext_attributes.iter().map(|attr| {
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                #attr_ident: ::cryptonamo::traits::TryFromTableAttr::try_from_table_attr(unsealed.from_plaintext(#attr)?)?
+                #attr_ident: ::cipherstash_dynamodb::traits::TryFromTableAttr::try_from_table_attr(unsealed.from_plaintext(#attr)?)?
             }
         }))
         .chain(skipped_attributes.iter().map(|attr| {
@@ -40,8 +40,8 @@ pub(crate) fn derive_decryptable(input: DeriveInput) -> Result<TokenStream, syn:
 
     let expanded = quote! {
         #[automatically_derived]
-        impl cryptonamo::traits::Decryptable for #ident {
-            fn from_unsealed(unsealed: cryptonamo::crypto::Unsealed) -> Result<Self, cryptonamo::crypto::SealError> {
+        impl cipherstash_dynamodb::traits::Decryptable for #ident {
+            fn from_unsealed(unsealed: cipherstash_dynamodb::crypto::Unsealed) -> Result<Self, cipherstash_dynamodb::crypto::SealError> {
                 Ok(Self {
                     #(#from_unsealed_impl,)*
                 })

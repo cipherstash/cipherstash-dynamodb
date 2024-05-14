@@ -1,4 +1,4 @@
-use cryptonamo::{Decryptable, Encryptable, EncryptedTable, Searchable};
+use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Searchable};
 use itertools::Itertools;
 use serial_test::serial;
 use std::future::Future;
@@ -6,21 +6,21 @@ use std::future::Future;
 mod common;
 
 #[derive(Encryptable, Decryptable, Searchable, Debug, PartialEq, Ord, PartialOrd, Eq)]
-#[cryptonamo(sort_key_prefix = "user")]
+#[cipherstash(sort_key_prefix = "user")]
 pub struct User {
-    #[cryptonamo(query = "exact", compound = "email#name")]
-    #[cryptonamo(query = "exact")]
+    #[cipherstash(query = "exact", compound = "email#name")]
+    #[cipherstash(query = "exact")]
     #[partition_key]
     pub email: String,
 
-    #[cryptonamo(query = "prefix", compound = "email#name")]
-    #[cryptonamo(query = "prefix")]
+    #[cipherstash(query = "prefix", compound = "email#name")]
+    #[cipherstash(query = "prefix")]
     pub name: String,
 
-    #[cryptonamo(plaintext)]
+    #[cipherstash(plaintext)]
     pub tag: String,
 
-    #[cryptonamo(skip)]
+    #[cipherstash(skip)]
     pub temp: bool,
 }
 

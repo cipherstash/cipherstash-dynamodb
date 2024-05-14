@@ -1,4 +1,4 @@
-use cryptonamo::{Decryptable, Encryptable, Searchable};
+use cipherstash_dynamodb::{Decryptable, Encryptable, Searchable};
 
 #[derive(Debug, Encryptable, Decryptable, Searchable)]
 pub struct License {
@@ -7,7 +7,7 @@ pub struct License {
     number: String,
     expires: String,
     #[allow(dead_code)]
-    #[cryptonamo(skip)]
+    #[cipherstash(skip)]
     reviewed_at: Option<String>,
 }
 
@@ -32,12 +32,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_cryptonamo_typename() {
+    fn test_cipherstash_typename() {
         assert_eq!(License::type_name(), "license");
     }
 
     #[test]
-    fn test_cryptonamo_instance() {
+    fn test_cipherstash_instance() {
         let license = License::new("person@example.net", "1234", "2020-01-01");
         assert_eq!(license.partition_key(), "person@example.net");
         assert_eq!(

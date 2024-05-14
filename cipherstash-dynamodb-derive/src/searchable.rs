@@ -19,7 +19,7 @@ pub(crate) fn derive_searchable(input: DeriveInput) -> Result<TokenStream, syn::
                 let index_type = IndexType::type_to_ident(index_type).unwrap();
 
                 quote! {
-                    #name => Some(Box::new(cryptonamo::encryption::compound_indexer::#index_type::new(#name, vec![])))
+                    #name => Some(Box::new(cipherstash_dynamodb::encryption::compound_indexer::#index_type::new(#name, vec![])))
                 }
             },
             IndexType::Compound2 { name, index: ((a, b), (c, d)) } => {
@@ -66,19 +66,19 @@ pub(crate) fn derive_searchable(input: DeriveInput) -> Result<TokenStream, syn::
 
     let expanded = quote! {
         #[automatically_derived]
-        impl cryptonamo::traits::Searchable for #ident {
+        impl cipherstash_dynamodb::traits::Searchable for #ident {
             fn protected_indexes() -> Vec<&'static str> {
                 vec![#(#protected_index_names,)*]
             }
 
-            fn index_by_name(name: &str) -> Option<Box<dyn cryptonamo::traits::ComposableIndex>> {
+            fn index_by_name(name: &str) -> Option<Box<dyn cipherstash_dynamodb::traits::ComposableIndex>> {
                 match name {
                     #(#indexes_impl,)*
                     _ => None,
                 }
             }
 
-            fn attribute_for_index(&self, index_name: &str) -> Option<cryptonamo::traits::ComposablePlaintext> {
+            fn attribute_for_index(&self, index_name: &str) -> Option<cipherstash_dynamodb::traits::ComposablePlaintext> {
                 match index_name {
                     #(#attributes_for_index_impl,)*
                     _ => None,

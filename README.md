@@ -1,8 +1,8 @@
-# cryptonamo
+# cipherstash-dynamodb
 
-## Cryptonamo: Encrypted Tables for DynamoDB
+## CipherStash for DynamoDB: Encrypted Tables for DynamoDB
 
-Based on the CipherStash SDK and ZeroKMS key service, Cryptonamo provides a simple interface for
+Based on the CipherStash SDK and ZeroKMS key service, CipherStash for DynamoDB provides a simple interface for
 storing and retrieving encrypted data in DynamoDB.
 
 ---
@@ -11,7 +11,7 @@ storing and retrieving encrypted data in DynamoDB.
 
 ### Install Stash CLI
 
-The `stash` CLI tool is required for creating an account and security credentials so that Cryptonamo can interact with the ZeroKMS key server.
+The `stash` CLI tool is required for creating an account and security credentials so that CipherStash for DynamoDB can interact with the ZeroKMS key server.
 
 See [here](https://docs.cipherstash.com/reference/cli.html#install-the-cipherstash-cli) for instructions on how to download and install the `stash` CLI tool.
 
@@ -37,7 +37,7 @@ Run `stash signup` and follow the on screen instructions.
 
 ### Upload a dataset config
 
-Cryptonamo fully manages the encrypted record and index settings.
+CipherStash for DynamoDB fully manages the encrypted record and index settings.
 
 However, ZeroKMS currently only initializes the the root key material on upload of a Dataset configuration. This step should not be necessary and we are planning on changing ZeroKMS to initialize the key material on creation of a Dataset.
 
@@ -53,17 +53,17 @@ Upload it to ZeroKMS using the following command:
 
 <!-- cargo-rdme start -->
 
-## Cryptonamo: Encrypted Tables for DynamoDB
+## CipherStash for DynamoDB: Encrypted Tables for DynamoDB
 
-Based on the CipherStash SDK and ZeroKMS key service, Cryptonamo provides a simple interface for
+Based on the CipherStash SDK and ZeroKMS key service, CipherStash for DynamoDB provides a simple interface for
 storing and retrieving encrypted data in DynamoDB.
 
 ## Usage
 
-To use Cryptonamo, you must first create a table in DynamoDB.
+To use CipherStash for DynamoDB, you must first create a table in DynamoDB.
 The table must have a at least partition key, sort key, and term field - all of type String.
 
-Cryptonamo also expects a Global Secondary Index called "TermIndex" to exist if you want to
+CipherStash for DynamoDB also expects a Global Secondary Index called "TermIndex" to exist if you want to
 search and query against records. This index should project all fields and have a key schema
 that is a hash on the term attribute.
 
@@ -83,15 +83,15 @@ aws dynamodb create-table \
     --global-secondary-indexes "IndexName=TermIndex,KeySchema=[{AttributeName=term,KeyType=HASH}],Projection={ProjectionType=ALL},ProvisionedThroughput={ReadCapacityUnits=5,WriteCapacityUnits=5}"
 ```
 
-See below for more information on schema design for Cryptonamo tables.
+See below for more information on schema design for CipherStash for DynamoDB tables.
 
 ### Annotating a Cryptanomo Type
 
-To use Cryptonamo, you must first annotate a struct with the `Encryptable`, `Searchable` and
+To use CipherStash for DynamoDB, you must first annotate a struct with the `Encryptable`, `Searchable` and
 `Decryptable` derive macros.
 
 ```rust
-use cryptonamo::{Searchable, Decryptable, Encryptable};
+use cipherstash_dynamodb::{Searchable, Decryptable, Encryptable};
 
 #[derive(Debug, Searchable, Decryptable, Encryptable)]
 struct User {
@@ -107,7 +107,7 @@ These derive macros will generate implementations for the following traits of th
 * `Encryptable` - a trait that allows you to encrypt a record for storage in DynamoDB
 * `Searchable`  - a trait that allows you to search for records in DynamoDB
 
-The above example is the minimum required to use Cryptonamo however you can expand capabilities via several macros.
+The above example is the minimum required to use CipherStash for DynamoDB however you can expand capabilities via several macros.
 
 ### Controlling Encryption
 
@@ -116,7 +116,7 @@ By default, all fields on an annotated struct are stored encrypted in the table.
 To store a field as a plaintext, you can use the `plaintext` attribute:
 
 ```rust
-use cryptonamo::{Searchable, Decryptable, Encryptable};
+use cipherstash_dynamodb::{Searchable, Decryptable, Encryptable};
 
 #[derive(Debug, Searchable, Decryptable, Encryptable)]
 struct User {
@@ -124,15 +124,15 @@ struct User {
     email: String,
     name: String,
 
-    #[cryptonamo(plaintext)]
+    #[cipherstash(plaintext)]
     not_sensitive: String,
 }
 ```
 
-If you don't want a field stored in the the database at all, you can annotate the field with `#[cryptonamo(skip)]`.
+If you don't want a field stored in the the database at all, you can annotate the field with `#[cipherstash(skip)]`.
 
 ```rust
-use cryptonamo::{Searchable, Encryptable, Decryptable};
+use cipherstash_dynamodb::{Searchable, Encryptable, Decryptable};
 
 #[derive(Debug, Searchable, Encryptable, Decryptable)]
 struct User {
@@ -140,7 +140,7 @@ struct User {
     email: String,
     name: String,
 
-    #[cryptonamo(skip)]
+    #[cipherstash(skip)]
     not_required: String,
 }
 ```
@@ -153,27 +153,27 @@ Cryptanomo requires every record to have a sort key. By default this will be der
 However, if you want to specify your own, you can use the `sort_key_prefix` attribute:
 
 ```rust
-use cryptonamo::Encryptable;
+use cipherstash_dynamodb::Encryptable;
 
 #[derive(Debug, Encryptable)]
-#[cryptonamo(sort_key_prefix = "user")]
+#[cipherstash(sort_key_prefix = "user")]
 struct User {
     #[partition_key]
     email: String,
     name: String,
 
-    #[cryptonamo(skip)]
+    #[cipherstash(skip)]
     not_required: String,
 }
 ```
 
 #### Dynamic Sort keys
 
-Cryptonamo also supports specifying the sort key dynamically based on a field on the struct.
+CipherStash for DynamoDB also supports specifying the sort key dynamically based on a field on the struct.
 You can choose the field using the `#[sort_key]` attribute.
 
 ```rust
-use cryptonamo::Encryptable;
+use cipherstash_dynamodb::Encryptable;
 
 #[derive(Debug, Encryptable)]
 struct User {
@@ -182,7 +182,7 @@ struct User {
     #[sort_key]
     name: String,
 
-    #[cryptonamo(skip)]
+    #[cipherstash(skip)]
     not_required: String,
 }
 ```
@@ -196,15 +196,15 @@ Exact, prefix and compound match types are currently supported.
 To index a field, use the `query` attribute:
 
 ```rust
-use cryptonamo::Encryptable;
+use cipherstash_dynamodb::Encryptable;
 
 #[derive(Debug, Encryptable)]
 struct User {
-    #[cryptonamo(query = "exact")]
+    #[cipherstash(query = "exact")]
     #[partition_key]
     email: String,
     
-   #[cryptonamo(query = "prefix")]
+   #[cipherstash(query = "prefix")]
     name: String,
 }
 ```
@@ -217,15 +217,15 @@ Fields mentioned in the compound index name that aren't correctly annotated will
 compilation error.
 
 ```rust
-use cryptonamo::Encryptable;
+use cipherstash_dynamodb::Encryptable;
 
 #[derive(Debug, Encryptable)]
 struct User {
-    #[cryptonamo(query = "exact", compound = "email#name")]
+    #[cipherstash(query = "exact", compound = "email#name")]
     #[partition_key]
     email: String,
     
-   #[cryptonamo(query = "prefix", compound = "email#name")]
+   #[cipherstash(query = "prefix", compound = "email#name")]
     name: String,
 }
 ```
@@ -235,18 +235,18 @@ different ways.
 
 
 ```rust
-use cryptonamo::Encryptable;
+use cipherstash_dynamodb::Encryptable;
 
 #[derive(Debug, Encryptable)]
 struct User {
-    #[cryptonamo(query = "exact")]
-    #[cryptonamo(query = "exact", compound = "email#name")]
+    #[cipherstash(query = "exact")]
+    #[cipherstash(query = "exact", compound = "email#name")]
     #[partition_key]
     email: String,
     
-   #[cryptonamo(query = "prefix")]
-   #[cryptonamo(query = "exact")]
-   #[cryptonamo(query = "prefix", compound = "email#name")]
+   #[cipherstash(query = "prefix")]
+   #[cipherstash(query = "exact")]
+   #[cipherstash(query = "prefix", compound = "email#name")]
     name: String,
 }
 ```
@@ -267,7 +267,7 @@ This would mean a total of 53 records would be inserted.
 Interacting with a table in DynamoDB is done via the [EncryptedTable] struct.
 
 ```rust
-use cryptonamo::{EncryptedTable, Key};
+use cipherstash_dynamodb::{EncryptedTable, Key};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -326,7 +326,7 @@ let results: Vec<User> = table
     .await?;
 ```
 
-If you have a compound index defined, Cryptonamo will automatically use it when querying.
+If you have a compound index defined, CipherStash for DynamoDB will automatically use it when querying.
 
 ```rust
 let results: Vec<User> = table
@@ -342,24 +342,24 @@ error.
 
 ## Table Verticalization
 
-Cryptonamo uses a technique called "verticalization" which is a popular approach to storing data in DynamoDB.
+CipherStash for DynamoDB uses a technique called "verticalization" which is a popular approach to storing data in DynamoDB.
 In practice, this means you can store multiple types in the same table.
 
 For example, you might want to store related records to `User` such as `License`.
 
 ```rust
-use cryptonamo::{ Searchable, Encryptable, Decryptable };
+use cipherstash_dynamodb::{ Searchable, Encryptable, Decryptable };
 
 #[derive(Debug, Searchable, Encryptable, Decryptable)]
 struct License {
-    #[cryptonamo(query = "exact")]
+    #[cipherstash(query = "exact")]
     #[partition_key]
     user_email: String,
 
-    #[cryptonamo(plaintext)]
+    #[cipherstash(plaintext)]
     license_type: String,
 
-    #[cryptonamo(query = "exact")]
+    #[cipherstash(query = "exact")]
     license_number: String,
 }
 ```
@@ -373,11 +373,11 @@ For example, you might want to query users by name using a prefix (say for using
 
 #[derive(Debug, Searchable, Encryptable, Decryptable)]
 pub struct UserView {
-    #[cryptonamo(skip)]
+    #[cipherstash(skip)]
     #[partition_key]
     email: String,
     
-    #[cryptonamo(query = "prefix")]
+    #[cipherstash(query = "prefix")]
     name: String,
 }
 ```
@@ -400,7 +400,7 @@ So long as the indexes are equivalent, you can mix and match types.
 
 ### Table Schema
 
-Tables created by Cryptonamo have the following schema:
+Tables created by CipherStash for DynamoDB have the following schema:
 
 ```txt
 PK        |  SK           |  term                  |   name       |  email   ....
@@ -420,7 +420,7 @@ They may be encrypted or otherwise.
 
 ### Source Encryption
 
-Cryptonamo uses the CipherStash SDK to encrypt and decrypt data.
+CipherStash for DynamoDB uses the CipherStash SDK to encrypt and decrypt data.
 Values are encypted using a unique key for each record using AES-GCM-SIV with 256-bit keys.
 Key generation is performed using the ZeroKMS key service and bulk operations are supported making even large queries quite fast.
 

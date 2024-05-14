@@ -764,6 +764,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "cipherstash-dynamodb"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "aws-config",
+ "aws-sdk-dynamodb",
+ "cipherstash-client",
+ "cipherstash-dynamodb-derive",
+ "env_logger",
+ "hex",
+ "itertools",
+ "log",
+ "serial_test",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "trybuild",
+]
+
+[[package]]
+name = "cipherstash-dynamodb-derive"
+version = "0.1.0"
+dependencies = [
+ "indexmap 2.1.0",
+ "itertools",
+ "paste",
+ "proc",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.38",
+]
+
+[[package]]
 name = "cmac"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -808,40 +842,6 @@ dependencies = [
  "generic-array",
  "rand_core",
  "typenum",
-]
-
-[[package]]
-name = "cryptonamo"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "aws-config",
- "aws-sdk-dynamodb",
- "cipherstash-client",
- "cryptonamo-derive",
- "env_logger",
- "hex",
- "itertools",
- "log",
- "serial_test",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "trybuild",
-]
-
-[[package]]
-name = "cryptonamo-derive"
-version = "0.1.0"
-dependencies = [
- "indexmap 2.1.0",
- "itertools",
- "paste",
- "proc",
- "proc-macro2",
- "quote",
- "syn 2.0.38",
 ]
 
 [[package]]

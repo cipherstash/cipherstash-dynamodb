@@ -36,14 +36,14 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                .add_protected(#attr, |x| cryptonamo::traits::Plaintext::from(x.#attr_ident.to_owned()))
+                .add_protected(#attr, |x| cipherstash_dynamodb::traits::Plaintext::from(x.#attr_ident.to_owned()))
             }
         })
         .chain(plaintext_attributes.iter().map(|attr| {
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                .add_plaintext(#attr, |x| cryptonamo::traits::TableAttribute::from(x.#attr_ident.clone()))
+                .add_plaintext(#attr, |x| cipherstash_dynamodb::traits::TableAttribute::from(x.#attr_ident.clone()))
             }
         }));
 
@@ -62,14 +62,14 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
     };
 
     let primary_key_impl = if settings.sort_key_field.is_some() {
-        quote! { type PrimaryKey = cryptonamo::PkSk; }
+        quote! { type PrimaryKey = cipherstash_dynamodb::PkSk; }
     } else {
-        quote! { type PrimaryKey = cryptonamo::Pk; }
+        quote! { type PrimaryKey = cipherstash_dynamodb::Pk; }
     };
 
     let expanded = quote! {
         #[automatically_derived]
-        impl cryptonamo::traits::Encryptable for #ident {
+        impl cipherstash_dynamodb::traits::Encryptable for #ident {
             #primary_key_impl
 
             #[inline]
@@ -109,8 +109,8 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
             }
 
             #[allow(clippy::needless_question_mark)]
-            fn into_sealer(self) -> Result<cryptonamo::crypto::Sealer<Self>, cryptonamo::crypto::SealError> {
-                Ok(cryptonamo::crypto::Sealer::new_with_descriptor(self, Self::type_name())
+            fn into_sealer(self) -> Result<cipherstash_dynamodb::crypto::Sealer<Self>, cipherstash_dynamodb::crypto::SealError> {
+                Ok(cipherstash_dynamodb::crypto::Sealer::new_with_descriptor(self, Self::type_name())
                     #(#into_unsealed_impl?)*)
             }
         }
