@@ -9,17 +9,9 @@ use std::{
 //#[skip_serializing_none]
 #[derive(Debug, Clone)]
 pub struct TableEntry {
-    //#[serde(with = "hex")]
     pub(crate) pk: String,
-
-    //#[serde(with = "hex")]
     pub(crate) sk: String,
-
-    //#[serde(with = "hex")]
-    pub(crate) term: Option<String>,
-
-    // Remaining fields
-    //#[serde(flatten)]
+    pub(crate) term: Option<Vec<u8>>,
     pub(crate) attributes: HashMap<String, TableAttribute>,
 }
 
@@ -36,7 +28,7 @@ impl TableEntry {
     pub fn new_with_attributes(
         pk: String,
         sk: String,
-        term: Option<String>,
+        term: Option<Vec<u8>>,
         attributes: HashMap<String, TableAttribute>,
     ) -> Self {
         Self {
@@ -51,7 +43,7 @@ impl TableEntry {
         self.attributes.insert(k.into(), v);
     }
 
-    pub(crate) fn set_term(mut self, term: impl Into<String>) -> Self {
+    pub(crate) fn set_term(mut self, term: impl Into<Vec<u8>>) -> Self {
         self.term = Some(term.into());
         self
     }

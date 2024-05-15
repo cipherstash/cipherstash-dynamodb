@@ -131,11 +131,11 @@ impl EncryptedTable {
         let PrimaryKeyParts { mut pk, mut sk } = k.into().into_parts::<T>();
 
         if T::is_partition_key_encrypted() {
-            pk = hmac("pk", &pk, None, &self.cipher)?;
+            pk = b64_encode(hmac("pk", &pk, None, &self.cipher)?);
         }
 
         if T::is_sort_key_encrypted() {
-            sk = hmac("sk", &sk, Some(pk.as_str()), &self.cipher)?;
+            sk = b64_encode(hmac("sk", &sk, Some(pk.as_str()), &self.cipher)?);
         }
 
         Ok(PrimaryKeyParts { pk, sk })
@@ -174,7 +174,9 @@ impl EncryptedTable {
 
         let transact_items = all_index_keys::<E>(&sk)
             .into_iter()
-            .map(|x| Ok::<_, DeleteError>(hmac("sk", &x, Some(pk.as_str()), &self.cipher)?))
+            .map(|x| {
+                Ok::<_, DeleteError>(b64_encode(hmac("sk", &x, Some(pk.as_str()), &self.cipher)?))
+            })
             .chain([Ok(sk)])
             .map(|sk| {
                 sk.and_then(|sk| {
@@ -235,7 +237,7 @@ impl EncryptedTable {
         }
 
         for index_sk in all_index_keys::<T>(&sk) {
-            let index_sk = hmac("sk", &index_sk, Some(pk.as_str()), &self.cipher)?;
+            let index_sk = b64_encode(hmac("sk", &index_sk, Some(pk.as_str()), &self.cipher)?);
 
             if seen_sk.contains(&index_sk) {
                 continue;
