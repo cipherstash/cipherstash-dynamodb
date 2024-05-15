@@ -1,4 +1,4 @@
-use super::{hmac, SealError, Sealed, Unsealed, MAX_TERMS_PER_INDEX};
+use super::{b64_encode, hmac, SealError, Sealed, Unsealed, MAX_TERMS_PER_INDEX};
 use crate::{
     encrypted_table::{TableAttribute, TableEntry},
     traits::PrimaryKeyParts,
@@ -64,11 +64,11 @@ impl<T> Sealer<T> {
         let mut sk = self.inner.sort_key();
 
         if T::is_partition_key_encrypted() {
-            pk = hmac("pk", &pk, None, cipher)?;
+            pk = b64_encode(hmac("pk", &pk, None, cipher)?);
         }
 
         if T::is_sort_key_encrypted() {
-            sk = hmac("sk", &sk, Some(pk.as_str()), cipher)?;
+            sk = b64_encode(hmac("sk", &sk, Some(pk.as_str()), cipher)?);
         }
 
         let mut table_entry = TableEntry::new_with_attributes(
@@ -137,14 +137,14 @@ impl<T> Sealer<T> {
             .enumerate()
             .take(MAX_TERMS_PER_INDEX)
             .map(|(i, (index_name, term))| {
-                Ok(Sealed(
-                    table_entry.clone().set_term(hex::encode(term)).set_sk(hmac(
+                Ok(Sealed(table_entry.clone().set_term(term).set_sk(
+                    b64_encode(hmac(
                         "sk",
                         &format!("{}#{}#{}", &sk, index_name, i),
                         Some(pk.as_str()),
                         cipher,
                     )?),
-                ))
+                )))
             })
             .chain(once(Ok(Sealed(table_entry.clone()))))
             .collect::<Result<_, SealError>>()?;

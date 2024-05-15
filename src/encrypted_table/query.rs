@@ -1,4 +1,4 @@
-use aws_sdk_dynamodb::types::AttributeValue;
+use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
 use cipherstash_client::encryption::{
     compound_indexer::{ComposableIndex, ComposablePlaintext, Operator},
     EncryptionError, Plaintext,
@@ -76,7 +76,7 @@ where
 
         // With DynamoDB queries must always return a single term
         let term = if let IndexTerm::Binary(x) = index_term {
-            hex::encode(x)
+            AttributeValue::B(Blob::new(x))
         } else {
             Err(QueryError::Other(format!(
                 "Returned IndexTerm had invalid type: {index_term:?}"
@@ -90,7 +90,7 @@ where
             .table_name(&builder.table.table_name)
             .index_name("TermIndex")
             .key_condition_expression("term = :term")
-            .expression_attribute_values(":term", AttributeValue::S(term));
+            .expression_attribute_values(":term", term);
 
         let result = query
             .send()

@@ -29,7 +29,7 @@ pub async fn create_table(client: &Client, table_name: &str) {
         .attribute_definitions(
             AttributeDefinition::builder()
                 .attribute_name("term")
-                .attribute_type(ScalarAttributeType::S)
+                .attribute_type(ScalarAttributeType::B)
                 .build()
                 .expect("Failed to build attribute definition"),
         )

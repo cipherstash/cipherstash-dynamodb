@@ -1,3 +1,4 @@
+mod b64_encode;
 mod sealed;
 mod sealer;
 mod unsealed;
@@ -12,6 +13,7 @@ use cipherstash_client::{
 };
 use thiserror::Error;
 
+pub use b64_encode::*;
 pub use sealed::Sealed;
 pub use sealer::Sealer;
 pub use unsealed::Unsealed;
@@ -65,7 +67,7 @@ pub(crate) fn hmac<C>(
     value: &str,
     salt: Option<&str>,
     cipher: &Encryption<C>,
-) -> Result<String, EncryptionError>
+) -> Result<Vec<u8>, EncryptionError>
 where
     C: Credentials<Token = ServiceToken>,
 {
@@ -81,7 +83,6 @@ where
             32,
         )?
         .as_binary()
-        .map(hex::encode)
         .ok_or(EncryptionError::IndexingError(
             "Invalid term type".to_string(),
         ))

@@ -3,7 +3,7 @@ use crate::{
     traits::{ReadConversionError, WriteConversionError},
     Decryptable,
 };
-use aws_sdk_dynamodb::types::AttributeValue;
+use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
 use cipherstash_client::{
     credentials::{service_credentials::ServiceToken, Credentials},
     encryption::Encryption,
@@ -180,7 +180,7 @@ impl TryFrom<Sealed> for HashMap<String, AttributeValue> {
         map.insert("sk".to_string(), AttributeValue::S(item.0.sk));
 
         if let Some(term) = item.0.term {
-            map.insert("term".to_string(), AttributeValue::S(term));
+            map.insert("term".to_string(), AttributeValue::B(Blob::new(term)));
         }
 
         item.0.attributes.into_iter().for_each(|(k, v)| {
