@@ -750,6 +750,7 @@ dependencies = [
  "cipherstash-client",
  "cipherstash-dynamodb-derive",
  "env_logger",
+ "hex",
  "itertools",
  "log",
  "serial_test",
