@@ -77,9 +77,9 @@ pub enum TableAttribute {
 }
 
 impl TableAttribute {
-    pub(crate) fn as_ciphertext(&self) -> Option<&str> {
-        if let TableAttribute::String(s) = self {
-            Some(s)
+    pub(crate) fn as_hex_ciphertext<'a>(&'a self) -> Option<String> {
+        if let TableAttribute::Bytes(s) = self {
+            Some(hex::encode(s))
         } else {
             None
         }

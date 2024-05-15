@@ -83,23 +83,27 @@ impl<T> Sealer<T> {
             .map(|name| self.unsealed.protected_with_descriptor(name))
             .collect::<Result<Vec<(&Plaintext, &str)>, _>>()?;
 
-        cipher
+        for (enc, name) in cipher
             .encrypt(protected)
             .await?
             .into_iter()
             .zip(T::protected_attributes().into_iter())
-            .for_each(|(enc, name)| {
-                if let Some(e) = enc {
-                    table_entry.add_attribute(
-                        match name {
-                            "pk" => "__pk",
-                            "sk" => "__sk",
-                            _ => name,
-                        },
-                        e.into(),
-                    );
-                }
-            });
+        {
+            if let Some(e) = enc {
+                table_entry.add_attribute(
+                    match name {
+                        "pk" => "__pk",
+                        "sk" => "__sk",
+                        _ => name,
+                    },
+                    hex::decode(e)
+                        .map_err(|_| {
+                            SealError::InvalidCiphertext("Encrypted result was invalid hex".into())
+                        })?
+                        .into(),
+                );
+            }
+        }
 
         let protected_indexes = T::protected_indexes();
         let terms: Vec<(&&str, Vec<u8>)> = protected_indexes
