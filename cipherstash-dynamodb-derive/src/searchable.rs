@@ -14,22 +14,30 @@ pub(crate) fn derive_searchable(input: DeriveInput) -> Result<TokenStream, syn::
     let ident = settings.ident();
 
     let indexes_impl = indexes.iter().map(|(_, index)| {
-        match index {
+        Ok::<_, syn::Error>(match index {
             IndexType::Single(name, index_type) => {
-                let index_type = IndexType::type_to_ident(index_type).unwrap();
+                let index_type = IndexType::type_to_ident(index_type)?;
 
                 quote! {
-                    #name => Some(Box::new(cipherstash_dynamodb::encryption::compound_indexer::#index_type::new(#name, vec![])))
+                    #name => Some(Box::new(cipherstash_dynamodb::encryption::compound_indexer::#index_type::new(vec![])))
                 }
             },
-            IndexType::Compound2 { name, index: ((a, b), (c, d)) } => {
+            IndexType::Compound2 { name, index: ((_name_left, index_type_left), (_name_right, index_type_right)) } => {
+                let left = IndexType::type_to_ident(index_type_left)?;
+                let right = IndexType::type_to_ident(index_type_right)?;
+
                 quote! {
-                    #name => Some(((#a.to_string(), #b.to_string()), (#c.to_string(), #d.to_string())).into())
+                    #name => Some(Box::new(
+                        cipherstash_dynamodb::encryption::compound_indexer::CompoundIndex::new(
+                            cipherstash_dynamodb::encryption::compound_indexer::#left::new(vec![])
+                        ).and(
+                            cipherstash_dynamodb::encryption::compound_indexer::#right::new(vec![])
+                        )))
                 }
             },
             _ => todo!()
-        }
-    });
+        })
+    }).collect::<Result<Vec<_>, _>>()?;
 
     let attributes_for_index_impl = indexes.iter().map(|(_, index)| match index {
         IndexType::Single(name, _) => {
