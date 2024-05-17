@@ -1,6 +1,6 @@
 use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
 use cipherstash_client::encryption::{
-    compound_indexer::{ComposableIndex, ComposablePlaintext, Operator},
+    compound_indexer::{ComposableIndex, ComposablePlaintext},
     EncryptionError, Plaintext,
 };
 use itertools::Itertools;
@@ -35,7 +35,7 @@ pub enum QueryError {
 }
 
 pub struct QueryBuilder<'t, T> {
-    parts: Vec<(String, Plaintext, Operator)>,
+    parts: Vec<(String, Plaintext)>,
     table: &'t EncryptedTable,
     __table: PhantomData<T>,
 }
@@ -53,14 +53,12 @@ where
     }
 
     pub fn eq(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        self.parts
-            .push((name.into(), plaintext.into(), Operator::Eq));
+        self.parts.push((name.into(), plaintext.into()));
         self
     }
 
     pub fn starts_with(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        self.parts
-            .push((name.into(), plaintext.into(), Operator::StartsWith));
+        self.parts.push((name.into(), plaintext.into()));
         self
     }
 

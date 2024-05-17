@@ -63,7 +63,6 @@ pub(crate) fn all_index_keys<E: Searchable + Encryptable>(sort_key: &str) -> Vec
 }
 
 pub(crate) fn hmac<C>(
-    field: &str,
     value: &str,
     salt: Option<&str>,
     cipher: &Encryption<C>,
@@ -72,7 +71,7 @@ where
     C: Credentials<Token = ServiceToken>,
 {
     let plaintext = Plaintext::Utf8Str(Some(value.to_string()));
-    let index = CompoundIndex::new(ExactIndex::new(field, vec![]));
+    let index = CompoundIndex::new(ExactIndex::new(vec![]));
 
     cipher
         .compound_index(
