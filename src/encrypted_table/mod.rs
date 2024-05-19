@@ -260,7 +260,7 @@ impl EncryptedTable {
             .collect::<Result<Vec<_>, _>>()?;
 
         // Dynamo has a limit of 100 items per transaction
-        for items in transact_items.chunks(100).into_iter() {
+        for items in transact_items.chunks(100) {
             self.db
                 .transact_write_items()
                 .set_transact_items(Some(items.to_vec()))
