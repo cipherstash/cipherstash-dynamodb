@@ -12,6 +12,9 @@ defaults:
   run:
     shell: bash -l {0}
 
+env:
+  CARGO_REGISTRIES_CIPHERSTASH_TOKEN: "Token ${{ secrets.CLOUDSMITH_CARGO_TOKEN }}"
+
 jobs:
   test:
     runs-on: ubuntu-latest

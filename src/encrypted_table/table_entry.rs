@@ -77,7 +77,7 @@ pub enum TableAttribute {
 }
 
 impl TableAttribute {
-    pub(crate) fn as_hex_ciphertext<'a>(&'a self) -> Option<String> {
+    pub(crate) fn as_hex_ciphertext(&self) -> Option<String> {
         if let TableAttribute::Bytes(s) = self {
             Some(hex::encode(s))
         } else {
@@ -477,17 +477,17 @@ mod test {
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum TestType {
-        SomeNumber,
-        SomeString,
-        SomeBytes,
+        Number,
+        String,
+        Bytes,
     }
 
     impl From<TestType> for TableAttribute {
         fn from(value: TestType) -> Self {
             match value {
-                TestType::SomeNumber => TableAttribute::Number(42.to_string()),
-                TestType::SomeString => TableAttribute::String("fourty two".to_string()),
-                TestType::SomeBytes => TableAttribute::Bytes(b"101010".to_vec()),
+                TestType::Number => TableAttribute::Number(42.to_string()),
+                TestType::String => TableAttribute::String("fourty two".to_string()),
+                TestType::Bytes => TableAttribute::Bytes(b"101010".to_vec()),
             }
         }
     }
@@ -495,9 +495,9 @@ mod test {
     impl TryFromTableAttr for TestType {
         fn try_from_table_attr(value: TableAttribute) -> Result<Self, ReadConversionError> {
             match value {
-                TableAttribute::Number(n) if n == "42" => Ok(Self::SomeNumber),
-                TableAttribute::String(s) if s == "fourty two" => Ok(Self::SomeString),
-                TableAttribute::Bytes(b) if b == b"101010" => Ok(Self::SomeBytes),
+                TableAttribute::Number(n) if n == "42" => Ok(Self::Number),
+                TableAttribute::String(s) if s == "fourty two" => Ok(Self::String),
+                TableAttribute::Bytes(b) if b == b"101010" => Ok(Self::Bytes),
                 _ => Err(ReadConversionError::ConversionFailed("".to_string())),
             }
         }
@@ -538,10 +538,10 @@ mod test {
     #[test]
     fn test_to_and_from_list() {
         let test_vec = vec![
-            TestType::SomeNumber,
-            TestType::SomeNumber,
-            TestType::SomeString,
-            TestType::SomeBytes,
+            TestType::Number,
+            TestType::Number,
+            TestType::String,
+            TestType::Bytes,
         ];
 
         let table_attribute = TableAttribute::from(test_vec.clone());
