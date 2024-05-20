@@ -3,9 +3,9 @@ use crate::{
     traits::{ReadConversionError, WriteConversionError},
     Decryptable,
 };
-use aws_sdk_dynamodb::types::AttributeValue;
+use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
 use cipherstash_client::{
-    credentials::{vitur_credentials::ViturToken, Credentials},
+    credentials::{service_credentials::ServiceToken, Credentials},
     encryption::Encryption,
 };
 use std::collections::HashMap;
@@ -41,7 +41,7 @@ impl Sealed {
         cipher: &Encryption<C>,
     ) -> Result<Vec<T>, SealError>
     where
-        C: Credentials<Token = ViturToken>,
+        C: Credentials<Token = ServiceToken>,
         T: Decryptable,
     {
         let items = items.as_ref();
@@ -49,7 +49,7 @@ impl Sealed {
         let decryptable_attributes = T::decryptable_attributes();
 
         let mut plaintext_items: Vec<Vec<&TableAttribute>> = Vec::with_capacity(items.len());
-        let mut decryptable_items: Vec<&str> =
+        let mut decryptable_items: Vec<String> =
             Vec::with_capacity(items.len() * decryptable_attributes.len());
 
         for item in items.iter() {
@@ -64,7 +64,7 @@ impl Sealed {
 
                     attribute
                         .ok_or_else(|| SealError::MissingAttribute(name.to_string()))?
-                        .as_ciphertext()
+                        .as_hex_ciphertext()
                         .ok_or_else(|| SealError::InvalidCiphertext(name.to_string()))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
@@ -122,7 +122,7 @@ impl Sealed {
     /// If you need to unseal multiple values at once use [`Sealed::unseal_all`]
     pub(crate) async fn unseal<C, T>(self, cipher: &Encryption<C>) -> Result<T, SealError>
     where
-        C: Credentials<Token = ViturToken>,
+        C: Credentials<Token = ServiceToken>,
         T: Decryptable,
     {
         let mut vec = Self::unseal_all([self], cipher).await?;
@@ -180,7 +180,7 @@ impl TryFrom<Sealed> for HashMap<String, AttributeValue> {
         map.insert("sk".to_string(), AttributeValue::S(item.0.sk));
 
         if let Some(term) = item.0.term {
-            map.insert("term".to_string(), AttributeValue::S(term));
+            map.insert("term".to_string(), AttributeValue::B(Blob::new(term)));
         }
 
         item.0.attributes.into_iter().for_each(|(k, v)| {

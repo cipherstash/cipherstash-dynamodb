@@ -1,11 +1,11 @@
-use super::{hmac, SealError, Sealed, Unsealed, MAX_TERMS_PER_INDEX};
+use super::{b64_encode, hmac, SealError, Sealed, Unsealed, MAX_TERMS_PER_INDEX};
 use crate::{
     encrypted_table::{TableAttribute, TableEntry},
     traits::PrimaryKeyParts,
     Searchable,
 };
 use cipherstash_client::{
-    credentials::{vitur_credentials::ViturToken, Credentials},
+    credentials::{service_credentials::ServiceToken, Credentials},
     encryption::{compound_indexer::CompoundIndex, Encryption, IndexTerm, Plaintext},
 };
 use itertools::Itertools;
@@ -57,18 +57,18 @@ impl<T> Sealer<T> {
         term_length: usize, // TODO: SealError
     ) -> Result<(PrimaryKeyParts, Vec<Sealed>), SealError>
     where
-        C: Credentials<Token = ViturToken>,
+        C: Credentials<Token = ServiceToken>,
         T: Searchable,
     {
         let mut pk = self.inner.partition_key();
         let mut sk = self.inner.sort_key();
 
         if T::is_partition_key_encrypted() {
-            pk = hmac("pk", &pk, None, cipher)?;
+            pk = b64_encode(hmac(&pk, None, cipher)?);
         }
 
         if T::is_sort_key_encrypted() {
-            sk = hmac("sk", &sk, Some(pk.as_str()), cipher)?;
+            sk = b64_encode(hmac(&sk, Some(pk.as_str()), cipher)?);
         }
 
         let mut table_entry = TableEntry::new_with_attributes(
@@ -83,23 +83,27 @@ impl<T> Sealer<T> {
             .map(|name| self.unsealed.protected_with_descriptor(name))
             .collect::<Result<Vec<(&Plaintext, &str)>, _>>()?;
 
-        cipher
+        for (enc, name) in cipher
             .encrypt(protected)
             .await?
             .into_iter()
             .zip(T::protected_attributes().into_iter())
-            .for_each(|(enc, name)| {
-                if let Some(e) = enc {
-                    table_entry.add_attribute(
-                        match name {
-                            "pk" => "__pk",
-                            "sk" => "__sk",
-                            _ => name,
-                        },
-                        e.into(),
-                    );
-                }
-            });
+        {
+            if let Some(e) = enc {
+                table_entry.add_attribute(
+                    match name {
+                        "pk" => "__pk",
+                        "sk" => "__sk",
+                        _ => name,
+                    },
+                    hex::decode(e)
+                        .map_err(|_| {
+                            SealError::InvalidCiphertext("Encrypted result was invalid hex".into())
+                        })?
+                        .into(),
+                );
+            }
+        }
 
         let protected_indexes = T::protected_indexes();
         let terms: Vec<(&&str, Vec<u8>)> = protected_indexes
@@ -137,14 +141,13 @@ impl<T> Sealer<T> {
             .enumerate()
             .take(MAX_TERMS_PER_INDEX)
             .map(|(i, (index_name, term))| {
-                Ok(Sealed(
-                    table_entry.clone().set_term(hex::encode(term)).set_sk(hmac(
-                        "sk",
+                Ok(Sealed(table_entry.clone().set_term(term).set_sk(
+                    b64_encode(hmac(
                         &format!("{}#{}#{}", &sk, index_name, i),
                         Some(pk.as_str()),
                         cipher,
                     )?),
-                ))
+                )))
             })
             .chain(once(Ok(Sealed(table_entry.clone()))))
             .collect::<Result<_, SealError>>()?;

@@ -63,6 +63,7 @@ run_dynamodb &
 PID="$!"
 
 if [ "$NEW_DB" = true ]; then
+  sleep 5
   create_tables
 fi
 

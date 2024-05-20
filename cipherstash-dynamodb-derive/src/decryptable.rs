@@ -20,7 +20,7 @@ pub(crate) fn derive_decryptable(input: DeriveInput) -> Result<TokenStream, syn:
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                #attr_ident: ::cipherstash_dynamodb::traits::TryFromPlaintext::try_from_plaintext(unsealed.from_protected(#attr)?)?
+                #attr_ident: TryFrom::try_from(unsealed.from_protected(#attr)?.to_owned())?
             }
         })
         .chain(plaintext_attributes.iter().map(|attr| {

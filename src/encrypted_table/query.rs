@@ -1,6 +1,6 @@
-use aws_sdk_dynamodb::types::AttributeValue;
+use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
 use cipherstash_client::encryption::{
-    compound_indexer::{ComposableIndex, ComposablePlaintext, Operator},
+    compound_indexer::{ComposableIndex, ComposablePlaintext},
     EncryptionError, Plaintext,
 };
 use itertools::Itertools;
@@ -35,7 +35,7 @@ pub enum QueryError {
 }
 
 pub struct QueryBuilder<'t, T> {
-    parts: Vec<(String, Plaintext, Operator)>,
+    parts: Vec<(String, Plaintext)>,
     table: &'t EncryptedTable,
     __table: PhantomData<T>,
 }
@@ -53,14 +53,12 @@ where
     }
 
     pub fn eq(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        self.parts
-            .push((name.into(), plaintext.into(), Operator::Eq));
+        self.parts.push((name.into(), plaintext.into()));
         self
     }
 
     pub fn starts_with(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        self.parts
-            .push((name.into(), plaintext.into(), Operator::StartsWith));
+        self.parts.push((name.into(), plaintext.into()));
         self
     }
 
@@ -76,7 +74,7 @@ where
 
         // With DynamoDB queries must always return a single term
         let term = if let IndexTerm::Binary(x) = index_term {
-            hex::encode(x)
+            AttributeValue::B(Blob::new(x))
         } else {
             Err(QueryError::Other(format!(
                 "Returned IndexTerm had invalid type: {index_term:?}"
@@ -90,7 +88,7 @@ where
             .table_name(&builder.table.table_name)
             .index_name("TermIndex")
             .key_condition_expression("term = :term")
-            .expression_attribute_values(":term", AttributeValue::S(term));
+            .expression_attribute_values(":term", term);
 
         let result = query
             .send()

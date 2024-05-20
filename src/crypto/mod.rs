@@ -1,10 +1,11 @@
+mod b64_encode;
 mod sealed;
 mod sealer;
 mod unsealed;
 
 use crate::traits::{Encryptable, ReadConversionError, Searchable, WriteConversionError};
 use cipherstash_client::{
-    credentials::{vitur_credentials::ViturToken, Credentials},
+    credentials::{service_credentials::ServiceToken, Credentials},
     encryption::{
         compound_indexer::{CompoundIndex, ExactIndex},
         Encryption, EncryptionError, Plaintext, TypeParseError,
@@ -12,6 +13,7 @@ use cipherstash_client::{
 };
 use thiserror::Error;
 
+pub use b64_encode::*;
 pub use sealed::Sealed;
 pub use sealer::Sealer;
 pub use unsealed::Unsealed;
@@ -61,16 +63,15 @@ pub(crate) fn all_index_keys<E: Searchable + Encryptable>(sort_key: &str) -> Vec
 }
 
 pub(crate) fn hmac<C>(
-    field: &str,
     value: &str,
     salt: Option<&str>,
     cipher: &Encryption<C>,
-) -> Result<String, EncryptionError>
+) -> Result<Vec<u8>, EncryptionError>
 where
-    C: Credentials<Token = ViturToken>,
+    C: Credentials<Token = ServiceToken>,
 {
     let plaintext = Plaintext::Utf8Str(Some(value.to_string()));
-    let index = CompoundIndex::new(ExactIndex::new(field, vec![]));
+    let index = CompoundIndex::new(ExactIndex::new(vec![]));
 
     cipher
         .compound_index(
@@ -81,7 +82,6 @@ where
             32,
         )?
         .as_binary()
-        .map(hex::encode)
         .ok_or(EncryptionError::IndexingError(
             "Invalid term type".to_string(),
         ))
