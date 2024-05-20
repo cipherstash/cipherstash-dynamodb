@@ -1,5 +1,9 @@
 [package]
 name = "cipherstash-dynamodb"
+license-file = "LICENSE"
+homepage = "https://cipherstash.com"
+readme = "README.md"
+description = "CipherStash client for storing and querying encrypted data in DynamoDB"
 version = "0.1.0"
 edition = "2021"
 
@@ -18,7 +22,7 @@ edition = "2021"
 [dependencies]
 aws-sdk-dynamodb = "1.3.0"
 tokio = { version = "1", features = ["full"] }
-cipherstash-dynamodb-derive = { path = "cipherstash-dynamodb-derive" }
+cipherstash-dynamodb-derive = { version = "0.1", path = "cipherstash-dynamodb-derive", registry = "cipherstash" }
 
 cipherstash-client = { version = "0.7.0", features = [ "tokio" ], registry = "cipherstash" }
 
