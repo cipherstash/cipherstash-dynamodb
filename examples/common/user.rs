@@ -27,7 +27,6 @@ impl User {
     }
 }
 
-// TODO: Move all these into a proper tests module
 #[cfg(test)]
 mod tests {
     use itertools::Itertools;

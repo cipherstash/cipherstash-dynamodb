@@ -274,7 +274,6 @@ impl EncryptedTable {
 
     pub async fn put<T>(&self, record: T) -> Result<(), PutError>
     where
-        // TODO: We may want to create a separate put_with_indexes function for Searchable types
         T: Searchable,
     {
         let mut seen_sk = HashSet::new();
@@ -282,7 +281,6 @@ impl EncryptedTable {
         let sealer: Sealer<T> = record.into_sealer()?;
         let (PrimaryKeyParts { pk, sk }, sealed) = sealer.seal(&self.cipher, 12).await?;
 
-        // TODO: Use a combinator
         let mut items: Vec<TransactWriteItem> = Vec::with_capacity(sealed.len());
 
         for entry in table_entries.into_iter() {

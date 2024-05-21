@@ -20,7 +20,6 @@ pub use unsealed::Unsealed;
 
 const MAX_TERMS_PER_INDEX: usize = 25;
 
-// TODO: Should we just call this CryptoError?
 #[derive(Debug, Error)]
 pub enum SealError {
     #[error("Failed to encrypt partition key")]

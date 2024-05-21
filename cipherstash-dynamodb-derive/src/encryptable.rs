@@ -9,7 +9,7 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
         .field_attributes(&input)?
         .build()?;
 
-    let partition_key_field = settings.get_partition_key()?;
+    let partition_key_field = settings.get_partition_key();
     let partition_key = format_ident!("{partition_key_field}");
     let type_name = settings.type_name.clone();
 
