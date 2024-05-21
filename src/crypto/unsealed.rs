@@ -4,7 +4,6 @@ use std::collections::HashMap;
 
 use super::SealError;
 
-// TODO: Zeroize, Debug, Display overrides (from SafeVec?)
 /// Wrapper to indicate that a value is NOT encrypted
 pub struct Unsealed {
     /// Optional descriptor prefix
@@ -32,22 +31,21 @@ impl Unsealed {
         }
     }
 
-    // TODO: Rename these to get_protected and get_unprotected
-    pub fn from_protected(&self, name: &str) -> Result<&Plaintext, SealError> {
+    pub fn get_protected(&self, name: &str) -> Result<&Plaintext, SealError> {
         let (plaintext, _) = self
             .protected
             .get(name)
-            .ok_or(SealError::MissingAttribute(name.to_string()))?;
+            .ok_or_else(|| SealError::MissingAttribute(name.to_string()))?;
 
         Ok(plaintext)
     }
 
-    pub fn from_plaintext(&self, name: &str) -> Result<TableAttribute, SealError> {
+    pub fn get_plaintext(&self, name: &str) -> Result<TableAttribute, SealError> {
         Ok(self
             .unprotected
             .get(name)
-            .ok_or(SealError::MissingAttribute(name.to_string()))?
-            .clone())
+            .cloned()
+            .ok_or_else(|| SealError::MissingAttribute(name.to_string()))?)
     }
 
     pub(super) fn add_protected(&mut self, name: impl Into<String>, plaintext: Plaintext) {

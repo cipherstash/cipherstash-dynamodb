@@ -32,7 +32,6 @@ pub enum WriteConversionError {
 pub trait Encryptable: Debug + Sized {
     type PrimaryKey: PrimaryKey;
 
-    // TODO: Add a function indicating that the root should be stored
     fn type_name() -> &'static str;
 
     fn sort_key_prefix() -> Option<&'static str>;
@@ -57,9 +56,7 @@ pub trait Encryptable: Debug + Sized {
 }
 
 pub trait Searchable: Encryptable {
-    // FIXME: This would be cleaner with a DSL
-    #[allow(unused_variables)]
-    fn attribute_for_index(&self, index_name: &str) -> Option<ComposablePlaintext> {
+    fn attribute_for_index(&self, _index_name: &str) -> Option<ComposablePlaintext> {
         None
     }
 
