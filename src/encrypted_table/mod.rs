@@ -6,10 +6,8 @@ pub use self::{
 };
 use crate::{
     crypto::*,
-    traits::{
-        Decryptable, PrimaryKey, PrimaryKeyParts, ReadConversionError, Searchable,
-        WriteConversionError,
-    },
+    errors::*,
+    traits::{Decryptable, PrimaryKey, PrimaryKeyParts, Searchable},
     Encryptable,
 };
 use aws_sdk_dynamodb::{
@@ -17,14 +15,13 @@ use aws_sdk_dynamodb::{
     Client,
 };
 use cipherstash_client::{
-    config::{console_config::ConsoleConfig, errors::ConfigError, zero_kms_config::ZeroKMSConfig},
+    config::{console_config::ConsoleConfig, zero_kms_config::ZeroKMSConfig},
     credentials::{auto_refresh::AutoRefresh, service_credentials::ServiceCredentials},
     encryption::{Encryption, EncryptionError},
-    zero_kms::{errors::LoadConfigError, DatasetConfigWithIndexRootKey, ZeroKMS},
+    zero_kms::{DatasetConfigWithIndexRootKey, ZeroKMS},
 };
 use log::info;
 use std::collections::HashSet;
-use thiserror::Error;
 
 pub struct EncryptedTable {
     db: Client,
@@ -32,52 +29,6 @@ pub struct EncryptedTable {
     // We may use this later but for now the config is in code
     _dataset_config: DatasetConfigWithIndexRootKey,
     table_name: String,
-}
-
-#[derive(Error, Debug)]
-pub enum PutError {
-    #[error("AwsError: {0}")]
-    Aws(String),
-    #[error("AwsBuildError: {0}")]
-    AwsBuildError(#[from] aws_sdk_dynamodb::error::BuildError),
-    #[error("Write Conversion Error: {0}")]
-    WriteConversion(#[from] WriteConversionError),
-    #[error("SealError: {0}")]
-    Seal(#[from] SealError),
-    #[error("CryptoError: {0}")]
-    Crypto(#[from] CryptoError),
-    #[error("Encryption Error: {0}")]
-    Encryption(#[from] EncryptionError),
-}
-
-#[derive(Error, Debug)]
-pub enum GetError {
-    #[error("SealError: {0}")]
-    Seal(#[from] SealError),
-    #[error("Encryption Error: {0}")]
-    Encryption(#[from] EncryptionError),
-    #[error("AwsError: {0}")]
-    Aws(String),
-    #[error("Read Conversion Error: {0}")]
-    ReadConversion(#[from] ReadConversionError),
-}
-
-#[derive(Error, Debug)]
-pub enum DeleteError {
-    #[error("Encryption Error: {0}")]
-    Encryption(#[from] EncryptionError),
-    #[error("AwsBuildError: {0}")]
-    AwsBuildError(#[from] aws_sdk_dynamodb::error::BuildError),
-    #[error("AwsError: {0}")]
-    Aws(String),
-}
-
-#[derive(Error, Debug)]
-pub enum InitError {
-    #[error("ConfigError: {0}")]
-    Config(#[from] ConfigError),
-    #[error("LoadConfigError: {0}")]
-    LoadConfig(#[from] LoadConfigError),
 }
 
 impl EncryptedTable {

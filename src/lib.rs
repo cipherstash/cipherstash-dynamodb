@@ -525,12 +525,13 @@
 //! - [ ] Sort keys are not currently hashed (and should be)
 //!
 pub mod crypto;
-mod encrypted_table;
-mod error;
+pub mod encrypted_table;
 pub mod traits;
 pub use encrypted_table::{EncryptedTable, QueryBuilder};
-pub use error::Error;
 pub use traits::{Decryptable, Encryptable, Pk, PkSk, PrimaryKey, Searchable};
+
+pub mod errors;
+pub use errors::Error;
 
 #[doc(hidden)]
 pub use cipherstash_dynamodb_derive::{Decryptable, Encryptable, Searchable};
