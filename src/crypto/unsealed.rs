@@ -41,11 +41,11 @@ impl Unsealed {
     }
 
     pub fn get_plaintext(&self, name: &str) -> Result<TableAttribute, SealError> {
-        Ok(self
+        self
             .unprotected
             .get(name)
             .cloned()
-            .ok_or_else(|| SealError::MissingAttribute(name.to_string()))?)
+            .ok_or_else(|| SealError::MissingAttribute(name.to_string()))
     }
 
     pub(super) fn add_protected(&mut self, name: impl Into<String>, plaintext: Plaintext) {
