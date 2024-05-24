@@ -21,7 +21,7 @@ edition = "2021"
 
 [dependencies]
 cipherstash-client = { version = "0.7.0", registry = "cipherstash" }
-cipherstash-dynamodb-derive = { version = "0.1", path = "cipherstash-dynamodb-derive", registry = "cipherstash" }
+cipherstash-dynamodb-derive = { version = "0.2", path = "cipherstash-dynamodb-derive", registry = "cipherstash" }
 
 aws-sdk-dynamodb = "1.3.0"
 async-trait = "0.1.73"
