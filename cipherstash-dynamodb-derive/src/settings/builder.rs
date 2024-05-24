@@ -340,7 +340,7 @@ impl SettingsBuilder {
             type_name,
             sort_key_prefix,
             sort_key_field,
-            partition_key_field: partition_key,
+            partition_key_field,
             protected_attributes,
             unprotected_attributes,
             skipped_attributes,
@@ -349,7 +349,7 @@ impl SettingsBuilder {
 
         let sort_key_prefix = sort_key_prefix.into_prefix(&type_name);
 
-        let partition_key = partition_key.ok_or_else(|| {
+        let partition_key_field = partition_key_field.ok_or_else(|| {
             syn::Error::new(
                 proc_macro2::Span::call_site(),
                 "Missing required attribute: #[partition_key]",
@@ -361,7 +361,7 @@ impl SettingsBuilder {
             sort_key_prefix,
             type_name,
             sort_key_field,
-            partition_key_field: Some(partition_key), // TODO: Remove the Some
+            partition_key_field,
             protected_attributes,
             unprotected_attributes,
             skipped_attributes,
@@ -387,7 +387,6 @@ impl SettingsBuilder {
         }
     }
 
-    // TODO: Add an IndexOptions enum so we can pass those through as well
     fn add_index(
         &mut self,
         name: impl Into<String>,
