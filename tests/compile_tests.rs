@@ -35,6 +35,7 @@ run_tests! {
 
     pass => {
         "./ui/pass.rs",
+        "./ui/public_api.rs",
         "./ui/pk-field-on-struct.rs",
         "./ui/various-fields.rs"
     }
