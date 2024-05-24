@@ -6,10 +6,8 @@ pub use self::{
 };
 use crate::{
     crypto::*,
-    traits::{
-        Decryptable, PrimaryKey, PrimaryKeyParts, ReadConversionError, Searchable,
-        WriteConversionError,
-    },
+    errors::*,
+    traits::{Decryptable, PrimaryKey, PrimaryKeyParts, Searchable},
     Encryptable,
 };
 use aws_sdk_dynamodb::{
@@ -17,14 +15,13 @@ use aws_sdk_dynamodb::{
     Client,
 };
 use cipherstash_client::{
-    config::{console_config::ConsoleConfig, errors::ConfigError, zero_kms_config::ZeroKMSConfig},
+    config::{console_config::ConsoleConfig, zero_kms_config::ZeroKMSConfig},
     credentials::{auto_refresh::AutoRefresh, service_credentials::ServiceCredentials},
     encryption::{Encryption, EncryptionError},
-    zero_kms::{errors::LoadConfigError, DatasetConfigWithIndexRootKey, ZeroKMS},
+    zero_kms::{DatasetConfigWithIndexRootKey, ZeroKMS},
 };
 use log::info;
 use std::collections::HashSet;
-use thiserror::Error;
 
 pub struct EncryptedTable {
     db: Client,
@@ -32,118 +29,6 @@ pub struct EncryptedTable {
     // We may use this later but for now the config is in code
     _dataset_config: DatasetConfigWithIndexRootKey,
     table_name: String,
-}
-
-#[derive(Error, Debug)]
-pub enum PutError {
-    #[error("AwsError: {0}")]
-    Aws(String),
-    #[error("AwsBuildError: {0}")]
-    AwsBuildError(#[from] aws_sdk_dynamodb::error::BuildError),
-    #[error("Write Conversion Error: {0}")]
-    WriteConversion(#[from] WriteConversionError),
-    #[error("SealError: {0}")]
-    Seal(#[from] SealError),
-    #[error("CryptoError: {0}")]
-    Crypto(#[from] CryptoError),
-    #[error("Encryption Error: {0}")]
-    Encryption(#[from] EncryptionError),
-}
-
-#[derive(Error, Debug)]
-pub enum GetError {
-    #[error("SealError: {0}")]
-    Seal(#[from] SealError),
-    #[error("Encryption Error: {0}")]
-    Encryption(#[from] EncryptionError),
-    #[error("AwsError: {0}")]
-    Aws(String),
-    #[error("Read Conversion Error: {0}")]
-    ReadConversion(#[from] ReadConversionError),
-}
-
-#[derive(Error, Debug)]
-pub enum DeleteError {
-    #[error("Encryption Error: {0}")]
-    Encryption(#[from] EncryptionError),
-    #[error("AwsBuildError: {0}")]
-    AwsBuildError(#[from] aws_sdk_dynamodb::error::BuildError),
-    #[error("AwsError: {0}")]
-    Aws(String),
-}
-
-#[derive(Error, Debug)]
-pub enum InitError {
-    #[error("ConfigError: {0}")]
-    Config(#[from] ConfigError),
-    #[error("LoadConfigError: {0}")]
-    LoadConfig(#[from] LoadConfigError),
-}
-
-impl<T: EncryptedRecord> Query<T> {
-    pub fn eq(name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        Self::new(name.into(), plaintext.into(), Operator::Eq)
-    }
-
-    pub fn starts_with(name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        Self::new(name.into(), plaintext.into(), Operator::StartsWith)
-    }
-
-    pub fn new(name: String, plaintext: Plaintext, op: Operator) -> Self {
-        Self {
-            parts: vec![(name, plaintext, op)],
-            __table: Default::default(),
-        }
-    }
-
-    pub fn and_eq(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        self.parts
-            .push((name.into(), plaintext.into(), Operator::Eq));
-        self
-    }
-
-    pub fn and_starts_with(
-        mut self,
-        name: impl Into<String>,
-        plaintext: impl Into<Plaintext>,
-    ) -> Self {
-        self.parts
-            .push((name.into(), plaintext.into(), Operator::StartsWith));
-        self
-    }
-
-    pub fn build(
-        self,
-    ) -> Result<(String, Box<dyn ComposableIndex>, ComposablePlaintext), QueryError> {
-        let items_len = self.parts.len();
-
-        // this is the simplest way to brute force the index names but relies on some gross
-        // stringly typing which doesn't feel good
-        for perm in self.parts.iter().permutations(items_len) {
-            let (name, plaintexts): (Vec<&String>, Vec<&Plaintext>) =
-                perm.into_iter().map(|x| (&x.0, &x.1)).unzip();
-
-            let name = name.iter().join("#");
-
-            if let Some(index) = T::index_by_name(name.as_str()) {
-                let mut plaintext = ComposablePlaintext::new(plaintexts[0].clone());
-
-                for p in plaintexts[1..].into_iter() {
-                    plaintext = plaintext
-                        .try_compose((*p).clone())
-                        .expect("Failed to compose");
-                }
-
-                return Ok((name, index, plaintext));
-            }
-        }
-
-        let fields = self.parts.iter().map(|x| &x.0).join(",");
-
-        Err(QueryError::InvalidQuery(format!(
-            "Could not build query for fields: {fields}"
-        )))
-    }
 }
 
 impl EncryptedTable {

@@ -1,38 +1,18 @@
 use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
 use cipherstash_client::encryption::{
     compound_indexer::{ComposableIndex, ComposablePlaintext},
-    EncryptionError, Plaintext,
+    Plaintext,
 };
 use itertools::Itertools;
 use std::marker::PhantomData;
-use thiserror::Error;
 
 use crate::{
-    crypto::CryptoError,
     encrypted_table::Sealed,
     traits::{Decryptable, Searchable},
 };
 use cipherstash_client::encryption::{compound_indexer::CompoundIndex, IndexTerm};
 
-use super::{EncryptedTable, SealError};
-
-#[derive(Error, Debug)]
-pub enum QueryError {
-    #[error("InvaldQuery: {0}")]
-    InvalidQuery(String),
-    #[error("CryptoError: {0}")]
-    CryptoError(#[from] CryptoError),
-    #[error("SealError: {0}")]
-    SealError(#[from] SealError),
-    #[error("EncryptionError: {0}")]
-    EncryptionError(#[from] EncryptionError),
-    #[error("AwsError: {0}")]
-    AwsError(String),
-    #[error("ReadConversionError: {0}")]
-    ReadConversionError(#[from] crate::traits::ReadConversionError),
-    #[error("{0}")]
-    Other(String),
-}
+use super::{EncryptedTable, QueryError};
 
 pub struct QueryBuilder<'t, T> {
     parts: Vec<(String, Plaintext)>,
