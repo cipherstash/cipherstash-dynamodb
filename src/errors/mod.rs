@@ -80,10 +80,7 @@ pub enum InitError {
     LoadConfig(#[from] LoadConfigError),
 }
 
-/// Error abstracing all errors returned by `cipherstash-dynamodb`.
-///
-/// If you use this error you can use `?` to convert from other `cipherstash-dynamodb` errors to
-/// this one.
+/// The [`Error`] type abstracts all errors returned by `cipherstash-dynamodb` for easy use with the `?` operator.
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("InitError: {0}")]
@@ -94,4 +91,6 @@ pub enum Error {
     GetError(#[from] GetError),
     #[error("DeleteError: {0}")]
     DeleteError(#[from] DeleteError),
+    #[error("QueryError: {0}")]
+    QueryError(#[from] QueryError),
 }
