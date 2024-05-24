@@ -41,8 +41,7 @@ impl Unsealed {
     }
 
     pub fn get_plaintext(&self, name: &str) -> Result<TableAttribute, SealError> {
-        self
-            .unprotected
+        self.unprotected
             .get(name)
             .cloned()
             .ok_or_else(|| SealError::MissingAttribute(name.to_string()))
