@@ -1,8 +1,8 @@
-use super::{b64_encode, hmac, SealError, Sealed, Unsealed, MAX_TERMS_PER_INDEX};
+use super::{b64_encode, format_term_key, hmac, SealError, Sealed, Unsealed, MAX_TERMS_PER_INDEX};
 use crate::{
     encrypted_table::{TableAttribute, TableEntry},
     traits::PrimaryKeyParts,
-    Searchable,
+    IndexType, Searchable,
 };
 use cipherstash_client::{
     credentials::{service_credentials::ServiceToken, Credentials},
@@ -86,17 +86,18 @@ impl<T> Sealer<T> {
                 record.unsealed.unprotected(),
             );
 
-            let terms: Vec<(&&str, Vec<u8>)> = protected_indexes
+            let terms: Vec<(&&str, IndexType, Vec<u8>)> = protected_indexes
                 .iter()
-                .map(|index_name| {
+                .map(|(index_name, index_type)| {
                     record
                         .inner
-                        .attribute_for_index(index_name)
+                        .attribute_for_index(index_name, *index_type)
                         .and_then(|attr| {
-                            S::index_by_name(index_name).map(|index| (attr, index, index_name))
+                            S::index_by_name(index_name, *index_type)
+                                .map(|index| (attr, index, index_name, index_type))
                         })
                         .ok_or(SealError::MissingAttribute(index_name.to_string()))
-                        .and_then(|(attr, index, index_name)| {
+                        .and_then(|(attr, index, index_name, index_type)| {
                             let term = cipher.compound_index(
                                 &CompoundIndex::new(index),
                                 attr,
@@ -104,18 +105,21 @@ impl<T> Sealer<T> {
                                 term_length,
                             )?;
 
-                            Ok::<_, SealError>((index_name, term))
+                            Ok::<_, SealError>((index_name, index_type, term))
                         })
                 })
                 .map(|index_term| match index_term {
-                    Ok((index_name, IndexTerm::Binary(x))) => Ok(vec![(index_name, x)]),
-                    Ok((index_name, IndexTerm::BinaryVec(x))) => {
-                        Ok(x.into_iter().map(|x| (index_name, x)).collect())
+                    Ok((index_name, index_type, IndexTerm::Binary(x))) => {
+                        Ok(vec![(index_name, *index_type, x)])
                     }
+                    Ok((index_name, index_type, IndexTerm::BinaryVec(x))) => Ok(x
+                        .into_iter()
+                        .take(MAX_TERMS_PER_INDEX)
+                        .map(|x| (index_name, *index_type, x))
+                        .collect()),
                     _ => Err(SealError::InvalidCiphertext("Invalid index term".into())),
                 })
                 .flatten_ok()
-                .take(MAX_TERMS_PER_INDEX)
                 .try_collect()?;
 
             table_entries.push((PrimaryKeyParts { pk, sk }, table_entry, terms));
@@ -153,11 +157,10 @@ impl<T> Sealer<T> {
             let table_entries = terms
                 .into_iter()
                 .enumerate()
-                .take(MAX_TERMS_PER_INDEX)
-                .map(|(i, (index_name, term))| {
+                .map(|(i, (index_name, index_type, term))| {
                     Ok(Sealed(table_entry.clone().set_term(term).set_sk(
                         b64_encode(hmac(
-                            &format!("{}#{}#{}", &primary_key.sk, index_name, i),
+                            &format_term_key(&primary_key.sk, index_name, index_type, i),
                             Some(primary_key.pk.as_str()),
                             cipher,
                         )?),

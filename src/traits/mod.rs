@@ -10,8 +10,43 @@ pub use cipherstash_client::encryption::{
 mod primary_key;
 pub use primary_key::*;
 
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use thiserror::Error;
+
+#[derive(Debug, Clone, Copy)]
+pub enum SingleIndex {
+    Exact,
+    Prefix,
+}
+
+impl Display for SingleIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Exact => f.write_str("exact"),
+            Self::Prefix => f.write_str("prefix"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum IndexType {
+    Single(SingleIndex),
+    Compound2((SingleIndex, SingleIndex)),
+}
+
+impl Display for IndexType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Single(index) => Display::fmt(index, f),
+            Self::Compound2((index_a, index_b)) => {
+                Display::fmt(index_a, f)?;
+                f.write_str(":")?;
+                Display::fmt(index_b, f)?;
+                Ok(())
+            }
+        }
+    }
+}
 
 #[derive(Debug, Error)]
 pub enum ReadConversionError {
@@ -56,16 +91,22 @@ pub trait Encryptable: Debug + Sized {
 }
 
 pub trait Searchable: Encryptable {
-    fn attribute_for_index(&self, _index_name: &str) -> Option<ComposablePlaintext> {
+    fn attribute_for_index(
+        &self,
+        _index_name: &str,
+        _index_type: IndexType,
+    ) -> Option<ComposablePlaintext> {
         None
     }
 
-    fn protected_indexes() -> Vec<&'static str> {
+    fn protected_indexes() -> Vec<(&'static str, IndexType)> {
         vec![]
     }
 
-    #[allow(unused_variables)]
-    fn index_by_name(name: &str) -> Option<Box<dyn ComposableIndex>> {
+    fn index_by_name(
+        _index_name: &str,
+        _index_type: IndexType,
+    ) -> Option<Box<dyn ComposableIndex>> {
         None
     }
 }

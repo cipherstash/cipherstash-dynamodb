@@ -4,7 +4,6 @@ use self::{builder::SettingsBuilder, index_type::IndexType};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use proc_macro2::Ident;
-use std::collections::HashMap;
 use syn::DeriveInput;
 
 pub(crate) enum AttributeMode {
@@ -25,7 +24,7 @@ pub(crate) struct Settings {
     /// Skipped attributes are never encrypted by the `DecryptedRecord` trait will
     /// use these to reconstruct the struct via `Default` (like serde).
     skipped_attributes: Vec<String>,
-    indexes: HashMap<String, IndexType>,
+    indexes: Vec<( String, IndexType )>,
 }
 
 impl Settings {
@@ -63,7 +62,7 @@ impl Settings {
 
     /// Return the indexes defined for this struct as an `IndexMap` sorted by index name.
     /// This is to make downstream functions and tests simpler.
-    pub(crate) fn indexes(&self) -> IndexMap<&str, IndexType> {
+    pub(crate) fn indexes(&self) -> Vec<( &str, IndexType )> {
         self.indexes
             .iter()
             .sorted_by(|(k1, _), (k2, _)| k1.cmp(k2))
