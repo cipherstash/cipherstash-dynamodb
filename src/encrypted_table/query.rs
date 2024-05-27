@@ -106,15 +106,21 @@ where
 
             let index_type = match indexes.len() {
                 1 => IndexType::Single(indexes_iter.next().ok_or_else(|| {
-                    QueryError::InvalidQuery("Expected indexes_iter to include have enough components".to_string())
+                    QueryError::InvalidQuery(
+                        "Expected indexes_iter to include have enough components".to_string(),
+                    )
                 })?),
 
                 2 => IndexType::Compound2((
                     indexes_iter.next().ok_or_else(|| {
-                        QueryError::InvalidQuery("Expected indexes_iter to include have enough components".to_string())
+                        QueryError::InvalidQuery(
+                            "Expected indexes_iter to include have enough components".to_string(),
+                        )
                     })?,
                     indexes_iter.next().ok_or_else(|| {
-                        QueryError::InvalidQuery("Expected indexes_iter to include have enough components".to_string())
+                        QueryError::InvalidQuery(
+                            "Expected indexes_iter to include have enough components".to_string(),
+                        )
                     })?,
                 )),
 

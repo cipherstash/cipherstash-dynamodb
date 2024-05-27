@@ -29,9 +29,8 @@ impl User {
 
 #[cfg(test)]
 mod tests {
-    use itertools::Itertools;
-
     use super::*;
+    use cipherstash_dynamodb::{IndexType, SingleIndex};
 
     #[test]
     fn test_cipherstash_typename() {
@@ -54,7 +53,14 @@ mod tests {
     fn test_cipherstash_index_names() {
         assert_eq!(
             User::protected_indexes(),
-            vec!["email", "email#name", "name"]
+            vec![
+                ("email", IndexType::Single(SingleIndex::Exact)),
+                (
+                    "email#name",
+                    IndexType::Compound2((SingleIndex::Exact, SingleIndex::Prefix))
+                ),
+                ("name", IndexType::Single(SingleIndex::Prefix)),
+            ]
         );
     }
 }
