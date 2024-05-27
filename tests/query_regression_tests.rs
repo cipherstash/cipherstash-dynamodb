@@ -64,7 +64,7 @@ async fn regrenerate_data(client: &aws_sdk_dynamodb::Client, table_name: &str) {
         .await
         .unwrap()
         .items()
-        .into_iter()
+        .iter()
         .cloned()
         .map(serde_dynamo::Item::from)
         .collect_vec();

@@ -462,10 +462,7 @@ impl SettingsBuilder {
 
         Self::validate_index_type(index_type.as_str(), index_type_span)?;
 
-        let mut index = IndexType::Compound1 {
-            name: name.clone(),
-            index: (field, index_type),
-        };
+        let mut index = IndexType::Single(field, index_type);
 
         for field in name_parts_iter {
             let (field, index_type, index_type_span) = parts

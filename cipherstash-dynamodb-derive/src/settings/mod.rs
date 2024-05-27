@@ -1,7 +1,6 @@
 mod builder;
 pub mod index_type;
 use self::{builder::SettingsBuilder, index_type::IndexType};
-use indexmap::IndexMap;
 use itertools::Itertools;
 use proc_macro2::Ident;
 use syn::DeriveInput;
@@ -60,7 +59,7 @@ impl Settings {
             .collect::<Vec<_>>()
     }
 
-    /// Return the indexes defined for this struct as an `IndexMap` sorted by index name.
+    /// Return the indexes defined for this struct as a vector sorted by index name.
     /// This is to make downstream functions and tests simpler.
     pub(crate) fn indexes(&self) -> Vec<( &str, IndexType )> {
         self.indexes

@@ -1,18 +1,10 @@
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::{TokenStream};
 use quote::{format_ident, quote};
 
 #[derive(Clone)]
 pub(crate) enum IndexType {
     Single(String, String),
-    Compound1 {
-        name: String,
-        index: (String, String),
-    },
-    Compound2 {
-        name: String,
-        index: ((String, String), (String, String)),
-    },
-    //Compound3 { name: String, index: ((String, String), (String, String), (String, String)) }
+    Compound2((String, String), (String, String)), //Compound3 { name: String, index: ((String, String), (String, String), (String, String)) }
 }
 
 impl IndexType {
@@ -22,19 +14,11 @@ impl IndexType {
 
     pub(super) fn and(self, field: String, index_type: String) -> Result<Self, syn::Error> {
         match self {
-            IndexType::Single(_, _) => unimplemented!(),
-            IndexType::Compound1 { name, index } => Ok(IndexType::Compound2 {
-                name: name.to_string(),
-                index: (index.clone(), (field, index_type)),
-            }),
-            // TODO
-            /*IndexType::Compound2 { name, index } => {
-                Ok(IndexType::Compound3 {
-                    name: name.to_string(),
-                    index: (index.0, index.1, (field, index_type)),
-                })
-            },*/
-            IndexType::Compound2 { .. } => Err(syn::Error::new_spanned(
+            IndexType::Single(field_a, index_a) => Ok(IndexType::Compound2(
+                (field_a, index_a),
+                (field, index_type),
+            )),
+            IndexType::Compound2(..) => Err(syn::Error::new_spanned(
                 field,
                 "Cannot add more than 2 fields to a compound index",
             )),
@@ -79,21 +63,14 @@ impl IndexType {
                 })
             }
 
-            Self::Compound1 { .. } => Err(syn::Error::new(
-                Span::call_site(),
-                format!("Internal error: unexpected Compound1 index"),
-            )),
-
-            Self::Compound2 {
-                index: ((field_a, _), (field_b, _)),
-                ..
-            } => {
+            Self::Compound2((field_a, _), (field_b, _)) => {
                 let field_a = format_ident!("{field_a}");
                 let field_b = format_ident!("{field_b}");
 
                 Ok(quote! {
-                ( self.#field_a.clone(), self.#field_b.clone() ).try_into().ok()
-            })},
+                    ( self.#field_a.clone(), self.#field_b.clone() ).try_into().ok()
+                })
+            }
         }
     }
 
@@ -107,15 +84,7 @@ impl IndexType {
                 })
             }
 
-            Self::Compound1 { .. } => Err(syn::Error::new(
-                Span::call_site(),
-                format!("Internal error: unexpected Compound1 index"),
-            )),
-
-            Self::Compound2 {
-                index: ((_field_a, index_a), (_field_b, index_b)),
-                ..
-            } => {
+            Self::Compound2((_field_a, index_a), (_field_b, index_b)) => {
                 let index_a = Self::type_to_ident(index_a)?;
                 let index_b = Self::type_to_ident(index_b)?;
 
@@ -141,15 +110,7 @@ impl IndexType {
                 })
             }
 
-            Self::Compound1 { .. } => Err(syn::Error::new(
-                Span::call_site(),
-                format!("Internal error: unexpected Compound1 index"),
-            )),
-
-            Self::Compound2 {
-                index: ((_field_a, index_a), (_field_b, index_b)),
-                ..
-            } => {
+            Self::Compound2((_field_a, index_a), (_field_b, index_b)) => {
                 let index_type_a = Self::type_to_cipherstash_dynamodb_type(index_a)?;
                 let index_type_b = Self::type_to_cipherstash_dynamodb_type(index_b)?;
 

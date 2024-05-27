@@ -751,7 +751,6 @@ dependencies = [
 name = "cipherstash-dynamodb-derive"
 version = "0.2.0"
 dependencies = [
- "indexmap",
  "itertools",
  "paste",
  "proc",
