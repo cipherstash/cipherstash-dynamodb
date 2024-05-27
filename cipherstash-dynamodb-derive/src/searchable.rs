@@ -1,6 +1,6 @@
-use crate::settings::{index_type::IndexType, Settings};
+use crate::settings::Settings;
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
+use quote::quote;
 use syn::DeriveInput;
 
 pub(crate) fn derive_searchable(input: DeriveInput) -> Result<TokenStream, syn::Error> {
