@@ -23,7 +23,7 @@ pub(crate) struct Settings {
     /// Skipped attributes are never encrypted by the `DecryptedRecord` trait will
     /// use these to reconstruct the struct via `Default` (like serde).
     skipped_attributes: Vec<String>,
-    indexes: Vec<( String, IndexType )>,
+    indexes: Vec<(String, IndexType)>,
 }
 
 impl Settings {
@@ -61,7 +61,7 @@ impl Settings {
 
     /// Return the indexes defined for this struct as a vector sorted by index name.
     /// This is to make downstream functions and tests simpler.
-    pub(crate) fn indexes(&self) -> Vec<( &str, IndexType )> {
+    pub(crate) fn indexes(&self) -> Vec<(&str, IndexType)> {
         self.indexes
             .iter()
             .sorted_by(|(k1, _), (k2, _)| k1.cmp(k2))
