@@ -10,84 +10,59 @@ pub(crate) fn derive_searchable(input: DeriveInput) -> Result<TokenStream, syn::
         .build()?;
 
     let indexes = settings.indexes();
-    let protected_index_names = indexes.keys();
     let ident = settings.ident();
 
-    let indexes_impl = indexes.iter().map(|(_, index)| {
-        Ok::<_, syn::Error>(match index {
-            IndexType::Single(name, index_type) => {
-                let index_type = IndexType::type_to_ident(index_type)?;
+    let protected_indexes_impl = indexes
+        .iter()
+        .map(|(index_name, index_type)| {
+            let index_type = index_type.to_cipherstash_dynamodb_type()?;
 
-                quote! {
-                    #name => Some(Box::new(cipherstash_dynamodb::encryption::compound_indexer::#index_type::new(vec![])))
-                }
-            },
-            IndexType::Compound2 { name, index: ((_name_left, index_type_left), (_name_right, index_type_right)) } => {
-                let left = IndexType::type_to_ident(index_type_left)?;
-                let right = IndexType::type_to_ident(index_type_right)?;
-
-                quote! {
-                    #name => Some(Box::new(
-                        cipherstash_dynamodb::encryption::compound_indexer::CompoundIndex::new(
-                            cipherstash_dynamodb::encryption::compound_indexer::#left::new(vec![])
-                        ).and(
-                            cipherstash_dynamodb::encryption::compound_indexer::#right::new(vec![])
-                        )))
-                }
-            },
-            _ => todo!()
+            Ok::<_, syn::Error>(quote! {
+                ( #index_name, #index_type )
+            })
         })
-    }).collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<_>, _>>()?;
 
-    let attributes_for_index_impl = indexes.iter().map(|(_, index)| match index {
-        IndexType::Single(name, _) => {
-            let field = format_ident!("{}", name);
+    let indexes_impl = indexes
+        .iter()
+        .map(|(index_name, index_type)| {
+            let indexer = index_type.to_cipherstash_dynamodb_indexer()?;
+            let index_type = index_type.to_cipherstash_dynamodb_type()?;
 
-            quote! {
-                #name => self.#field.clone().try_into().ok()
-            }
-        }
-        IndexType::Compound1 {
-            name,
-            index: (a, _),
-        } => {
-            let field = format_ident!("{}", a);
+            Ok::<_, syn::Error>(quote! {
+                ( #index_name, #index_type ) => Some(#indexer)
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
-            quote! {
-                #name => self.#field.clone().try_into().ok()
-            }
-        }
-        IndexType::Compound2 {
-            name,
-            index: ((a, _), (b, _)),
-        } => {
-            let field_a = format_ident!("{}", a);
-            let field_b = format_ident!("{}", b);
+    let attributes_for_index_impl = indexes
+        .iter()
+        .map(|(index_name, index_type)| {
+            let field_access = index_type.to_compound_plaintext_access()?;
+            let index_type = index_type.to_cipherstash_dynamodb_type()?;
 
-            quote! {
-                #name => {
-                    (self.#field_a.clone(), self.#field_b.clone()).try_into().ok()
-                }
-            }
-        }
-    });
+            Ok::<_, syn::Error>(quote! {
+                ( #index_name, #index_type ) => #field_access
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
     let expanded = quote! {
         #[automatically_derived]
         impl cipherstash_dynamodb::traits::Searchable for #ident {
-            fn protected_indexes() -> Vec<&'static str> {
-                vec![#(#protected_index_names,)*]
+            fn protected_indexes() -> Vec<( &'static str, cipherstash_dynamodb::IndexType )> {
+                vec![#(#protected_indexes_impl,)*]
             }
 
-            fn index_by_name(name: &str) -> Option<Box<dyn cipherstash_dynamodb::traits::ComposableIndex>> {
-                match name {
+            fn index_by_name(index_name: &str, index_type: cipherstash_dynamodb::IndexType) -> Option<Box<dyn cipherstash_dynamodb::traits::ComposableIndex>> {
+                match ( index_name, index_type ) {
                     #(#indexes_impl,)*
                     _ => None,
                 }
             }
 
-            fn attribute_for_index(&self, index_name: &str) -> Option<cipherstash_dynamodb::traits::ComposablePlaintext> {
-                match index_name {
+            fn attribute_for_index(&self, index_name: &str, index_type: cipherstash_dynamodb::IndexType) -> Option<cipherstash_dynamodb::traits::ComposablePlaintext> {
+                match ( index_name, index_type ) {
                     #(#attributes_for_index_impl,)*
                     _ => None,
                 }

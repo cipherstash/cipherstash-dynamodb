@@ -30,7 +30,7 @@ pub(crate) struct SettingsBuilder {
     protected_attributes: Vec<String>,
     unprotected_attributes: Vec<String>,
     skipped_attributes: Vec<String>,
-    indexes: HashMap<String, IndexType>,
+    indexes: Vec<(String, IndexType)>,
 }
 
 impl SettingsBuilder {
@@ -57,7 +57,7 @@ impl SettingsBuilder {
             protected_attributes: Vec::new(),
             unprotected_attributes: Vec::new(),
             skipped_attributes: Vec::new(),
-            indexes: HashMap::new(),
+            indexes: Vec::new(),
         }
     }
 
@@ -397,10 +397,10 @@ impl SettingsBuilder {
 
         Self::validate_index_type(index_type, index_type_span)?;
 
-        self.indexes.insert(
+        self.indexes.push((
             name.clone(),
             IndexType::single(name, index_type.to_string()),
-        );
+        ));
 
         Ok(())
     }
@@ -484,7 +484,7 @@ impl SettingsBuilder {
             index = index.and(field, index_type)?;
         }
 
-        self.indexes.insert(name, index);
+        self.indexes.push((name, index));
 
         Ok(())
     }

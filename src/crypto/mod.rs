@@ -3,7 +3,10 @@ mod sealed;
 mod sealer;
 mod unsealed;
 
-use crate::traits::{Encryptable, ReadConversionError, Searchable, WriteConversionError};
+use crate::{
+    traits::{Encryptable, ReadConversionError, Searchable, WriteConversionError},
+    IndexType,
+};
 use cipherstash_client::{
     credentials::{service_credentials::ServiceToken, Credentials},
     encryption::{
@@ -49,13 +52,22 @@ pub enum CryptoError {
     Other(String),
 }
 
+pub fn format_term_key(
+    sort_key: &str,
+    index_name: &str,
+    index_type: IndexType,
+    counter: usize,
+) -> String {
+    format!("{sort_key}#{index_name}#{index_type}#{counter}")
+}
+
 pub(crate) fn all_index_keys<E: Searchable + Encryptable>(sort_key: &str) -> Vec<String> {
     E::protected_indexes()
         .iter()
-        .flat_map(|index_name| {
+        .flat_map(|(index_name, index_type)| {
             (0..)
                 .take(MAX_TERMS_PER_INDEX)
-                .map(|i| format!("{}#{}#{}", sort_key, index_name, i))
+                .map(|i| format_term_key(sort_key, index_name, *index_type, i))
                 .collect::<Vec<String>>()
         })
         .collect()

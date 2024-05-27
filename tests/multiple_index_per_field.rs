@@ -1,10 +1,11 @@
 use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Searchable};
+use itertools::Itertools;
 use serial_test::serial;
 use std::future::Future;
 
 mod common;
 
-#[derive(Encryptable, Decryptable, Searchable, Debug, PartialEq)]
+#[derive(Encryptable, Decryptable, Searchable, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct User {
     #[partition_key]
     pub email: String,
@@ -98,7 +99,10 @@ async fn test_query_prefix() {
             .starts_with("name", "Dan")
             .send()
             .await
-            .expect("Failed to query");
+            .expect("Failed to query")
+            .into_iter()
+            .sorted()
+            .collect_vec();
 
         assert_eq!(
             res,
