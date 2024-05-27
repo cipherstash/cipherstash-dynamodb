@@ -13,7 +13,7 @@ pub use primary_key::*;
 use std::fmt::{Debug, Display};
 use thiserror::Error;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SingleIndex {
     Exact,
     Prefix,
@@ -28,7 +28,7 @@ impl Display for SingleIndex {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum IndexType {
     Single(SingleIndex),
     Compound2((SingleIndex, SingleIndex)),
