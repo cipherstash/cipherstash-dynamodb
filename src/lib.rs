@@ -528,7 +528,9 @@ pub mod crypto;
 pub mod encrypted_table;
 pub mod traits;
 pub use encrypted_table::{EncryptedTable, QueryBuilder};
-pub use traits::{Decryptable, Encryptable, Pk, PkSk, PrimaryKey, Searchable};
+pub use traits::{
+    Decryptable, Encryptable, IndexType, Pk, PkSk, PrimaryKey, Searchable, SingleIndex,
+};
 
 pub mod errors;
 pub use errors::Error;

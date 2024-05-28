@@ -36,6 +36,46 @@ impl User {
     }
 }
 
+#[allow(dead_code)]
+async fn regrenerate_data(client: &aws_sdk_dynamodb::Client, table_name: &str) {
+    let table = EncryptedTable::init(client.clone(), table_name)
+        .await
+        .expect("Failed to init table");
+
+    table
+        .put(User::new("dan@coderdan.co", "Dan Draper", "blue"))
+        .await
+        .expect("Failed to insert Dan");
+
+    table
+        .put(User::new("jane@smith.org", "Jane Smith", "red"))
+        .await
+        .expect("Failed to insert Jane");
+
+    table
+        .put(User::new("daniel@example.com", "Daniel Johnson", "green"))
+        .await
+        .expect("Failed to insert Daniel");
+
+    let all_items = client
+        .scan()
+        .table_name(table_name)
+        .send()
+        .await
+        .unwrap()
+        .items()
+        .iter()
+        .cloned()
+        .map(serde_dynamo::Item::from)
+        .collect_vec();
+
+    std::fs::write(
+        "./tests/query_regression_data.json",
+        serde_json::to_string_pretty(&all_items).expect("Failed to stringify dynamo records"),
+    )
+    .expect("Failed to update query regression test data");
+}
+
 async fn run_test<F: Future<Output = ()>>(mut f: impl FnMut(EncryptedTable) -> F) {
     let config = aws_config::from_env()
         .endpoint_url("http://localhost:8000")
@@ -47,6 +87,13 @@ async fn run_test<F: Future<Output = ()>>(mut f: impl FnMut(EncryptedTable) -> F
     let table_name = "test-users-pk";
 
     common::create_table(&client, table_name).await;
+
+    let table = EncryptedTable::init(client.clone(), table_name)
+        .await
+        .expect("Failed to init table");
+
+    // Uncomment to regenerate the query_regression data json file
+    // regrenerate_data(&client, table_name).await;
 
     let items: Vec<serde_dynamo::Item> =
         serde_json::from_str(include_str!("./query_regression_data.json"))
@@ -73,10 +120,6 @@ async fn run_test<F: Future<Output = ()>>(mut f: impl FnMut(EncryptedTable) -> F
         .send()
         .await
         .expect("failed to send");
-
-    let table = EncryptedTable::init(client, table_name)
-        .await
-        .expect("Failed to init table");
 
     f(table).await;
 }

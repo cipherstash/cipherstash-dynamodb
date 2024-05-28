@@ -42,7 +42,7 @@ mod tests {
         assert_eq!(license.partition_key(), "person@example.net");
         assert_eq!(
             License::protected_attributes(),
-            vec!["email", "number", "expires"]
+            vec!["email", "expires", "number"]
         );
         assert!(License::plaintext_attributes().is_empty());
     }

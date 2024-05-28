@@ -30,7 +30,7 @@ pub(crate) struct SettingsBuilder {
     protected_attributes: Vec<String>,
     unprotected_attributes: Vec<String>,
     skipped_attributes: Vec<String>,
-    indexes: HashMap<String, IndexType>,
+    indexes: Vec<IndexType>,
 }
 
 impl SettingsBuilder {
@@ -57,7 +57,7 @@ impl SettingsBuilder {
             protected_attributes: Vec::new(),
             unprotected_attributes: Vec::new(),
             skipped_attributes: Vec::new(),
-            indexes: HashMap::new(),
+            indexes: Vec::new(),
         }
     }
 
@@ -393,14 +393,24 @@ impl SettingsBuilder {
         index_type: &str,
         index_type_span: Span,
     ) -> Result<(), syn::Error> {
-        let name = name.into();
+        let name: String = name.into();
 
         Self::validate_index_type(index_type, index_type_span)?;
 
-        self.indexes.insert(
-            name.clone(),
-            IndexType::single(name, index_type.to_string()),
-        );
+        let index = IndexType::single(name.clone(), index_type.to_string());
+
+        if self
+            .indexes
+            .iter()
+            .any(|existing_index| existing_index == &index)
+        {
+            return Err(syn::Error::new(
+                Span::call_site(),
+                format!("Index '{name}' with type '{index}' has been defined more than once"),
+            ));
+        }
+
+        self.indexes.push(index);
 
         Ok(())
     }
@@ -462,10 +472,7 @@ impl SettingsBuilder {
 
         Self::validate_index_type(index_type.as_str(), index_type_span)?;
 
-        let mut index = IndexType::Compound1 {
-            name: name.clone(),
-            index: (field, index_type),
-        };
+        let mut index = IndexType::Single(field, index_type);
 
         for field in name_parts_iter {
             let (field, index_type, index_type_span) = parts
@@ -484,7 +491,18 @@ impl SettingsBuilder {
             index = index.and(field, index_type)?;
         }
 
-        self.indexes.insert(name, index);
+        if self
+            .indexes
+            .iter()
+            .any(|existing_index| existing_index == &index)
+        {
+            return Err(syn::Error::new(
+                Span::call_site(),
+                format!("Index '{name}' with type '{index}' has been defined more than once"),
+            ));
+        }
+
+        self.indexes.push(index);
 
         Ok(())
     }
