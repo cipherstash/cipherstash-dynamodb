@@ -1,10 +1,23 @@
+use std::fmt::Display;
+
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub(crate) enum IndexType {
     Single(String, String),
     Compound2((String, String), (String, String)), //Compound3 { name: String, index: ((String, String), (String, String), (String, String)) }
+}
+
+impl Display for IndexType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Single(_field, index_type) => f.write_str(index_type),
+            Self::Compound2((_field_a, index_type_a), (_field_b, index_type_b)) => {
+                f.write_str(format!("{index_type_a}:{index_type_b}").as_str())
+            }
+        }
+    }
 }
 
 impl IndexType {
@@ -22,6 +35,13 @@ impl IndexType {
                 field,
                 "Cannot add more than 2 fields to a compound index",
             )),
+        }
+    }
+
+    pub fn index_name(&self) -> String {
+        match self {
+            Self::Single(field, _) => field.clone(),
+            Self::Compound2((field_a, _), (field_b, _)) => format!("{field_a}#{field_b}"),
         }
     }
 

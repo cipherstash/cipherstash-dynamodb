@@ -26,6 +26,7 @@ run_tests! {
         "./ui/compound-index-unsupported.rs",
         "./ui/index-unsupported.rs",
         "./ui/invalid-field-name.rs",
+        "./ui/no-multi-same-index-per-field.rs",
         "./ui/pk-field-no-partition.rs",
         "./ui/pk-field-wrong-partition.rs",
         "./ui/sk-field-no-sort.rs",

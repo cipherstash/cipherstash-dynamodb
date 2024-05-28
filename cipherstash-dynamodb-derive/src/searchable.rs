@@ -14,8 +14,9 @@ pub(crate) fn derive_searchable(input: DeriveInput) -> Result<TokenStream, syn::
 
     let protected_indexes_impl = indexes
         .iter()
-        .map(|(index_name, index_type)| {
-            let index_type = index_type.to_cipherstash_dynamodb_type()?;
+        .map(|index| {
+            let index_name = index.index_name();
+            let index_type = index.to_cipherstash_dynamodb_type()?;
 
             Ok::<_, syn::Error>(quote! {
                 ( #index_name, #index_type )
@@ -25,9 +26,10 @@ pub(crate) fn derive_searchable(input: DeriveInput) -> Result<TokenStream, syn::
 
     let indexes_impl = indexes
         .iter()
-        .map(|(index_name, index_type)| {
-            let indexer = index_type.to_cipherstash_dynamodb_indexer()?;
-            let index_type = index_type.to_cipherstash_dynamodb_type()?;
+        .map(|index| {
+            let index_name = index.index_name();
+            let indexer = index.to_cipherstash_dynamodb_indexer()?;
+            let index_type = index.to_cipherstash_dynamodb_type()?;
 
             Ok::<_, syn::Error>(quote! {
                 ( #index_name, #index_type ) => Some(#indexer)
@@ -37,9 +39,10 @@ pub(crate) fn derive_searchable(input: DeriveInput) -> Result<TokenStream, syn::
 
     let attributes_for_index_impl = indexes
         .iter()
-        .map(|(index_name, index_type)| {
-            let field_access = index_type.to_compound_plaintext_access()?;
-            let index_type = index_type.to_cipherstash_dynamodb_type()?;
+        .map(|index| {
+            let index_name = index.index_name();
+            let field_access = index.to_compound_plaintext_access()?;
+            let index_type = index.to_cipherstash_dynamodb_type()?;
 
             Ok::<_, syn::Error>(quote! {
                 ( #index_name, #index_type ) => #field_access

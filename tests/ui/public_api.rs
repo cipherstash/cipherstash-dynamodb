@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 // Derive Traits
 use cipherstash_dynamodb::{Decryptable, Encryptable, Searchable};
 
