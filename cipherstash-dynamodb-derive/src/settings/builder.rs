@@ -30,7 +30,7 @@ pub(crate) struct SettingsBuilder {
     protected_attributes: Vec<String>,
     unprotected_attributes: Vec<String>,
     skipped_attributes: Vec<String>,
-    indexes: Vec<(String, IndexType)>,
+    indexes: Vec<IndexType>,
 }
 
 impl SettingsBuilder {
@@ -393,14 +393,24 @@ impl SettingsBuilder {
         index_type: &str,
         index_type_span: Span,
     ) -> Result<(), syn::Error> {
-        let name = name.into();
+        let name: String = name.into();
 
         Self::validate_index_type(index_type, index_type_span)?;
 
-        self.indexes.push((
-            name.clone(),
-            IndexType::single(name, index_type.to_string()),
-        ));
+        let index = IndexType::single(name.clone(), index_type.to_string());
+
+        if self
+            .indexes
+            .iter()
+            .any(|existing_index| existing_index == &index)
+        {
+            return Err(syn::Error::new(
+                Span::call_site(),
+                format!("Index '{name}' with type '{index}' has been defined more than once"),
+            ));
+        }
+
+        self.indexes.push(index);
 
         Ok(())
     }
@@ -481,7 +491,18 @@ impl SettingsBuilder {
             index = index.and(field, index_type)?;
         }
 
-        self.indexes.push((name, index));
+        if self
+            .indexes
+            .iter()
+            .any(|existing_index| existing_index == &index)
+        {
+            return Err(syn::Error::new(
+                Span::call_site(),
+                format!("Index '{name}' with type '{index}' has been defined more than once"),
+            ));
+        }
+
+        self.indexes.push(index);
 
         Ok(())
     }
