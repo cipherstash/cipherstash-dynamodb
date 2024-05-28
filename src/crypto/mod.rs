@@ -61,7 +61,7 @@ pub fn format_term_key(
     format!("{sort_key}#{index_name}#{index_type}#{counter}")
 }
 
-pub(crate) fn all_index_keys<E: Searchable + Encryptable>(sort_key: &str) -> Vec<String> {
+pub fn all_index_keys<E: Searchable + Encryptable>(sort_key: &str) -> Vec<String> {
     E::protected_indexes()
         .iter()
         .flat_map(|(index_name, index_type)| {

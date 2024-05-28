@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use super::SealError;
 
 /// Wrapper to indicate that a value is NOT encrypted
+#[derive(Clone)]
 pub struct Unsealed {
     /// Optional descriptor prefix
     descriptor: Option<String>,
@@ -47,13 +48,13 @@ impl Unsealed {
             .ok_or_else(|| SealError::MissingAttribute(name.to_string()))
     }
 
-    pub(super) fn add_protected(&mut self, name: impl Into<String>, plaintext: Plaintext) {
+    pub fn add_protected(&mut self, name: impl Into<String>, plaintext: Plaintext) {
         let name = name.into();
         let descriptor = format!("{}/{}", self.descriptor.as_deref().unwrap_or(""), &name);
         self.protected.insert(name, (plaintext, descriptor));
     }
 
-    pub(super) fn add_unprotected(&mut self, name: impl Into<String>, attribute: TableAttribute) {
+    pub fn add_unprotected(&mut self, name: impl Into<String>, attribute: TableAttribute) {
         self.unprotected.insert(name.into(), attribute);
     }
 

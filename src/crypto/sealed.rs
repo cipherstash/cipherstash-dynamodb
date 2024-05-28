@@ -35,18 +35,17 @@ impl Sealed {
     /// Unseal a list of [`Sealed`] values in an efficient manner that optimizes for bulk
     /// decryptions
     ///
-    /// This should be used over [`Sealed::unseal`] when multiple values need to be unsealed.
-    pub(crate) async fn unseal_all<T, C>(
+    /// This should be used over [`Sealed::unseal_raw`] when multiple values need to be unsealed.
+    pub(crate) async fn unseal_all_raw<C>(
         items: impl AsRef<[Sealed]>,
+        plaintext_attributes: Vec<&'static str>,
+        decryptable_attributes: Vec<&'static str>,
         cipher: &Encryption<C>,
-    ) -> Result<Vec<T>, SealError>
+    ) -> Result<Vec<Unsealed>, SealError>
     where
         C: Credentials<Token = ServiceToken>,
-        T: Decryptable,
     {
         let items = items.as_ref();
-        let plaintext_attributes = T::plaintext_attributes();
-        let decryptable_attributes = T::decryptable_attributes();
 
         let mut plaintext_items: Vec<Vec<&TableAttribute>> = Vec::with_capacity(items.len());
         let mut decryptable_items = Vec::with_capacity(items.len() * decryptable_attributes.len());
@@ -109,22 +108,51 @@ impl Sealed {
                     unsealed.add_unprotected(*name, plaintext.clone());
                 }
 
-                unsealed.into_value()
+                unsealed
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Vec<_>>();
 
         Ok(unsealed)
     }
 
-    /// Unseal the current value and return it's plaintext representation
+    /// Unseal a list of [`Sealed`] values to T in an efficient manner that optimizes for bulk
+    /// decryptions
     ///
-    /// If you need to unseal multiple values at once use [`Sealed::unseal_all`]
-    pub(crate) async fn unseal<C, T>(self, cipher: &Encryption<C>) -> Result<T, SealError>
+    /// This should be used over [`Sealed::unseal`] when multiple values need to be unsealed.
+    pub(crate) async fn unseal_all<T, C>(
+        items: impl AsRef<[Sealed]>,
+        cipher: &Encryption<C>,
+    ) -> Result<Vec<T>, SealError>
     where
         C: Credentials<Token = ServiceToken>,
         T: Decryptable,
     {
-        let mut vec = Self::unseal_all([self], cipher).await?;
+        // let items = items.as_ref();
+        let plaintext_attributes = T::plaintext_attributes();
+        let decryptable_attributes = T::decryptable_attributes();
+
+        Self::unseal_all_raw(items, plaintext_attributes, decryptable_attributes, cipher)
+            .await?
+            .into_iter()
+            .map(Unsealed::into_value)
+            .collect::<Result<Vec<_>, _>>()
+    }
+
+    /// Unseal the current value and return it's plaintext representation
+    ///
+    /// If you need to unseal multiple values at once use [`Sealed::unseal_all_raw`]
+    pub(crate) async fn unseal_raw<C>(
+        self,
+        plaintext_attributes: Vec<&'static str>,
+        decryptable_attributes: Vec<&'static str>,
+        cipher: &Encryption<C>,
+    ) -> Result<Unsealed, SealError>
+    where
+        C: Credentials<Token = ServiceToken>,
+    {
+        let mut vec =
+            Self::unseal_all_raw([self], plaintext_attributes, decryptable_attributes, cipher)
+                .await?;
 
         if vec.len() != 1 {
             let actual = vec.len();
@@ -135,6 +163,23 @@ impl Sealed {
         }
 
         Ok(vec.remove(0))
+    }
+
+    /// Unseal the current value and return it's plaintext representation as T
+    ///
+    /// If you need to unseal multiple values at once use [`Sealed::unseal_all`]
+    pub(crate) async fn unseal<C, T>(self, cipher: &Encryption<C>) -> Result<T, SealError>
+    where
+        C: Credentials<Token = ServiceToken>,
+        T: Decryptable,
+    {
+        self.unseal_raw(
+            T::plaintext_attributes(),
+            T::decryptable_attributes(),
+            cipher,
+        )
+        .await?
+        .into_value()
     }
 }
 

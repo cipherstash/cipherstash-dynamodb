@@ -1,5 +1,6 @@
 pub mod query;
 mod table_entry;
+use self::query::RawQueryBuilder;
 pub use self::{
     query::QueryBuilder,
     table_entry::{TableAttribute, TableEntry, TryFromTableAttr},
@@ -32,6 +33,10 @@ pub struct EncryptedTable {
 }
 
 impl EncryptedTable {
+    pub fn cipher(&self) -> &Encryption<AutoRefresh<ServiceCredentials>> {
+        &self.cipher
+    }
+
     pub async fn init(
         db: aws_sdk_dynamodb::Client,
         table_name: impl Into<String>,
@@ -75,17 +80,32 @@ impl EncryptedTable {
         QueryBuilder::new(self)
     }
 
-    fn get_primary_key_parts<T: Encryptable>(
+    pub fn query_raw(&self) -> RawQueryBuilder {
+        RawQueryBuilder::new(self)
+    }
+
+    pub fn get_primary_key_parts<T: Encryptable>(
         &self,
         k: impl Into<T::PrimaryKey>,
     ) -> Result<PrimaryKeyParts, EncryptionError> {
-        let PrimaryKeyParts { mut pk, mut sk } = k.into().into_parts::<T>();
+        self.get_primary_key_parts_raw(
+            k.into().into_parts::<T>(),
+            T::is_partition_key_encrypted(),
+            T::is_sort_key_encrypted(),
+        )
+    }
 
-        if T::is_partition_key_encrypted() {
+    pub fn get_primary_key_parts_raw(
+        &self,
+        PrimaryKeyParts { mut pk, mut sk }: PrimaryKeyParts,
+        is_partition_key_encrypted: bool,
+        is_sort_key_encrypted: bool,
+    ) -> Result<PrimaryKeyParts, EncryptionError> {
+        if is_partition_key_encrypted {
             pk = b64_encode(hmac(&pk, None, &self.cipher)?);
         }
 
-        if T::is_sort_key_encrypted() {
+        if is_sort_key_encrypted {
             sk = b64_encode(hmac(&sk, Some(pk.as_str()), &self.cipher)?);
         }
 
@@ -96,8 +116,28 @@ impl EncryptedTable {
     where
         T: Decryptable,
     {
-        let PrimaryKeyParts { pk, sk } = self.get_primary_key_parts::<T>(k)?;
+        let primary_key_parts = self.get_primary_key_parts::<T>(k)?;
 
+        if let Some(unsealed) = self
+            .get_raw(
+                primary_key_parts,
+                T::plaintext_attributes(),
+                T::decryptable_attributes(),
+            )
+            .await?
+        {
+            Ok(Some(T::from_unsealed(unsealed)?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub async fn get_raw(
+        &self,
+        PrimaryKeyParts { pk, sk }: PrimaryKeyParts,
+        plaintext_attributes: Vec<&'static str>,
+        decryptable_attributes: Vec<&'static str>,
+    ) -> Result<Option<Unsealed>, GetError> {
         let result = self
             .db
             .get_item()
@@ -108,22 +148,33 @@ impl EncryptedTable {
             .await
             .map_err(|e| GetError::Aws(format!("{e:?}")))?;
 
-        let sealed: Option<Sealed> = result.item.map(Sealed::try_from).transpose()?;
+        let Some(item) = result.item else {
+            return Ok(None);
+        };
 
-        if let Some(sealed) = sealed {
-            Ok(Some(sealed.unseal(&self.cipher).await?))
-        } else {
-            Ok(None)
-        }
+        Ok(Some(
+            Sealed::try_from(item)?
+                .unseal_raw(plaintext_attributes, decryptable_attributes, &self.cipher)
+                .await?,
+        ))
     }
 
     pub async fn delete<E: Searchable>(
         &self,
         k: impl Into<E::PrimaryKey>,
     ) -> Result<(), DeleteError> {
-        let PrimaryKeyParts { pk, sk } = self.get_primary_key_parts::<E>(k)?;
+        let primary_key_parts = self.get_primary_key_parts::<E>(k)?;
+        let all_index_keys = all_index_keys::<E>(&primary_key_parts.sk);
 
-        let transact_items = all_index_keys::<E>(&sk)
+        self.delete_raw(primary_key_parts, all_index_keys).await
+    }
+
+    pub async fn delete_raw(
+        &self,
+        PrimaryKeyParts { pk, sk }: PrimaryKeyParts,
+        all_index_keys: Vec<String>,
+    ) -> Result<(), DeleteError> {
+        let transact_items = all_index_keys
             .into_iter()
             .map(|x| Ok::<_, DeleteError>(b64_encode(hmac(&x, Some(pk.as_str()), &self.cipher)?)))
             .chain([Ok(sk)])
@@ -161,11 +212,21 @@ impl EncryptedTable {
     where
         T: Searchable,
     {
-        let mut seen_sk = HashSet::new();
-
         let sealer: Sealer<T> = record.into_sealer()?;
-        let (PrimaryKeyParts { pk, sk }, sealed) = sealer.seal(&self.cipher, 12).await?;
+        let (primary_key_parts, sealed) = sealer.seal(&self.cipher, 12).await?;
+        let all_index_keys = all_index_keys::<T>(&primary_key_parts.sk);
 
+        self.put_raw(primary_key_parts, sealed, all_index_keys)
+            .await
+    }
+
+    pub async fn put_raw(
+        &self,
+        PrimaryKeyParts { pk, .. }: PrimaryKeyParts,
+        sealed: Vec<Sealed>,
+        all_index_keys: Vec<String>,
+    ) -> Result<(), PutError> {
+        let mut seen_sk = HashSet::new();
         let mut items: Vec<TransactWriteItem> = Vec::with_capacity(sealed.len());
 
         for entry in sealed.into_iter() {
@@ -183,7 +244,7 @@ impl EncryptedTable {
             );
         }
 
-        for index_sk in all_index_keys::<T>(&sk) {
+        for index_sk in all_index_keys {
             let index_sk = b64_encode(hmac(&index_sk, Some(pk.as_str()), &self.cipher)?);
 
             if seen_sk.contains(&index_sk) {

@@ -13,45 +13,51 @@ use crate::{
 };
 use cipherstash_client::encryption::{compound_indexer::CompoundIndex, IndexTerm};
 
-use super::{EncryptedTable, QueryError};
+use super::{EncryptedTable, QueryError, Unsealed};
 
-pub struct QueryBuilder<'t, T> {
-    parts: Vec<(String, SingleIndex, Plaintext)>,
+pub struct RawQueryBuilder<'t> {
     table: &'t EncryptedTable,
-    __table: PhantomData<T>,
+    parts: Vec<(String, SingleIndex, Plaintext)>,
 }
 
-impl<'t, T> QueryBuilder<'t, T>
-where
-    T: Searchable + Decryptable,
-{
+impl<'t> RawQueryBuilder<'t> {
     pub fn new(table: &'t EncryptedTable) -> Self {
         Self {
-            parts: vec![],
             table,
-            __table: Default::default(),
+            parts: Default::default(),
         }
     }
 
-    pub fn eq(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
+    pub fn eq(&mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> &mut Self {
         self.parts
             .push((name.into(), SingleIndex::Exact, plaintext.into()));
         self
     }
 
-    pub fn starts_with(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
+    pub fn starts_with(
+        &mut self,
+        name: impl Into<String>,
+        plaintext: impl Into<Plaintext>,
+    ) -> &mut Self {
         self.parts
             .push((name.into(), SingleIndex::Prefix, plaintext.into()));
+
         self
     }
 
-    pub async fn send(self) -> Result<Vec<T>, QueryError> {
-        let (index_name, index, plaintext, builder) = self.build()?;
+    pub async fn send(
+        self,
+        type_name: &'static str,
+        index_by_name: impl Fn(&str, IndexType) -> Option<Box<dyn ComposableIndex>>,
+        plaintext_attributes: Vec<&'static str>,
+        decryptable_attributes: Vec<&'static str>,
+    ) -> Result<Vec<Unsealed>, QueryError> {
+        let (index_name, index, plaintext) = self.build(index_by_name)?;
 
-        let index_term = builder.table.cipher.compound_query(
+        let index_term = self.table.cipher.compound_query(
             &CompoundIndex::new(index),
             plaintext,
-            Some(format!("{}#{}", T::type_name(), index_name)),
+            Some(format!("{}#{}", type_name, index_name)),
             12,
         )?;
 
@@ -64,11 +70,11 @@ where
             )))?
         };
 
-        let query = builder
+        let query = self
             .table
             .db
             .query()
-            .table_name(&builder.table.table_name)
+            .table_name(&self.table.table_name)
             .index_name("TermIndex")
             .key_condition_expression("term = :term")
             .expression_attribute_values(":term", term);
@@ -84,14 +90,21 @@ where
 
         let table_entries = Sealed::vec_from(items)?;
 
-        let results = Sealed::unseal_all(table_entries, &builder.table.cipher).await?;
+        let results = Sealed::unseal_all_raw(
+            table_entries,
+            plaintext_attributes,
+            decryptable_attributes,
+            &self.table.cipher,
+        )
+        .await?;
 
         Ok(results)
     }
 
-    fn build(
-        self,
-    ) -> Result<(String, Box<dyn ComposableIndex>, ComposablePlaintext, Self), QueryError> {
+    pub fn build(
+        &self,
+        index_by_name: impl Fn(&str, IndexType) -> Option<Box<dyn ComposableIndex>>,
+    ) -> Result<(String, Box<dyn ComposableIndex>, ComposablePlaintext), QueryError> {
         let items_len = self.parts.len();
 
         // this is the simplest way to brute force the index names but relies on some gross
@@ -131,7 +144,7 @@ where
                 }
             };
 
-            if let Some(index) = T::index_by_name(name.as_str(), index_type) {
+            if let Some(index) = index_by_name(name.as_str(), index_type) {
                 let mut plaintext = ComposablePlaintext::new(plaintexts[0].clone());
 
                 for p in plaintexts[1..].iter() {
@@ -140,7 +153,7 @@ where
                         .expect("Failed to compose");
                 }
 
-                return Ok((name, index, plaintext, self));
+                return Ok((name, index, plaintext));
             }
         }
 
@@ -149,5 +162,46 @@ where
         Err(QueryError::InvalidQuery(format!(
             "Could not build query for fields: {fields}"
         )))
+    }
+}
+
+pub struct QueryBuilder<'t, T> {
+    raw_builder: RawQueryBuilder<'t>,
+    __table: PhantomData<T>,
+}
+
+impl<'t, T> QueryBuilder<'t, T>
+where
+    T: Searchable + Decryptable,
+{
+    pub fn new(table: &'t EncryptedTable) -> Self {
+        Self {
+            raw_builder: RawQueryBuilder::new(table),
+            __table: Default::default(),
+        }
+    }
+
+    pub fn eq(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
+        self.raw_builder.eq(name, plaintext);
+        self
+    }
+
+    pub fn starts_with(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
+        self.raw_builder.starts_with(name, plaintext);
+        self
+    }
+
+    pub async fn send(self) -> Result<Vec<T>, QueryError> {
+        self.raw_builder
+            .send(
+                std::any::type_name::<T>(),
+                T::index_by_name,
+                T::plaintext_attributes(),
+                T::decryptable_attributes(),
+            )
+            .await?
+            .into_iter()
+            .map(|unsealed| Ok(T::from_unsealed(unsealed)?))
+            .collect::<Result<Vec<_>, QueryError>>()
     }
 }

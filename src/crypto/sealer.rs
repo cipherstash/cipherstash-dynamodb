@@ -32,6 +32,10 @@ impl<T> Sealer<T> {
         }
     }
 
+    pub fn unsealed(self) -> Unsealed {
+        self.unsealed.clone()
+    }
+
     pub fn add_protected<F>(mut self, name: impl Into<String>, f: F) -> Result<Self, SealError>
     where
         F: FnOnce(&T) -> Plaintext,
@@ -171,7 +175,7 @@ impl<T> Sealer<T> {
         Ok(output)
     }
 
-    pub(crate) async fn seal<C>(
+    pub async fn seal<C>(
         self,
         cipher: &Encryption<C>,
         term_length: usize,

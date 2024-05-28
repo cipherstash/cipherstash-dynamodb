@@ -1,5 +1,6 @@
 use crate::Encryptable;
 
+#[derive(Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
 pub struct PrimaryKeyParts {
     pub pk: String,
     pub sk: String,
