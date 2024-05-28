@@ -1,5 +1,8 @@
-use crate::crypto::{SealError, Sealer, Unsealed};
 pub use crate::encrypted_table::{TableAttribute, TryFromTableAttr};
+use crate::{
+    crypto::{SealError, Sealer, Unsealed},
+    errors::QueryError,
+};
 pub use cipherstash_client::encryption::{
     compound_indexer::{
         ComposableIndex, ComposablePlaintext, CompoundIndex, ExactIndex, PrefixIndex,
@@ -32,6 +35,40 @@ impl Display for SingleIndex {
 pub enum IndexType {
     Single(SingleIndex),
     Compound2((SingleIndex, SingleIndex)),
+}
+
+impl IndexType {
+    pub fn from_single_index_iter<I>(index_iter: I) -> Result<Self, QueryError>
+    where
+        I: IntoIterator<Item = SingleIndex>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let mut indexes_iter = index_iter.into_iter();
+
+        match indexes_iter.len() {
+            1 => Ok(IndexType::Single(indexes_iter.next().ok_or_else(|| {
+                QueryError::InvalidQuery(
+                    "Expected indexes_iter to include have enough components".to_string(),
+                )
+            })?)),
+
+            2 => Ok(IndexType::Compound2((
+                indexes_iter.next().ok_or_else(|| {
+                    QueryError::InvalidQuery(
+                        "Expected indexes_iter to include have enough components".to_string(),
+                    )
+                })?,
+                indexes_iter.next().ok_or_else(|| {
+                    QueryError::InvalidQuery(
+                        "Expected indexes_iter to include have enough components".to_string(),
+                    )
+                })?,
+            ))),
+            x => Err(QueryError::InvalidQuery(format!(
+                "Query included an invalid number of components: {x}"
+            ))),
+        }
+    }
 }
 
 impl Display for IndexType {

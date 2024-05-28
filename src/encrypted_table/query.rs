@@ -28,17 +28,13 @@ impl<'t> RawQueryBuilder<'t> {
         }
     }
 
-    pub fn eq(&mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> &mut Self {
+    pub fn eq(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
         self.parts
             .push((name.into(), SingleIndex::Exact, plaintext.into()));
         self
     }
 
-    pub fn starts_with(
-        &mut self,
-        name: impl Into<String>,
-        plaintext: impl Into<Plaintext>,
-    ) -> &mut Self {
+    pub fn starts_with(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
         self.parts
             .push((name.into(), SingleIndex::Prefix, plaintext.into()));
 
@@ -52,7 +48,7 @@ impl<'t> RawQueryBuilder<'t> {
         plaintext_attributes: Vec<&'static str>,
         decryptable_attributes: Vec<&'static str>,
     ) -> Result<Vec<Unsealed>, QueryError> {
-        let (index_name, index, plaintext) = self.build(index_by_name)?;
+        let (index_name, index, _index_type, plaintext) = Self::build(&self.parts, index_by_name)?;
 
         let index_term = self.table.cipher.compound_query(
             &CompoundIndex::new(index),
@@ -102,47 +98,29 @@ impl<'t> RawQueryBuilder<'t> {
     }
 
     pub fn build(
-        &self,
+        parts: &[(String, SingleIndex, Plaintext)],
         index_by_name: impl Fn(&str, IndexType) -> Option<Box<dyn ComposableIndex>>,
-    ) -> Result<(String, Box<dyn ComposableIndex>, ComposablePlaintext), QueryError> {
-        let items_len = self.parts.len();
+    ) -> Result<
+        (
+            String,
+            Box<dyn ComposableIndex>,
+            IndexType,
+            ComposablePlaintext,
+        ),
+        QueryError,
+    > {
+        let items_len = parts.len();
 
         // this is the simplest way to brute force the index names but relies on some gross
         // stringly typing which doesn't feel good
-        for perm in self.parts.iter().permutations(items_len) {
+        for perm in parts.iter().permutations(items_len) {
             let (indexes, plaintexts): (Vec<(&String, &SingleIndex)>, Vec<&Plaintext>) =
                 perm.into_iter().map(|x| ((&x.0, &x.1), &x.2)).unzip();
 
             let name = indexes.iter().map(|(index_name, _)| index_name).join("#");
 
-            let mut indexes_iter = indexes.iter().map(|(_, index)| **index);
-
-            let index_type = match indexes.len() {
-                1 => IndexType::Single(indexes_iter.next().ok_or_else(|| {
-                    QueryError::InvalidQuery(
-                        "Expected indexes_iter to include have enough components".to_string(),
-                    )
-                })?),
-
-                2 => IndexType::Compound2((
-                    indexes_iter.next().ok_or_else(|| {
-                        QueryError::InvalidQuery(
-                            "Expected indexes_iter to include have enough components".to_string(),
-                        )
-                    })?,
-                    indexes_iter.next().ok_or_else(|| {
-                        QueryError::InvalidQuery(
-                            "Expected indexes_iter to include have enough components".to_string(),
-                        )
-                    })?,
-                )),
-
-                x => {
-                    return Err(QueryError::InvalidQuery(format!(
-                        "Query included an invalid number of components: {x}"
-                    )));
-                }
-            };
+            let index_type =
+                IndexType::from_single_index_iter(indexes.iter().map(|(_, index)| **index))?;
 
             if let Some(index) = index_by_name(name.as_str(), index_type) {
                 let mut plaintext = ComposablePlaintext::new(plaintexts[0].clone());
@@ -153,11 +131,11 @@ impl<'t> RawQueryBuilder<'t> {
                         .expect("Failed to compose");
                 }
 
-                return Ok((name, index, plaintext));
+                return Ok((name, index, index_type, plaintext));
             }
         }
 
-        let fields = self.parts.iter().map(|x| &x.0).join(",");
+        let fields = parts.iter().map(|x| &x.0).join(",");
 
         Err(QueryError::InvalidQuery(format!(
             "Could not build query for fields: {fields}"
@@ -166,6 +144,7 @@ impl<'t> RawQueryBuilder<'t> {
 }
 
 pub struct QueryBuilder<'t, T> {
+    table: &'t EncryptedTable,
     raw_builder: RawQueryBuilder<'t>,
     __table: PhantomData<T>,
 }
@@ -176,18 +155,21 @@ where
 {
     pub fn new(table: &'t EncryptedTable) -> Self {
         Self {
+            table,
             raw_builder: RawQueryBuilder::new(table),
             __table: Default::default(),
         }
     }
 
     pub fn eq(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        self.raw_builder.eq(name, plaintext);
+        self.raw_builder = self.raw_builder.eq(name, plaintext);
+
         self
     }
 
     pub fn starts_with(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
-        self.raw_builder.starts_with(name, plaintext);
+        self.raw_builder = self.raw_builder.starts_with(name, plaintext);
+
         self
     }
 
