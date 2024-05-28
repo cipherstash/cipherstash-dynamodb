@@ -6,7 +6,7 @@ use quote::{format_ident, quote};
 #[derive(Clone, PartialEq)]
 pub(crate) enum IndexType {
     Single(String, String),
-    Compound2((String, String), (String, String)), //Compound3 { name: String, index: ((String, String), (String, String), (String, String)) }
+    Compound2((String, String), (String, String)),
 }
 
 impl Display for IndexType {
