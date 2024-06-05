@@ -119,6 +119,8 @@ impl Sealed {
     /// decryptions
     ///
     /// This should be used over [`Sealed::unseal`] when multiple values need to be unsealed.
+    // TODO: Function is not used anymore, should it be removed?
+    #[allow(unused)]
     pub(crate) async fn unseal_all<T, C>(
         items: impl AsRef<[Sealed]>,
         cipher: &Encryption<C>,
@@ -168,6 +170,8 @@ impl Sealed {
     /// Unseal the current value and return it's plaintext representation as T
     ///
     /// If you need to unseal multiple values at once use [`Sealed::unseal_all`]
+    // TODO: Function is not used anymore, should it be removed?
+    #[allow(unused)]
     pub(crate) async fn unseal<C, T>(self, cipher: &Encryption<C>) -> Result<T, SealError>
     where
         C: Credentials<Token = ServiceToken>,
