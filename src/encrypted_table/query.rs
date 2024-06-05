@@ -144,7 +144,6 @@ impl<'t> RawQueryBuilder<'t> {
 }
 
 pub struct QueryBuilder<'t, T> {
-    table: &'t EncryptedTable,
     raw_builder: RawQueryBuilder<'t>,
     __table: PhantomData<T>,
 }
@@ -155,7 +154,6 @@ where
 {
     pub fn new(table: &'t EncryptedTable) -> Self {
         Self {
-            table,
             raw_builder: RawQueryBuilder::new(table),
             __table: Default::default(),
         }

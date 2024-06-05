@@ -1,8 +1,7 @@
 pub mod query;
 mod table_entry;
-use self::query::RawQueryBuilder;
 pub use self::{
-    query::QueryBuilder,
+    query::{QueryBuilder, RawQueryBuilder},
     table_entry::{TableAttribute, TableEntry, TryFromTableAttr},
 };
 use crate::{
