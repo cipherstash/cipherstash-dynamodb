@@ -176,7 +176,7 @@ where
     pub async fn send(self) -> Result<Vec<T>, QueryError> {
         self.raw_builder
             .send(
-                std::any::type_name::<T>(),
+                T::type_name(),
                 T::index_by_name,
                 T::plaintext_attributes(),
                 T::decryptable_attributes(),
