@@ -9,6 +9,8 @@ use cipherstash_dynamodb::{
     Error,
 };
 
+use cipherstash_dynamodb::traits::TryFromPlaintext;
+
 // Error Dependencies
 use cipherstash_dynamodb::errors::{
     BuildError, ConfigError, EncryptionError, LoadConfigError, SealError, WriteConversionError,
