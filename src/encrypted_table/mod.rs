@@ -211,8 +211,7 @@ impl EncryptedTable {
     where
         T: Searchable,
     {
-        let sealer: Sealer<T> = record.into_sealer()?;
-        let (primary_key_parts, sealed) = sealer.seal(&self.cipher, 12).await?;
+        let (primary_key_parts, sealed) = Sealer::seal(record, &self.cipher).await?;
         let all_index_keys = all_index_keys::<T>(&primary_key_parts.sk);
 
         self.put_raw(primary_key_parts, sealed, all_index_keys)

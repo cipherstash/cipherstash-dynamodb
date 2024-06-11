@@ -1,141 +1,149 @@
 use super::{b64_encode, format_term_key, hmac, SealError, Sealed, Unsealed, MAX_TERMS_PER_INDEX};
 use crate::{
-    encrypted_table::{TableAttribute, TableEntry},
-    traits::PrimaryKeyParts,
-    IndexType, Searchable,
+    encrypted_table::TableEntry,
+    traits::{PrimaryKeyParts, TableAttribute},
+    Encryptable, IndexType, Searchable,
 };
 use cipherstash_client::{
     credentials::{service_credentials::ServiceToken, Credentials},
-    encryption::{compound_indexer::CompoundIndex, Encryption, IndexTerm, Plaintext},
+    encryption::{
+        compound_indexer::{ComposableIndex, ComposablePlaintext, CompoundIndex},
+        Encryption, IndexTerm, Plaintext,
+    },
 };
 use itertools::Itertools;
 use std::iter::once;
 
-/// Builder pattern for sealing a record of type, `T`.
-pub struct Sealer<T> {
-    inner: T,
-    unsealed: Unsealed,
+const TERM_LENGTH: usize = 12;
+
+// TODO: At the very least 'pa and 'pi can be changed to static, when the derive macro output
+// static slices instead of Vec's
+pub struct Sealer<'p, 'e, 'pa, 'pi, C>
+where
+    C: Credentials<Token = ServiceToken>,
+{
+    table_entries: Vec<(
+        PrimaryKeyParts,
+        TableEntry,
+        Vec<(&'static str, IndexType, Vec<u8>)>,
+    )>,
+    protected: Vec<(&'p Plaintext, &'p str)>,
+    cipher: &'e Encryption<C>,
+
+    is_partition_key_encrypted: bool,
+    is_sort_key_encrypted: bool,
+    index_by_name: fn(&str, IndexType) -> Option<Box<dyn ComposableIndex>>,
+    protected_attributes: &'pa [&'static str],
+    protected_indexes: &'pi [(&'static str, IndexType)],
+    type_name: &'static str,
 }
 
-impl<T> Sealer<T> {
-    pub fn new(inner: T) -> Self {
+impl<'p, 'e, 'pa, 'pi, C> Sealer<'p, 'e, 'pa, 'pi, C>
+where
+    C: Credentials<Token = ServiceToken>,
+{
+    pub fn new(
+        cipher: &'e Encryption<C>,
+        is_partition_key_encrypted: bool,
+        is_sort_key_encrypted: bool,
+        index_by_name: fn(&str, IndexType) -> Option<Box<dyn ComposableIndex>>,
+        protected_attributes: &'pa [&'static str],
+        protected_indexes: &'pi [(&'static str, IndexType)],
+        type_name: &'static str,
+    ) -> Self {
         Self {
-            inner,
-            unsealed: Unsealed::new(),
+            table_entries: Vec::new(),
+            protected: Vec::new(),
+            cipher,
+
+            is_partition_key_encrypted,
+            is_sort_key_encrypted,
+            index_by_name,
+            protected_attributes,
+            protected_indexes,
+            type_name,
         }
     }
 
-    pub fn new_with_descriptor(inner: T, descriptor: impl Into<String>) -> Self {
-        Self {
-            inner,
-            unsealed: Unsealed::new_with_descriptor(descriptor),
+    /// Reserve space for n additional unsealed records
+    pub fn reserve(&mut self, n_records: usize) {
+        self.protected
+            .reserve(n_records * self.protected_attributes.len());
+        self.table_entries.reserve(n_records);
+    }
+
+    pub fn push<I>(
+        &mut self,
+        unsealed: &'p Unsealed,
+        partition_key: String,
+        sort_key: String,
+        attributes_for_indexes: I,
+    ) -> Result<(), SealError>
+    where
+        I: IntoIterator<Item = ComposablePlaintext>,
+    {
+        let pk = if self.is_partition_key_encrypted {
+            b64_encode(hmac(&partition_key, None, self.cipher)?)
+        } else {
+            partition_key
+        };
+
+        let sk = if self.is_sort_key_encrypted {
+            b64_encode(hmac(&sort_key, Some(pk.as_str()), self.cipher)?)
+        } else {
+            sort_key
+        };
+
+        for &attr in self.protected_attributes.iter() {
+            println!("{:?}", unsealed.protected_with_descriptor(attr)?);
+            self.protected
+                .push(unsealed.protected_with_descriptor(attr)?);
         }
-    }
 
-    pub fn unsealed(self) -> Unsealed {
-        self.unsealed.clone()
-    }
+        let table_entry =
+            TableEntry::new_with_attributes(pk.clone(), sk.clone(), None, unsealed.unprotected());
 
-    pub fn add_protected<F>(mut self, name: impl Into<String>, f: F) -> Result<Self, SealError>
-    where
-        F: FnOnce(&T) -> Plaintext,
-    {
-        let name: String = name.into();
+        let terms: Vec<(&str, IndexType, Vec<u8>)> = self
+            .protected_indexes
+            .iter()
+            .zip(attributes_for_indexes)
+            .map(|(&(index_name, index_type), attr)| {
+                let index = ((self.index_by_name)(index_name, index_type))
+                    .ok_or(SealError::MissingAttribute(index_name.to_string()))?;
+                let index_term = self.cipher.compound_index(
+                    &CompoundIndex::new(index),
+                    attr,
+                    Some(format!("{}#{}", self.type_name, index_name)),
+                    TERM_LENGTH,
+                )?;
 
-        self.unsealed.add_protected(name, f(&self.inner));
-        Ok(self)
-    }
-
-    pub fn add_plaintext<F>(mut self, name: impl Into<String>, f: F) -> Result<Self, SealError>
-    where
-        F: FnOnce(&T) -> TableAttribute,
-    {
-        let name: String = name.into();
-        self.unsealed.add_unprotected(name, f(&self.inner));
-        Ok(self)
-    }
-
-    pub(crate) async fn seal_all<S: Searchable>(
-        records: impl AsRef<[Sealer<S>]>,
-        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
-        term_length: usize,
-    ) -> Result<Vec<(PrimaryKeyParts, Vec<Sealed>)>, SealError> {
-        let records = records.as_ref();
-        let protected_attributes = S::protected_attributes();
-        let protected_indexes = S::protected_indexes();
-
-        let mut protected = Vec::with_capacity(records.len() * protected_attributes.len());
-        let mut table_entries = Vec::with_capacity(records.len());
-
-        for record in records.iter() {
-            let mut pk = record.inner.partition_key();
-            let mut sk = record.inner.sort_key();
-
-            if S::is_partition_key_encrypted() {
-                pk = b64_encode(hmac(&pk, None, cipher)?);
-            }
-
-            if S::is_sort_key_encrypted() {
-                sk = b64_encode(hmac(&sk, Some(pk.as_str()), cipher)?);
-            }
-
-            for attr in protected_attributes.iter() {
-                protected.push(record.unsealed.protected_with_descriptor(attr)?);
-            }
-
-            let table_entry = TableEntry::new_with_attributes(
-                pk.clone(),
-                sk.clone(),
-                None,
-                record.unsealed.unprotected(),
-            );
-
-            let terms: Vec<(&&str, IndexType, Vec<u8>)> = protected_indexes
-                .iter()
-                .map(|(index_name, index_type)| {
-                    record
-                        .inner
-                        .attribute_for_index(index_name, *index_type)
-                        .and_then(|attr| {
-                            S::index_by_name(index_name, *index_type)
-                                .map(|index| (attr, index, index_name, index_type))
-                        })
-                        .ok_or(SealError::MissingAttribute(index_name.to_string()))
-                        .and_then(|(attr, index, index_name, index_type)| {
-                            let term = cipher.compound_index(
-                                &CompoundIndex::new(index),
-                                attr,
-                                Some(format!("{}#{}", S::type_name(), index_name)),
-                                term_length,
-                            )?;
-
-                            Ok::<_, SealError>((index_name, index_type, term))
-                        })
-                })
-                .map(|index_term| match index_term {
-                    Ok((index_name, index_type, IndexTerm::Binary(x))) => {
-                        Ok(vec![(index_name, *index_type, x)])
-                    }
-                    Ok((index_name, index_type, IndexTerm::BinaryVec(x))) => Ok(x
+                match index_term {
+                    IndexTerm::Binary(x) => Ok(vec![(index_name, index_type, x)]),
+                    IndexTerm::BinaryVec(x) => Ok(x
                         .into_iter()
                         .take(MAX_TERMS_PER_INDEX)
-                        .map(|x| (index_name, *index_type, x))
+                        .map(|x| (index_name, index_type, x))
                         .collect()),
                     _ => Err(SealError::InvalidCiphertext("Invalid index term".into())),
-                })
-                .flatten_ok()
-                .try_collect()?;
+                }
+            })
+            .flatten_ok()
+            .try_collect()?;
 
-            table_entries.push((PrimaryKeyParts { pk, sk }, table_entry, terms));
-        }
+        self.table_entries
+            .push((PrimaryKeyParts { pk, sk }, table_entry, terms));
 
-        let encrypted = cipher.encrypt(protected).await?;
+        Ok(())
+    }
+
+    pub async fn finalize(mut self) -> Result<Vec<(PrimaryKeyParts, Vec<Sealed>)>, SealError> {
+        let encrypted = self.cipher.encrypt(self.protected).await?;
 
         for (encrypted, (_, table_entry, _)) in encrypted
-            .chunks_exact(protected_attributes.len())
-            .zip(table_entries.iter_mut())
+            .chunks_exact(self.protected_attributes.len())
+            .zip(self.table_entries.iter_mut())
         {
-            for (enc, name) in encrypted.iter().zip(protected_attributes.iter()) {
+            for (enc, name) in encrypted.iter().zip(self.protected_attributes.iter()) {
                 table_entry.add_attribute(
                     match *name {
                         "pk" => "__pk",
@@ -151,9 +159,9 @@ impl<T> Sealer<T> {
             }
         }
 
-        let mut output = Vec::with_capacity(records.len());
+        let mut output = Vec::with_capacity(self.table_entries.len());
 
-        for (primary_key, table_entry, terms) in table_entries.into_iter() {
+        for (primary_key, table_entry, terms) in self.table_entries.into_iter() {
             let table_entries = terms
                 .into_iter()
                 .enumerate()
@@ -162,7 +170,7 @@ impl<T> Sealer<T> {
                         b64_encode(hmac(
                             &format_term_key(&primary_key.sk, index_name, index_type, i),
                             Some(primary_key.pk.as_str()),
-                            cipher,
+                            self.cipher,
                         )?),
                     )))
                 })
@@ -175,25 +183,69 @@ impl<T> Sealer<T> {
         Ok(output)
     }
 
-    pub async fn seal<C>(
-        self,
-        cipher: &Encryption<C>,
-        term_length: usize,
-    ) -> Result<(PrimaryKeyParts, Vec<Sealed>), SealError>
+    pub async fn seal_all<T>(
+        records: Vec<T>,
+        cipher: &'e Encryption<C>,
+    ) -> Result<Vec<(PrimaryKeyParts, Vec<Sealed>)>, SealError>
     where
-        C: Credentials<Token = ServiceToken>,
-        T: Searchable,
+        T: Searchable + Encryptable,
     {
-        let mut vec = Self::seal_all([self], cipher, term_length).await?;
+        let protected_attributes = T::protected_attributes();
+        let protected_indexes = T::protected_indexes();
 
-        if vec.len() != 1 {
-            let actual = vec.len();
+        let mut sealer = Sealer::new(
+            cipher,
+            T::is_partition_key_encrypted(),
+            T::is_sort_key_encrypted(),
+            T::index_by_name,
+            &protected_attributes,
+            &protected_indexes,
+            T::type_name(),
+        );
 
-            return Err(SealError::AssertionFailed(format!(
-                "Expected seal_all to return 1 result but got {actual}"
-            )));
+        sealer.reserve(records.len());
+
+        let records_meta = records
+            .iter()
+            .map(|record| {
+                (
+                    record.all_attributes_for_indexes(),
+                    record.partition_key(),
+                    record.sort_key(),
+                )
+            })
+            .collect_vec();
+
+        let unsealed_records = records
+            .into_iter()
+            .map(|record| record.into_unsealed())
+            .collect_vec();
+
+        for ((all_attributes_for_indexes, pk, sk), unsealed) in
+            records_meta.into_iter().zip(unsealed_records.iter())
+        {
+            sealer.push(unsealed, pk, sk, all_attributes_for_indexes)?;
         }
 
-        Ok(vec.remove(0))
+        sealer.finalize().await
+    }
+
+    pub async fn seal<T>(
+        record: T,
+        cipher: &'e Encryption<C>,
+    ) -> Result<(PrimaryKeyParts, Vec<Sealed>), SealError>
+    where
+        T: Encryptable + Searchable,
+    {
+        let mut result = Self::seal_all(vec![record], cipher).await?;
+
+        if result.len() == 1 {
+            Ok(result.remove(0))
+        } else {
+            Err(SealError::AssertionFailed(format!(
+                "Expected seal_all to return 1 result but got {}",
+                result.len()
+            )))
+        }
     }
 }

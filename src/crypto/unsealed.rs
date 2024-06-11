@@ -16,7 +16,7 @@ pub struct Unsealed {
 }
 
 impl Unsealed {
-    pub(super) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             descriptor: None,
             protected: Default::default(),
@@ -24,7 +24,7 @@ impl Unsealed {
         }
     }
 
-    pub(super) fn new_with_descriptor(descriptor: impl Into<String>) -> Self {
+    pub fn new_with_descriptor(descriptor: impl Into<String>) -> Self {
         Self {
             descriptor: Some(descriptor.into()),
             protected: Default::default(),

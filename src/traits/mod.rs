@@ -1,6 +1,6 @@
 pub use crate::encrypted_table::{TableAttribute, TryFromTableAttr};
 use crate::{
-    crypto::{SealError, Sealer, Unsealed},
+    crypto::{SealError, Unsealed},
     errors::QueryError,
 };
 pub use cipherstash_client::encryption::{
@@ -124,7 +124,7 @@ pub trait Encryptable: Debug + Sized {
         vec![]
     }
 
-    fn into_sealer(self) -> Result<Sealer<Self>, SealError>;
+    fn into_unsealed(self) -> Unsealed;
 }
 
 pub trait Searchable: Encryptable {
@@ -134,6 +134,17 @@ pub trait Searchable: Encryptable {
         _index_type: IndexType,
     ) -> Option<ComposablePlaintext> {
         None
+    }
+
+    /// Returns attributes for all indexes in the same order as [Self::protected_indexes]
+    fn all_attributes_for_indexes(&self) -> Vec<ComposablePlaintext> {
+        Self::protected_indexes()
+            .iter()
+            .map(|&(index_name, index_type)| {
+                self.attribute_for_index(index_name, index_type)
+                    .expect("No attribute for index")
+            })
+            .collect()
     }
 
     fn protected_indexes() -> Vec<(&'static str, IndexType)> {

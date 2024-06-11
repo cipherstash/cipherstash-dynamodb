@@ -36,7 +36,7 @@ impl Sealed {
     /// decryptions
     ///
     /// This should be used over [`Sealed::unseal_raw`] when multiple values need to be unsealed.
-    pub(crate) async fn unseal_all_raw<C>(
+    pub async fn unseal_all_raw<C>(
         items: impl AsRef<[Sealed]>,
         plaintext_attributes: Vec<&'static str>,
         decryptable_attributes: Vec<&'static str>,
@@ -143,7 +143,7 @@ impl Sealed {
     /// Unseal the current value and return it's plaintext representation
     ///
     /// If you need to unseal multiple values at once use [`Sealed::unseal_all_raw`]
-    pub(crate) async fn unseal_raw<C>(
+    pub async fn unseal_raw<C>(
         self,
         plaintext_attributes: Vec<&'static str>,
         decryptable_attributes: Vec<&'static str>,
