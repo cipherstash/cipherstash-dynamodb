@@ -53,8 +53,8 @@ pub(crate) fn derive_searchable(input: DeriveInput) -> Result<TokenStream, syn::
     let expanded = quote! {
         #[automatically_derived]
         impl cipherstash_dynamodb::traits::Searchable for #ident {
-            fn protected_indexes() -> Vec<( &'static str, cipherstash_dynamodb::IndexType )> {
-                vec![#(#protected_indexes_impl,)*]
+            fn protected_indexes() -> &'static [( &'static str, cipherstash_dynamodb::IndexType )] {
+                &[#(#protected_indexes_impl,)*]
             }
 
             fn index_by_name(index_name: &str, index_type: cipherstash_dynamodb::IndexType) -> Option<Box<dyn cipherstash_dynamodb::traits::ComposableIndex>> {

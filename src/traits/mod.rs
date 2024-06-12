@@ -118,10 +118,10 @@ pub trait Encryptable: Debug + Sized {
 
     fn partition_key(&self) -> String;
 
-    fn protected_attributes() -> Vec<&'static str>;
+    fn protected_attributes() -> &'static [&'static str];
 
-    fn plaintext_attributes() -> Vec<&'static str> {
-        vec![]
+    fn plaintext_attributes() -> &'static [&'static str] {
+        &[]
     }
 
     fn into_unsealed(self) -> Unsealed;
@@ -147,8 +147,8 @@ pub trait Searchable: Encryptable {
             .collect()
     }
 
-    fn protected_indexes() -> Vec<(&'static str, IndexType)> {
-        vec![]
+    fn protected_indexes() -> &'static [(&'static str, IndexType)] {
+        &[]
     }
 
     fn index_by_name(
@@ -167,7 +167,7 @@ pub trait Decryptable: Encryptable {
     /// Defines which attributes are decryptable for this type.
     /// Must be equal to or a subset of protected_attributes().
     /// By default, this is the same as protected_attributes().
-    fn decryptable_attributes() -> Vec<&'static str> {
+    fn decryptable_attributes() -> &'static [&'static str] {
         Self::protected_attributes()
     }
 }

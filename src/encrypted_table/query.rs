@@ -45,8 +45,8 @@ impl<'t> RawQueryBuilder<'t> {
         self,
         type_name: &'static str,
         index_by_name: impl Fn(&str, IndexType) -> Option<Box<dyn ComposableIndex>>,
-        plaintext_attributes: Vec<&'static str>,
-        decryptable_attributes: Vec<&'static str>,
+        plaintext_attributes: &[&'static str],
+        decryptable_attributes: &[&'static str],
     ) -> Result<Vec<Unsealed>, QueryError> {
         let (index_name, index, _index_type, plaintext) = Self::build(&self.parts, index_by_name)?;
 

@@ -18,7 +18,7 @@ const TERM_LENGTH: usize = 12;
 
 // TODO: At the very least 'pa and 'pi can be changed to static, when the derive macro output
 // static slices instead of Vec's
-pub struct Sealer<'p, 'e, 'pa, 'pi, C>
+pub struct Sealer<'p, 'e, C>
 where
     C: Credentials<Token = ServiceToken>,
 {
@@ -33,12 +33,12 @@ where
     is_partition_key_encrypted: bool,
     is_sort_key_encrypted: bool,
     index_by_name: fn(&str, IndexType) -> Option<Box<dyn ComposableIndex>>,
-    protected_attributes: &'pa [&'static str],
-    protected_indexes: &'pi [(&'static str, IndexType)],
+    protected_attributes: &'static [&'static str],
+    protected_indexes: &'static [(&'static str, IndexType)],
     type_name: &'static str,
 }
 
-impl<'p, 'e, 'pa, 'pi, C> Sealer<'p, 'e, 'pa, 'pi, C>
+impl<'p, 'e, C> Sealer<'p, 'e, C>
 where
     C: Credentials<Token = ServiceToken>,
 {
@@ -47,8 +47,8 @@ where
         is_partition_key_encrypted: bool,
         is_sort_key_encrypted: bool,
         index_by_name: fn(&str, IndexType) -> Option<Box<dyn ComposableIndex>>,
-        protected_attributes: &'pa [&'static str],
-        protected_indexes: &'pi [(&'static str, IndexType)],
+        protected_attributes: &'static [&'static str],
+        protected_indexes: &'static [(&'static str, IndexType)],
         type_name: &'static str,
     ) -> Self {
         Self {

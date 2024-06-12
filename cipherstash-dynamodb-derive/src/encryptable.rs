@@ -100,12 +100,12 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
                 self.#partition_key.to_string()
             }
 
-            fn protected_attributes() -> Vec<&'static str> {
-                vec![#(#protected_attributes,)*]
+            fn protected_attributes() -> &'static [&'static str] {
+                &[#(#protected_attributes,)*]
             }
 
-            fn plaintext_attributes() -> Vec<&'static str> {
-                vec![#(#plaintext_attributes,)*]
+            fn plaintext_attributes() -> &'static [&'static str] {
+                &[#(#plaintext_attributes,)*]
             }
 
             fn into_unsealed(self) -> cipherstash_dynamodb::crypto::Unsealed {

@@ -134,8 +134,8 @@ impl EncryptedTable {
     pub async fn get_raw(
         &self,
         PrimaryKeyParts { pk, sk }: PrimaryKeyParts,
-        plaintext_attributes: Vec<&'static str>,
-        decryptable_attributes: Vec<&'static str>,
+        plaintext_attributes: &[&'static str],
+        decryptable_attributes: &[&'static str],
     ) -> Result<Option<Unsealed>, GetError> {
         let result = self
             .db

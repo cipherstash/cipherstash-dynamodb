@@ -38,8 +38,8 @@ impl Sealed {
     /// This should be used over [`Sealed::unseal_raw`] when multiple values need to be unsealed.
     pub async fn unseal_all_raw<C>(
         items: impl AsRef<[Sealed]>,
-        plaintext_attributes: Vec<&'static str>,
-        decryptable_attributes: Vec<&'static str>,
+        plaintext_attributes: &[&'static str],
+        decryptable_attributes: &[&'static str],
         cipher: &Encryption<C>,
     ) -> Result<Vec<Unsealed>, SealError>
     where
@@ -145,8 +145,8 @@ impl Sealed {
     /// If you need to unseal multiple values at once use [`Sealed::unseal_all_raw`]
     pub async fn unseal_raw<C>(
         self,
-        plaintext_attributes: Vec<&'static str>,
-        decryptable_attributes: Vec<&'static str>,
+        plaintext_attributes: &[&'static str],
+        decryptable_attributes: &[&'static str],
         cipher: &Encryption<C>,
     ) -> Result<Unsealed, SealError>
     where
