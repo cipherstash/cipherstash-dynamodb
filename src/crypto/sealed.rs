@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use super::{SealError, Unsealed};
 
 /// Wrapped to indicate that the value is encrypted
+#[derive(Clone)]
 pub struct Sealed(pub(super) TableEntry);
 
 impl Sealed {
@@ -30,6 +31,48 @@ impl Sealed {
 
     pub(crate) fn inner(&self) -> &TableEntry {
         &self.0
+    }
+
+    pub fn get_attributes<'a, 'b>(
+        &'a self,
+        plaintext_attributes: &'b [&'static str],
+        decryptable_attributes: &'b [&'static str],
+    ) -> (
+        impl Iterator<Item = Result<(&'b str, &'a TableAttribute), SealError>>,
+        impl Iterator<Item = Result<(&'b str, &'a TableAttribute), SealError>>,
+    ) {
+        let plaintext_iter = plaintext_attributes.iter().map(|name| {
+            let name = match *name {
+                "sk" => "__sk",
+                _ => name,
+            };
+
+            Ok((
+                name,
+                self.inner()
+                    .attributes
+                    .get(name)
+                    .ok_or(SealError::MissingAttribute(name.to_string()))?,
+            ))
+        });
+
+        let decryptable_iter = decryptable_attributes.iter().map(|name| {
+            let name = match *name {
+                "pk" => "__pk",
+                "sk" => "__sk",
+                _ => name,
+            };
+
+            Ok((
+                name,
+                self.inner()
+                    .attributes
+                    .get(name)
+                    .ok_or_else(|| SealError::MissingAttribute(name.to_string()))?,
+            ))
+        });
+
+        (plaintext_iter, decryptable_iter)
     }
 
     /// Unseal a list of [`Sealed`] values in an efficient manner that optimizes for bulk
@@ -51,35 +94,20 @@ impl Sealed {
         let mut decryptable_items = Vec::with_capacity(items.len() * decryptable_attributes.len());
 
         for item in items.iter() {
-            let ciphertexts = decryptable_attributes
-                .iter()
-                .map(|name| {
-                    let attribute = item.inner().attributes.get(match *name {
-                        "pk" => "__pk",
-                        "sk" => "__sk",
-                        _ => name,
-                    });
+            let (plaintext_iter, decryptable_iter) =
+                item.get_attributes(plaintext_attributes, decryptable_attributes);
 
-                    attribute
-                        .ok_or_else(|| SealError::MissingAttribute(name.to_string()))?
+            let ciphertexts = decryptable_iter
+                .map(|result| {
+                    let (name, cipher) = result?;
+                    cipher
                         .as_encrypted_record()
                         .ok_or_else(|| SealError::InvalidCiphertext(name.to_string()))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
 
-            let unprotected = plaintext_attributes
-                .iter()
-                .map(|name| {
-                    let attr = match *name {
-                        "sk" => "__sk",
-                        _ => name,
-                    };
-
-                    item.inner()
-                        .attributes
-                        .get(attr)
-                        .ok_or(SealError::MissingAttribute(attr.to_string()))
-                })
+            let unprotected = plaintext_iter
+                .map(|result| Ok(result?.1))
                 .collect::<Result<Vec<&TableAttribute>, SealError>>()?;
 
             plaintext_items.push(unprotected);
