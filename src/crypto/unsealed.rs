@@ -58,7 +58,7 @@ impl Unsealed {
         self.unprotected.insert(name.into(), attribute);
     }
 
-    pub(crate) fn unprotected(&self) -> HashMap<String, TableAttribute> {
+    pub fn unprotected(&self) -> HashMap<String, TableAttribute> {
         self.unprotected.clone()
     }
 
