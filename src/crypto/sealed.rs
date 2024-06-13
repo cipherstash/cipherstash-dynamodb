@@ -272,3 +272,9 @@ impl TryFrom<Sealed> for HashMap<String, AttributeValue> {
         Ok(map)
     }
 }
+
+impl From<TableEntry> for Sealed {
+    fn from(table_entry: TableEntry) -> Self {
+        Self(table_entry)
+    }
+}
