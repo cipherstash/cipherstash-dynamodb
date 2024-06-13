@@ -95,7 +95,6 @@ where
         };
 
         for &attr in self.protected_attributes.iter() {
-            println!("{:?}", unsealed.protected_with_descriptor(attr)?);
             self.protected
                 .push(unsealed.protected_with_descriptor(attr)?);
         }
