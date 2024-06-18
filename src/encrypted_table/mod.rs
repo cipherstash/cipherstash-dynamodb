@@ -87,14 +87,14 @@ impl EncryptedTable {
         &self,
         k: impl Into<T::PrimaryKey>,
     ) -> Result<PrimaryKeyParts, EncryptionError> {
-        self.get_primary_key_parts_raw(
+        self.encrypt_primary_key_parts(
             k.into().into_parts::<T>(),
             T::is_partition_key_encrypted(),
             T::is_sort_key_encrypted(),
         )
     }
 
-    pub fn get_primary_key_parts_raw(
+    pub fn encrypt_primary_key_parts(
         &self,
         PrimaryKeyParts { mut pk, mut sk }: PrimaryKeyParts,
         is_partition_key_encrypted: bool,
