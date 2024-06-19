@@ -6,7 +6,6 @@ use std::future::Future;
 mod common;
 
 #[derive(Encryptable, Decryptable, Searchable, Debug, PartialEq, Eq, PartialOrd, Ord)]
-#[cipherstash(sort_key_prefix = None)]
 pub struct User {
     #[partition_key]
     pub email: String,
@@ -18,10 +17,9 @@ pub struct User {
 
 impl User {
     fn new(email: impl Into<String>, name: impl Into<String>) -> Self {
-        let name = name.into();
         Self {
             email: email.into(),
-            name,
+            name: name.into(),
         }
     }
 }
