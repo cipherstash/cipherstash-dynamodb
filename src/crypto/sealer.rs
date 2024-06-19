@@ -16,8 +16,6 @@ use std::iter::once;
 
 const TERM_LENGTH: usize = 12;
 
-// TODO: At the very least 'pa and 'pi can be changed to static, when the derive macro output
-// static slices instead of Vec's
 pub struct Sealer<'p, 'e, C>
 where
     C: Credentials<Token = ServiceToken>,
