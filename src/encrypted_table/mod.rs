@@ -36,6 +36,10 @@ impl EncryptedTable {
         &self.cipher
     }
 
+    pub fn db(&self) -> &Client {
+        &self.db
+    }
+
     pub async fn init(
         db: aws_sdk_dynamodb::Client,
         table_name: impl Into<String>,
