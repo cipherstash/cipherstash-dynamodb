@@ -1,7 +1,7 @@
 use super::{index_type::IndexType, AttributeMode, Settings};
 use proc_macro2::{Ident, Span};
 use std::collections::HashMap;
-use syn::{Data, DeriveInput, Fields, LitStr, Type};
+use syn::{Data, DeriveInput, Fields, LitStr};
 
 enum SortKeyPrefix {
     Default,
@@ -27,7 +27,7 @@ pub(crate) struct SettingsBuilder {
     sort_key_prefix: SortKeyPrefix,
     sort_key_field: Option<String>,
     partition_key_field: Option<String>,
-    protected_attributes: Vec<(String, Type)>,
+    protected_attributes: Vec<String>,
     unprotected_attributes: Vec<String>,
     skipped_attributes: Vec<String>,
     indexes: Vec<IndexType>,
@@ -124,7 +124,6 @@ impl SettingsBuilder {
 
                 for field in &fields_named.named {
                     let ident = &field.ident;
-                    let ty = field.ty.clone();
                     let mut attr_mode = AttributeMode::Protected;
 
                     let field_name = ident
@@ -322,7 +321,6 @@ impl SettingsBuilder {
                             .as_ref()
                             .ok_or(syn::Error::new_spanned(field, "missing field"))?
                             .to_string(),
-                        ty,
                         attr_mode,
                     );
                 }
@@ -381,9 +379,9 @@ impl SettingsBuilder {
         Ok(())
     }
 
-    fn add_attribute(&mut self, value: String, ty: Type, mode: AttributeMode) {
+    fn add_attribute(&mut self, value: String, mode: AttributeMode) {
         match mode {
-            AttributeMode::Protected => self.protected_attributes.push((value, ty)),
+            AttributeMode::Protected => self.protected_attributes.push(value),
             AttributeMode::Plaintext => self.unprotected_attributes.push(value),
             AttributeMode::Skipped => self.skipped_attributes.push(value),
         }
