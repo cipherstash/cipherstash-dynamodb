@@ -3,7 +3,7 @@ pub mod index_type;
 use self::{builder::SettingsBuilder, index_type::IndexType};
 use itertools::Itertools;
 use proc_macro2::Ident;
-use syn::DeriveInput;
+use syn::{DeriveInput, Type};
 
 pub(crate) enum AttributeMode {
     Protected,
@@ -17,7 +17,7 @@ pub(crate) struct Settings {
     pub(crate) type_name: String,
     pub(crate) sort_key_field: Option<String>,
     pub(crate) partition_key_field: String,
-    protected_attributes: Vec<String>,
+    protected_attributes: Vec<(String, Type)>,
     unprotected_attributes: Vec<String>,
 
     /// Skipped attributes are never encrypted by the `DecryptedRecord` trait will
@@ -35,11 +35,11 @@ impl Settings {
         &self.ident
     }
 
-    pub(crate) fn protected_attributes(&self) -> Vec<&str> {
+    pub(crate) fn protected_attributes(&self) -> Vec<(&str, &Type)> {
         self.protected_attributes
             .iter()
-            .map(|s| s.as_str())
-            .sorted()
+            .map(|(ident, ty)| (ident.as_str(), ty))
+            .sorted_by_key(|(ident, _ty)| *ident)
             .collect::<Vec<_>>()
     }
 

@@ -1,5 +1,5 @@
 use crate::{encrypted_table::TableAttribute, Decryptable};
-use cipherstash_client::encryption::Plaintext;
+use cipherstash_client::encryption::{Plaintext, PlaintextNullVariant};
 use std::collections::HashMap;
 
 use super::SealError;
@@ -32,20 +32,22 @@ impl Unsealed {
         }
     }
 
-    pub fn get_protected(&self, name: &str) -> Result<&Plaintext, SealError> {
-        let (plaintext, _) = self
-            .protected
+    pub fn get_protected<T>(&self, name: &str) -> Plaintext
+    where
+        T: PlaintextNullVariant,
+    {
+        self.protected
             .get(name)
-            .ok_or_else(|| SealError::MissingAttribute(name.to_string()))?;
-
-        Ok(plaintext)
+            .map(|(plaintext, _)| plaintext)
+            .cloned()
+            .unwrap_or_else(|| T::null())
     }
 
-    pub fn get_plaintext(&self, name: &str) -> Result<TableAttribute, SealError> {
+    pub fn get_plaintext(&self, name: &str) -> TableAttribute {
         self.unprotected
             .get(name)
             .cloned()
-            .ok_or_else(|| SealError::MissingAttribute(name.to_string()))
+            .unwrap_or(TableAttribute::Null)
     }
 
     pub fn add_protected(&mut self, name: impl Into<String>, plaintext: Plaintext) {
