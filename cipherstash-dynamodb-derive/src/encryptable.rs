@@ -19,11 +19,7 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
         .map(|x| quote! { Some(#x) })
         .unwrap_or_else(|| quote! { None });
 
-    let protected_attributes = settings
-        .protected_attributes()
-        .into_iter()
-        .map(|(attr, _ty)| attr)
-        .collect::<Vec<_>>();
+    let protected_attributes = settings.protected_attributes();
     let plaintext_attributes = settings.plaintext_attributes();
     let ident = settings.ident();
 
