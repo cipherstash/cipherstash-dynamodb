@@ -49,8 +49,7 @@ impl Sealed {
         let decryptable_attributes = T::decryptable_attributes();
 
         let mut plaintext_items: Vec<Vec<&TableAttribute>> = Vec::with_capacity(items.len());
-        let mut decryptable_items =
-            Vec::with_capacity(items.len() * decryptable_attributes.len());
+        let mut decryptable_items = Vec::with_capacity(items.len() * decryptable_attributes.len());
 
         for item in items.iter() {
             let ciphertexts = decryptable_attributes
