@@ -132,22 +132,18 @@ impl<T> Sealer<T> {
             .zip(table_entries.iter_mut())
         {
             for (enc, name) in encrypted.iter().zip(protected_attributes.iter()) {
-                if let Some(e) = enc {
-                    table_entry.add_attribute(
-                        match *name {
-                            "pk" => "__pk",
-                            "sk" => "__sk",
-                            _ => name,
-                        },
-                        hex::decode(e)
-                            .map_err(|_| {
-                                SealError::InvalidCiphertext(
-                                    "Encrypted result was invalid hex".into(),
-                                )
-                            })?
-                            .into(),
-                    );
-                }
+                table_entry.add_attribute(
+                    match *name {
+                        "pk" => "__pk",
+                        "sk" => "__sk",
+                        _ => name,
+                    },
+                    TableAttribute::Bytes(enc.to_vec().map_err(|_| {
+                        SealError::InvalidCiphertext(
+                            "Failed to serialize encrypted record as bytes".into(),
+                        )
+                    })?),
+                );
             }
         }
 
