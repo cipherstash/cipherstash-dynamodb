@@ -670,9 +670,9 @@ dependencies = [
 
 [[package]]
 name = "cipherstash-client"
-version = "0.8.0"
+version = "0.9.0"
 source = "sparse+https://cargo.cloudsmith.io/cipherstash/cipherstash/"
-checksum = "1af4fc3e72cd930d2fdb30eec09ad76307e2106f3e5a150d96da8a3e19acfd0b"
+checksum = "8da9043792ea70abb7eae8961145589e1ce41a192505c527365f51c6a34baed1"
 dependencies = [
  "anyhow",
  "async-mutex",
@@ -680,7 +680,8 @@ dependencies = [
  "base64 0.22.1",
  "cfg-if",
  "chrono",
- "cipherstash-core 0.1.1 (git+ssh://git@github.com/cipherstash/cipherstash-suite.git?branch=feat/compound-spike)",
+ "cipherstash-core",
+ "cipherstash-stats",
  "dirs",
  "hex",
  "hmac",
@@ -688,6 +689,7 @@ dependencies = [
  "miette",
  "open",
  "ore-rs",
+ "percent-encoding",
  "recipher",
  "reqwest 0.12.4",
  "reqwest-middleware",
@@ -725,7 +727,7 @@ dependencies = [
 
 [[package]]
 name = "cipherstash-dynamodb"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "aws-config",
@@ -749,7 +751,7 @@ dependencies = [
 
 [[package]]
 name = "cipherstash-dynamodb-derive"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "itertools",
  "paste",
@@ -757,6 +759,16 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.66",
+]
+
+[[package]]
+name = "cipherstash-stats"
+version = "0.1.0"
+source = "sparse+https://cargo.cloudsmith.io/cipherstash/cipherstash/"
+checksum = "9b24095300064077c1781e876f1e405a414012f2c1b0e48046fdb3fb8b7380f1"
+dependencies = [
+ "lazy_static",
+ "prometheus",
 ]
 
 [[package]]
@@ -2068,6 +2080,27 @@ checksum = "22244ce15aa966053a896d1accb3a6e68469b97c7f33f284b99f0d576879fc23"
 dependencies = [
  "unicode-ident",
 ]
+
+[[package]]
+name = "prometheus"
+version = "0.13.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d33c28a30771f7f96db69893f78b857f7450d7e0237e9c8fc6427a81bae7ed1"
+dependencies = [
+ "cfg-if",
+ "fnv",
+ "lazy_static",
+ "memchr",
+ "parking_lot 0.12.3",
+ "protobuf",
+ "thiserror",
+]
+
+[[package]]
+name = "protobuf"
+version = "2.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "106dd99e98437432fed6519dedecfade6a06a73bb7b2a1e019fdd2bee5778d94"
 
 [[package]]
 name = "ptr_meta"
