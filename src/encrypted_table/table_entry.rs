@@ -1,5 +1,6 @@
 use crate::traits::ReadConversionError;
 use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
+use cipherstash_client::encryption::EncryptedRecord;
 use std::{
     collections::{BTreeMap, HashMap},
     str::FromStr,
@@ -77,9 +78,9 @@ pub enum TableAttribute {
 }
 
 impl TableAttribute {
-    pub(crate) fn as_hex_ciphertext(&self) -> Option<String> {
+    pub(crate) fn as_encrypted_record(&self) -> Option<EncryptedRecord> {
         if let TableAttribute::Bytes(s) = self {
-            Some(hex::encode(s))
+            EncryptedRecord::from_slice(&s[..]).ok()
         } else {
             None
         }
