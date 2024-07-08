@@ -1,8 +1,8 @@
-use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Searchable};
+use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Identifiable, Searchable};
 
 mod common;
 
-#[derive(Debug, Clone, PartialEq, Encryptable, Decryptable, Searchable)]
+#[derive(Debug, Clone, PartialEq, Identifiable, Encryptable, Decryptable, Searchable)]
 struct Crazy {
     #[partition_key]
     email: String,

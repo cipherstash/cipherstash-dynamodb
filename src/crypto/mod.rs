@@ -4,7 +4,7 @@ mod sealer;
 mod unsealed;
 
 use crate::{
-    traits::{Encryptable, ReadConversionError, Searchable, WriteConversionError},
+    traits::{Encryptable, PrimaryKeyError, ReadConversionError, Searchable, WriteConversionError},
     IndexType,
 };
 use cipherstash_client::{
@@ -17,7 +17,7 @@ use cipherstash_client::{
 use thiserror::Error;
 
 pub use b64_encode::*;
-pub use sealed::Sealed;
+pub use sealed::SealedTableEntry;
 pub use sealer::Sealer;
 pub use unsealed::Unsealed;
 
@@ -25,6 +25,8 @@ const MAX_TERMS_PER_INDEX: usize = 25;
 
 #[derive(Debug, Error)]
 pub enum SealError {
+    #[error("Error when creating primary key: {0}")]
+    PrimaryKeyError(#[from] PrimaryKeyError),
     #[error("Failed to encrypt partition key")]
     CryptoError(#[from] EncryptionError),
     #[error("Failed to convert attribute: {0} from internal representation")]
@@ -73,7 +75,7 @@ pub(crate) fn all_index_keys<E: Searchable + Encryptable>(sort_key: &str) -> Vec
         .collect()
 }
 
-pub(crate) fn hmac<C>(
+pub fn hmac<C>(
     value: &str,
     salt: Option<&str>,
     cipher: &Encryption<C>,

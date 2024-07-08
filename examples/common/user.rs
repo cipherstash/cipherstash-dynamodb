@@ -1,6 +1,6 @@
-use cipherstash_dynamodb::{Decryptable, Encryptable, Searchable};
+use cipherstash_dynamodb::{Decryptable, Encryptable, Identifiable, Searchable};
 
-#[derive(Debug, Encryptable, Decryptable, Searchable)]
+#[derive(Debug, Identifiable, Encryptable, Decryptable, Searchable)]
 #[cipherstash(sort_key_prefix = "user")]
 pub struct User {
     #[cipherstash(query = "exact", compound = "email#name")]

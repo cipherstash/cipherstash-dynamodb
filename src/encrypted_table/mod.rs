@@ -7,35 +7,50 @@ pub use self::{
 use crate::{
     crypto::*,
     errors::*,
-    traits::{Decryptable, PrimaryKey, PrimaryKeyParts, Searchable},
-    Encryptable,
+    traits::{Decryptable, PrimaryKeyError, PrimaryKeyParts, Searchable},
+    Identifiable,
 };
-use aws_sdk_dynamodb::{
-    types::{AttributeValue, Delete, Put, TransactWriteItem},
-    Client,
-};
+use aws_sdk_dynamodb::types::{AttributeValue, Delete, Put, TransactWriteItem};
 use cipherstash_client::{
     config::{console_config::ConsoleConfig, zero_kms_config::ZeroKMSConfig},
     credentials::{auto_refresh::AutoRefresh, service_credentials::ServiceCredentials},
-    encryption::{Encryption, EncryptionError},
-    zero_kms::{DatasetConfigWithIndexRootKey, ZeroKMS},
+    encryption::Encryption,
+    zero_kms::ZeroKMS,
 };
 use log::info;
-use std::collections::HashSet;
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Deref,
+};
 
-pub struct EncryptedTable {
-    db: Client,
-    cipher: Box<Encryption<AutoRefresh<ServiceCredentials>>>,
-    // We may use this later but for now the config is in code
-    _dataset_config: DatasetConfigWithIndexRootKey,
-    table_name: String,
+pub struct Headless;
+
+pub struct Dynamo {
+    pub(crate) db: aws_sdk_dynamodb::Client,
+    pub(crate) table_name: String,
 }
 
-impl EncryptedTable {
-    pub async fn init(
-        db: aws_sdk_dynamodb::Client,
-        table_name: impl Into<String>,
-    ) -> Result<EncryptedTable, InitError> {
+impl Deref for Dynamo {
+    type Target = aws_sdk_dynamodb::Client;
+
+    fn deref(&self) -> &Self::Target {
+        &self.db
+    }
+}
+
+pub struct EncryptedTable<D = Dynamo> {
+    db: D,
+    cipher: Box<Encryption<AutoRefresh<ServiceCredentials>>>,
+}
+
+impl<D> EncryptedTable<D> {
+    // option here to generate query params
+
+    // option here to seal
+}
+
+impl EncryptedTable<Headless> {
+    pub async fn init_headless() -> Result<Self, InitError> {
         info!("Initializing...");
         let console_config = ConsoleConfig::builder().with_env().build()?;
         let zero_kms_config = ZeroKMSConfig::builder()
@@ -53,6 +68,7 @@ impl EncryptedTable {
 
         info!("Fetching dataset config...");
         let dataset_config = zero_kms_client.load_dataset_config().await?;
+
         let cipher = Box::new(Encryption::new(
             dataset_config.index_root_key,
             zero_kms_client,
@@ -61,54 +77,190 @@ impl EncryptedTable {
         info!("Ready!");
 
         Ok(Self {
-            db,
+            db: Headless,
             cipher,
-            _dataset_config: dataset_config,
-            table_name: table_name.into(),
         })
     }
+}
 
-    pub fn query<R>(&self) -> QueryBuilder<R>
+/// A patch of records to insert and delete based on an operation
+///
+/// When inserting records with CipherStash DynamoDB, previous index terms must be deleted in order
+/// to maintain data integrity. For a `put` operation this will contain both "put" records and
+/// "delete" records.
+///
+/// When deleting records this patch will only contain "delete" records.
+pub struct DynamoRecordPatch {
+    pub put_records: Vec<HashMap<String, AttributeValue>>,
+    pub delete_records: Vec<PrimaryKeyParts>,
+}
+
+impl DynamoRecordPatch {
+    /// Consume the [`DynamoRecordPatch`] and create a list of [`TransactWriteItem`] used to put
+    /// and delete records from DynamoDB.
+    ///
+    /// Not that only 100 transact write items can be sent to DynamoDB at one time.
+    pub fn into_transact_write_items(
+        self,
+        table_name: &str,
+    ) -> Result<Vec<TransactWriteItem>, BuildError> {
+        let mut items = Vec::with_capacity(self.put_records.len() + self.delete_records.len());
+
+        for insert in self.put_records.into_iter() {
+            items.push(
+                TransactWriteItem::builder()
+                    .put(
+                        Put::builder()
+                            .table_name(table_name)
+                            .set_item(Some(insert))
+                            .build()?,
+                    )
+                    .build(),
+            );
+        }
+
+        for PrimaryKeyParts { pk, sk } in self.delete_records.into_iter() {
+            items.push(
+                TransactWriteItem::builder()
+                    .delete(
+                        Delete::builder()
+                            .table_name(table_name)
+                            .key("pk", AttributeValue::S(pk))
+                            .key("sk", AttributeValue::S(sk))
+                            .build()?,
+                    )
+                    .build(),
+            );
+        }
+
+        Ok(items)
+    }
+}
+
+impl<D> EncryptedTable<D> {
+    pub fn query<S>(&self) -> QueryBuilder<S, D>
     where
-        R: Searchable + Decryptable,
+        S: Searchable,
     {
         QueryBuilder::new(self)
     }
 
-    fn get_primary_key_parts<T: Encryptable>(
+    pub async fn create_delete_patch<E: Searchable + Identifiable>(
         &self,
-        k: impl Into<T::PrimaryKey>,
-    ) -> Result<PrimaryKeyParts, EncryptionError> {
-        let PrimaryKeyParts { mut pk, mut sk } = k.into().into_parts::<T>();
+        k: impl Into<E::PrimaryKey>,
+    ) -> Result<DynamoRecordPatch, DeleteError> {
+        let PrimaryKeyParts { pk, sk } = self.get_primary_key_parts::<E>(k)?;
 
-        if T::is_partition_key_encrypted() {
-            pk = b64_encode(hmac(&pk, None, &self.cipher)?);
+        let delete_records = all_index_keys::<E>(&sk)
+            .into_iter()
+            .map(|x| Ok::<_, DeleteError>(b64_encode(hmac(&x, Some(pk.as_str()), &self.cipher)?)))
+            .chain([Ok(sk)])
+            .map(|sk| {
+                let sk = sk?;
+                Ok::<_, DeleteError>(PrimaryKeyParts { pk: pk.clone(), sk })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(DynamoRecordPatch {
+            put_records: vec![],
+            delete_records,
+        })
+    }
+
+    /// Create a [`DynamoRecordPatch`] used to insert records into DynamoDB.
+    ///
+    /// This will create a root record with all attributes and index records that only include
+    /// attributes specified by the `index_predicate`. Use this predicate to only project certain
+    /// attributes into the index.
+    ///
+    /// This patch will also include multiple delete items to remove any index keys that could be
+    /// remaining in the database after updating a record.
+    pub async fn create_put_patch<E: Searchable + Identifiable>(
+        &self,
+        record: E,
+        index_predicate: impl FnMut(&str, &TableAttribute) -> bool,
+    ) -> Result<DynamoRecordPatch, PutError> {
+        let mut seen_sk = HashSet::new();
+
+        let sealer: Sealer<E> = record.into_sealer()?;
+        let sealed = sealer.seal(&self.cipher, 12).await?;
+
+        let mut put_records = Vec::with_capacity(sealed.len());
+        let mut delete_records = vec![];
+
+        let PrimaryKeyParts { pk, sk } = sealed.primary_key();
+
+        let (root, index_entries) = sealed.into_table_entries(index_predicate);
+
+        seen_sk.insert(root.inner().sk.clone());
+        put_records.push(root.try_into()?);
+
+        for entry in index_entries.into_iter() {
+            seen_sk.insert(entry.inner().sk.clone());
+            put_records.push(entry.try_into()?);
         }
 
-        if T::is_sort_key_encrypted() {
-            sk = b64_encode(hmac(&sk, Some(pk.as_str()), &self.cipher)?);
+        for index_sk in all_index_keys::<E>(&sk) {
+            let index_sk = b64_encode(hmac(&index_sk, Some(pk.as_str()), &self.cipher)?);
+
+            if seen_sk.contains(&index_sk) {
+                continue;
+            }
+
+            delete_records.push(PrimaryKeyParts {
+                pk: pk.clone(),
+                sk: index_sk,
+            });
         }
 
-        Ok(PrimaryKeyParts { pk, sk })
+        Ok(DynamoRecordPatch {
+            put_records,
+            delete_records,
+        })
+    }
+
+    fn get_primary_key_parts<I: Identifiable>(
+        &self,
+        k: impl Into<I::PrimaryKey>,
+    ) -> Result<PrimaryKeyParts, PrimaryKeyError> {
+        I::get_primary_key_parts_from_key(k.into(), &self.cipher)
+    }
+}
+
+impl EncryptedTable<Dynamo> {
+    pub async fn init(
+        db: aws_sdk_dynamodb::Client,
+        table_name: impl Into<String>,
+    ) -> Result<Self, InitError> {
+        let table = EncryptedTable::init_headless().await?;
+
+        Ok(Self {
+            db: Dynamo {
+                table_name: table_name.into(),
+                db,
+            },
+            cipher: table.cipher,
+        })
     }
 
     pub async fn get<T>(&self, k: impl Into<T::PrimaryKey>) -> Result<Option<T>, GetError>
     where
-        T: Decryptable,
+        T: Decryptable + Identifiable,
     {
         let PrimaryKeyParts { pk, sk } = self.get_primary_key_parts::<T>(k)?;
 
         let result = self
             .db
             .get_item()
-            .table_name(&self.table_name)
+            .table_name(&self.db.table_name)
             .key("pk", AttributeValue::S(pk))
             .key("sk", AttributeValue::S(sk))
             .send()
             .await
             .map_err(|e| GetError::Aws(format!("{e:?}")))?;
 
-        let sealed: Option<Sealed> = result.item.map(Sealed::try_from).transpose()?;
+        let sealed: Option<SealedTableEntry> =
+            result.item.map(SealedTableEntry::try_from).transpose()?;
 
         if let Some(sealed) = sealed {
             Ok(Some(sealed.unseal(&self.cipher).await?))
@@ -117,32 +269,14 @@ impl EncryptedTable {
         }
     }
 
-    pub async fn delete<E: Searchable>(
+    pub async fn delete<E: Searchable + Identifiable>(
         &self,
         k: impl Into<E::PrimaryKey>,
     ) -> Result<(), DeleteError> {
-        let PrimaryKeyParts { pk, sk } = self.get_primary_key_parts::<E>(k)?;
-
-        let transact_items = all_index_keys::<E>(&sk)
-            .into_iter()
-            .map(|x| Ok::<_, DeleteError>(b64_encode(hmac(&x, Some(pk.as_str()), &self.cipher)?)))
-            .chain([Ok(sk)])
-            .map(|sk| {
-                sk.and_then(|sk| {
-                    Ok::<_, DeleteError>(
-                        TransactWriteItem::builder()
-                            .delete(
-                                Delete::builder()
-                                    .table_name(&self.table_name)
-                                    .key("pk", AttributeValue::S(pk.clone()))
-                                    .key("sk", AttributeValue::S(sk))
-                                    .build()?,
-                            )
-                            .build(),
-                    )
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let transact_items = self
+            .create_delete_patch::<E>(k)
+            .await?
+            .into_transact_write_items(&self.db.table_name)?;
 
         // Dynamo has a limit of 100 items per transaction
         for items in transact_items.chunks(100) {
@@ -159,52 +293,21 @@ impl EncryptedTable {
 
     pub async fn put<T>(&self, record: T) -> Result<(), PutError>
     where
-        T: Searchable,
+        T: Searchable + Identifiable,
     {
-        let mut seen_sk = HashSet::new();
+        let transact_items = self
+            .create_put_patch(
+                record,
+                // include all records in the indexes
+                |_, _| true,
+            )
+            .await?
+            .into_transact_write_items(&self.db.table_name)?;
 
-        let sealer: Sealer<T> = record.into_sealer()?;
-        let (PrimaryKeyParts { pk, sk }, sealed) = sealer.seal(&self.cipher, 12).await?;
-
-        let mut items: Vec<TransactWriteItem> = Vec::with_capacity(sealed.len());
-
-        for entry in sealed.into_iter() {
-            seen_sk.insert(entry.inner().sk.clone());
-
-            items.push(
-                TransactWriteItem::builder()
-                    .put(
-                        Put::builder()
-                            .table_name(&self.table_name)
-                            .set_item(Some(entry.try_into()?))
-                            .build()?,
-                    )
-                    .build(),
-            );
-        }
-
-        for index_sk in all_index_keys::<T>(&sk) {
-            let index_sk = b64_encode(hmac(&index_sk, Some(pk.as_str()), &self.cipher)?);
-
-            if seen_sk.contains(&index_sk) {
-                continue;
-            }
-
-            items.push(
-                TransactWriteItem::builder()
-                    .delete(
-                        Delete::builder()
-                            .table_name(&self.table_name)
-                            .key("pk", AttributeValue::S(pk.clone()))
-                            .key("sk", AttributeValue::S(index_sk))
-                            .build()?,
-                    )
-                    .build(),
-            );
-        }
+        println!("ITEMS {:#?}", transact_items);
 
         // Dynamo has a limit of 100 items per transaction
-        for items in items.chunks(100) {
+        for items in transact_items.chunks(100) {
             self.db
                 .transact_write_items()
                 .set_transact_items(Some(items.to_vec()))

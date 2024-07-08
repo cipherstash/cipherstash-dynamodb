@@ -1,11 +1,13 @@
-use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Searchable};
+use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Identifiable, Searchable};
 use itertools::Itertools;
 use serial_test::serial;
 use std::future::Future;
 
 mod common;
 
-#[derive(Encryptable, Decryptable, Searchable, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Identifiable, Encryptable, Decryptable, Searchable, Debug, PartialEq, Eq, PartialOrd, Ord,
+)]
 pub struct User {
     #[partition_key]
     pub email: String,
@@ -79,7 +81,7 @@ async fn test_query_single_exact() {
 async fn test_query_exact_no_records() {
     run_test(|table| async move {
         let res: Vec<User> = table
-            .query()
+            .query::<User>()
             .eq("name", "Dan")
             .send()
             .await
@@ -95,7 +97,7 @@ async fn test_query_exact_no_records() {
 async fn test_query_prefix() {
     run_test(|table| async move {
         let res: Vec<User> = table
-            .query()
+            .query::<User>()
             .starts_with("name", "Dan")
             .send()
             .await

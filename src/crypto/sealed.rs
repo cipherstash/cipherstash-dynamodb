@@ -13,9 +13,9 @@ use std::collections::HashMap;
 use super::{SealError, Unsealed};
 
 /// Wrapped to indicate that the value is encrypted
-pub struct Sealed(pub(super) TableEntry);
+pub struct SealedTableEntry(pub(super) TableEntry);
 
-impl Sealed {
+impl SealedTableEntry {
     pub fn vec_from<O: TryInto<Self>>(
         items: Vec<O>,
     ) -> Result<Vec<Self>, <O as TryInto<Self>>::Error> {
@@ -37,7 +37,7 @@ impl Sealed {
     ///
     /// This should be used over [`Sealed::unseal`] when multiple values need to be unsealed.
     pub(crate) async fn unseal_all<T, C>(
-        items: impl AsRef<[Sealed]>,
+        items: impl AsRef<[SealedTableEntry]>,
         cipher: &Encryption<C>,
     ) -> Result<Vec<T>, SealError>
     where
@@ -46,7 +46,7 @@ impl Sealed {
     {
         let items = items.as_ref();
         let plaintext_attributes = T::plaintext_attributes();
-        let decryptable_attributes = T::decryptable_attributes();
+        let decryptable_attributes = T::protected_attributes();
 
         let mut plaintext_items: Vec<Vec<&TableAttribute>> = Vec::with_capacity(items.len());
         let mut decryptable_items = Vec::with_capacity(items.len() * decryptable_attributes.len());
@@ -138,7 +138,7 @@ impl Sealed {
     }
 }
 
-impl TryFrom<HashMap<String, AttributeValue>> for Sealed {
+impl TryFrom<HashMap<String, AttributeValue>> for SealedTableEntry {
     type Error = ReadConversionError;
 
     fn try_from(item: HashMap<String, AttributeValue>) -> Result<Self, Self::Error> {
@@ -165,14 +165,14 @@ impl TryFrom<HashMap<String, AttributeValue>> for Sealed {
                 table_entry.add_attribute(&k, v.into());
             });
 
-        Ok(Sealed(table_entry))
+        Ok(SealedTableEntry(table_entry))
     }
 }
 
-impl TryFrom<Sealed> for HashMap<String, AttributeValue> {
+impl TryFrom<SealedTableEntry> for HashMap<String, AttributeValue> {
     type Error = WriteConversionError;
 
-    fn try_from(item: Sealed) -> Result<Self, Self::Error> {
+    fn try_from(item: SealedTableEntry) -> Result<Self, Self::Error> {
         let mut map = HashMap::new();
 
         map.insert("pk".to_string(), AttributeValue::S(item.0.pk));

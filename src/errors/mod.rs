@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+use crate::traits::PrimaryKeyError;
 pub use crate::{
     crypto::{CryptoError, SealError},
     traits::{ReadConversionError, WriteConversionError},
@@ -14,6 +15,8 @@ pub use aws_sdk_dynamodb::error::BuildError;
 /// Error returned by [`EncryptedTable::put`] when indexing, encrypting and inserting records into DynamoDB
 #[derive(Error, Debug)]
 pub enum PutError {
+    #[error("PrimaryKeyError: {0}")]
+    PrimaryKeyError(#[from] PrimaryKeyError),
     #[error("AwsError: {0}")]
     Aws(String),
     #[error("AwsBuildError: {0}")]
@@ -31,6 +34,8 @@ pub enum PutError {
 /// Error returned by [`EncryptedTable::get`] when retrieving and decrypting records from DynamoDB
 #[derive(Error, Debug)]
 pub enum GetError {
+    #[error("PrimaryKeyError: {0}")]
+    PrimaryKeyError(#[from] PrimaryKeyError),
     #[error("SealError: {0}")]
     Seal(#[from] SealError),
     #[error("Encryption Error: {0}")]
@@ -44,6 +49,8 @@ pub enum GetError {
 /// Error returned by [`EncryptedTable::delete`] when indexing and deleting records in DynamoDB
 #[derive(Error, Debug)]
 pub enum DeleteError {
+    #[error("PrimaryKeyError: {0}")]
+    PrimaryKeyError(#[from] PrimaryKeyError),
     #[error("Encryption Error: {0}")]
     Encryption(#[from] EncryptionError),
     #[error("AwsBuildError: {0}")]
@@ -55,6 +62,8 @@ pub enum DeleteError {
 /// Error returned by [`EncryptedTable::query`] when indexing, retrieving and decrypting records from DynamoDB
 #[derive(Error, Debug)]
 pub enum QueryError {
+    #[error("PrimaryKeyError: {0}")]
+    PrimaryKeyError(#[from] PrimaryKeyError),
     #[error("InvaldQuery: {0}")]
     InvalidQuery(String),
     #[error("CryptoError: {0}")]

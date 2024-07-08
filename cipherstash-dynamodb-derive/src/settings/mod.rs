@@ -16,7 +16,7 @@ pub(crate) struct Settings {
     pub(crate) sort_key_prefix: Option<String>,
     pub(crate) type_name: String,
     pub(crate) sort_key_field: Option<String>,
-    pub(crate) partition_key_field: String,
+    pub(crate) partition_key_field: Option<String>,
     protected_attributes: Vec<String>,
     unprotected_attributes: Vec<String>,
 
@@ -69,7 +69,7 @@ impl Settings {
             .collect()
     }
 
-    pub(crate) fn get_partition_key(&self) -> String {
+    pub(crate) fn get_partition_key(&self) -> Option<String> {
         self.partition_key_field.clone()
     }
 }

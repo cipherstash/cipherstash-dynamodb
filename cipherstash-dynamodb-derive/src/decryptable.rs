@@ -41,6 +41,14 @@ pub(crate) fn derive_decryptable(input: DeriveInput) -> Result<TokenStream, syn:
     let expanded = quote! {
         #[automatically_derived]
         impl cipherstash_dynamodb::traits::Decryptable for #ident {
+            fn protected_attributes() -> Vec<&'static str> {
+                vec![#(#protected_attributes,)*]
+            }
+
+            fn plaintext_attributes() -> Vec<&'static str> {
+                vec![#(#plaintext_attributes,)*]
+            }
+
             fn from_unsealed(unsealed: cipherstash_dynamodb::crypto::Unsealed) -> Result<Self, cipherstash_dynamodb::crypto::SealError> {
                 Ok(Self {
                     #(#from_unsealed_impl,)*

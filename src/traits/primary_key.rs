@@ -1,15 +1,14 @@
-use crate::Encryptable;
-
 pub struct PrimaryKeyParts {
     pub pk: String,
     pub sk: String,
 }
 
-pub trait PrimaryKey: private::Sealed {
-    fn into_parts<E: Encryptable>(self) -> PrimaryKeyParts;
-}
+pub trait PrimaryKey: private::Sealed {}
 
-pub struct Pk(String);
+impl PrimaryKey for Pk {}
+impl PrimaryKey for PkSk {}
+
+pub struct Pk(pub String);
 
 impl Pk {
     pub fn new(pk: impl Into<String>) -> Self {
@@ -23,7 +22,7 @@ impl<P: Into<String>> From<P> for Pk {
     }
 }
 
-pub struct PkSk(String, String);
+pub struct PkSk(pub String, pub String);
 
 impl<Pk: Into<String>, Sk: Into<String>> From<(Pk, Sk)> for PkSk {
     fn from(value: (Pk, Sk)) -> Self {
@@ -46,24 +45,23 @@ mod private {
     impl Sealed for PkSk {}
 }
 
-impl PrimaryKey for Pk {
-    fn into_parts<E: Encryptable>(self) -> PrimaryKeyParts {
-        PrimaryKeyParts {
-            pk: self.0,
-            sk: E::sort_key_prefix().unwrap_or(E::type_name()).to_string(),
-        }
-    }
-}
-
-impl PrimaryKey for PkSk {
-    fn into_parts<E: Encryptable>(self) -> PrimaryKeyParts {
-        let sk = self.1;
-
-        PrimaryKeyParts {
-            pk: self.0,
-            sk: E::sort_key_prefix()
-                .map(|x| format!("{x}#{sk}"))
-                .unwrap_or_else(|| sk.to_string()),
-        }
-    }
-}
+// impl PrimaryKey for Pk
+// where
+//     <PrimaryKey::Model as Identifiable>::PrimaryKey = Pk,
+// {
+//     fn into_parts<I: Identifiable>(
+//         self,
+//         cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+//     ) -> Result<PrimaryKeyParts, EncryptionError> {
+//         Ok(I::get_primary_key_parts_from_key(self, cipher))
+//     }
+// }
+//
+// impl PrimaryKey for PkSk {
+//     fn into_parts<I: Identifiable>(
+//         self,
+//         cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+//     ) -> Result<PrimaryKeyParts, EncryptionError> {
+//         Ok(I::get_primary_key_parts_from_key(self, cipher))
+//     }
+// }

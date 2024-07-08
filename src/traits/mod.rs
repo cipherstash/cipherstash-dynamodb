@@ -1,10 +1,14 @@
 use crate::crypto::{SealError, Sealer, Unsealed};
 pub use crate::encrypted_table::{TableAttribute, TryFromTableAttr};
-pub use cipherstash_client::encryption::{
-    compound_indexer::{
-        ComposableIndex, ComposablePlaintext, CompoundIndex, ExactIndex, PrefixIndex,
+use cipherstash_client::encryption::EncryptionError;
+pub use cipherstash_client::{
+    credentials::{service_credentials::ServiceToken, Credentials},
+    encryption::{
+        compound_indexer::{
+            ComposableIndex, ComposablePlaintext, CompoundIndex, ExactIndex, PrefixIndex,
+        },
+        Encryption, Plaintext, PlaintextNullVariant, TryFromPlaintext,
     },
-    Plaintext, PlaintextNullVariant, TryFromPlaintext,
 };
 
 mod primary_key;
@@ -64,28 +68,40 @@ pub enum WriteConversionError {
     ConversionFailed(String),
 }
 
-pub trait Encryptable: Debug + Sized {
+#[derive(Error, Debug)]
+pub enum PrimaryKeyError {
+    #[error("EncryptionError: {0}")]
+    EncryptionError(#[from] EncryptionError),
+    #[error("PrimaryKeyError: {0}")]
+    Unknown(String),
+}
+
+pub trait Identifiable {
     type PrimaryKey: PrimaryKey;
 
+    fn get_primary_key_parts(
+        &self,
+        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+    ) -> Result<PrimaryKeyParts, PrimaryKeyError>;
+
+    fn get_primary_key_parts_from_key(
+        primary_key: Self::PrimaryKey,
+        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+    ) -> Result<PrimaryKeyParts, PrimaryKeyError>;
+}
+
+pub trait Encryptable: Debug + Sized {
     fn type_name() -> &'static str;
 
-    fn sort_key_prefix() -> Option<&'static str>;
-
-    fn is_partition_key_encrypted() -> bool;
-
-    fn is_sort_key_encrypted() -> bool;
-
-    fn sort_key(&self) -> String {
-        Self::type_name().into()
-    }
-
-    fn partition_key(&self) -> String;
-
+    /// Defines what attributes are protected and should be encrypted for this type.
+    ///
+    /// Must be equal to or a superset of protected_attributes on the [`Decryptable`] type.
     fn protected_attributes() -> Vec<&'static str>;
 
-    fn plaintext_attributes() -> Vec<&'static str> {
-        vec![]
-    }
+    /// Defines what attributes are plaintext for this type.
+    ///
+    /// Must be equal to or a superset of plaintext_attributes on the [`Decryptable`] type.
+    fn plaintext_attributes() -> Vec<&'static str>;
 
     fn into_sealer(self) -> Result<Sealer<Self>, SealError>;
 }
@@ -111,15 +127,18 @@ pub trait Searchable: Encryptable {
     }
 }
 
-pub trait Decryptable: Encryptable {
+pub trait Decryptable: Sized {
     /// Convert an `Unsealed` into a `Self`.
 
     fn from_unsealed(unsealed: Unsealed) -> Result<Self, SealError>;
 
-    /// Defines which attributes are decryptable for this type.
-    /// Must be equal to or a subset of protected_attributes().
-    /// By default, this is the same as protected_attributes().
-    fn decryptable_attributes() -> Vec<&'static str> {
-        Self::protected_attributes()
-    }
+    /// Defines what attributes are protected and decryptable for this type.
+    ///
+    /// Must be equal to or a subset of protected_attributes on the [`Encryptable`] type.
+    fn protected_attributes() -> Vec<&'static str>;
+
+    /// Defines what attributes are plaintext for this type.
+    ///
+    /// Must be equal to or a subset of protected_attributes on the [`Encryptable`] type.
+    fn plaintext_attributes() -> Vec<&'static str>;
 }
