@@ -1,11 +1,13 @@
-use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Searchable};
+use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Identifiable, Searchable};
 use itertools::Itertools;
 use serial_test::serial;
 use std::future::Future;
 
 mod common;
 
-#[derive(Encryptable, Decryptable, Searchable, Debug, PartialEq, Ord, PartialOrd, Eq)]
+#[derive(
+    Identifiable, Encryptable, Decryptable, Searchable, Debug, PartialEq, Ord, PartialOrd, Eq,
+)]
 #[cipherstash(sort_key_prefix = "user")]
 pub struct User {
     #[cipherstash(query = "exact", compound = "email#name")]

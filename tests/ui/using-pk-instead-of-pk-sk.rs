@@ -1,7 +1,7 @@
-use cipherstash_dynamodb::{Decryptable, Encryptable, Searchable};
+use cipherstash_dynamodb::{Identifiable, Decryptable, Encryptable, Searchable};
 use cipherstash_dynamodb::EncryptedTable;
 
-#[derive(Debug, Encryptable, Decryptable, Searchable)]
+#[derive(Debug, Identifiable, Encryptable, Decryptable, Searchable)]
 struct User {
     #[cipherstash(query = "exact")]
     #[partition_key]

@@ -1,20 +1,84 @@
-use super::{b64_encode, format_term_key, hmac, SealError, Sealed, Unsealed, MAX_TERMS_PER_INDEX};
+use super::{
+    b64_encode, format_term_key, hmac, SealError, SealedTableEntry, Unsealed, MAX_TERMS_PER_INDEX,
+};
 use crate::{
     encrypted_table::{TableAttribute, TableEntry},
     traits::PrimaryKeyParts,
-    IndexType, Searchable,
+    Identifiable, IndexType, Searchable,
 };
 use cipherstash_client::{
     credentials::{service_credentials::ServiceToken, Credentials},
     encryption::{compound_indexer::CompoundIndex, Encryption, IndexTerm, Plaintext},
 };
 use itertools::Itertools;
-use std::iter::once;
+use std::collections::HashMap;
 
 /// Builder pattern for sealing a record of type, `T`.
 pub struct Sealer<T> {
     inner: T,
     unsealed: Unsealed,
+}
+
+struct Term {
+    sk: String,
+    value: Vec<u8>,
+}
+
+pub struct Sealed {
+    pk: String,
+    sk: String,
+    attributes: HashMap<String, TableAttribute>,
+    terms: Vec<Term>,
+}
+
+impl Sealed {
+    pub fn len(&self) -> usize {
+        // the length of the terms plus the root entry
+        self.terms.len() + 1
+    }
+
+    pub fn primary_key(&self) -> PrimaryKeyParts {
+        PrimaryKeyParts {
+            pk: self.pk.clone(),
+            sk: self.sk.clone(),
+        }
+    }
+
+    pub fn into_table_entries(
+        self,
+        mut index_predicate: impl FnMut(&str, &TableAttribute) -> bool,
+    ) -> (SealedTableEntry, Vec<SealedTableEntry>) {
+        let root_attributes = self.attributes;
+
+        let index_attributes = root_attributes
+            .iter()
+            .filter(|(key, value)| index_predicate(key, value))
+            .map(|(key, value)| (key.to_string(), value.clone()))
+            .collect::<HashMap<_, _>>();
+
+        let term_entries = self
+            .terms
+            .into_iter()
+            .map(|Term { sk, value }| {
+                SealedTableEntry(TableEntry::new_with_attributes(
+                    self.pk.clone(),
+                    sk,
+                    Some(value),
+                    index_attributes.clone(),
+                ))
+            })
+            .collect();
+
+        (
+            SealedTableEntry(TableEntry::new_with_attributes(
+                self.pk,
+                self.sk,
+                None,
+                root_attributes,
+            )),
+            term_entries,
+        )
+    }
 }
 
 impl<T> Sealer<T> {
@@ -51,11 +115,11 @@ impl<T> Sealer<T> {
         Ok(self)
     }
 
-    pub(crate) async fn seal_all<S: Searchable>(
+    pub(crate) async fn seal_all<S: Searchable + Identifiable>(
         records: impl AsRef<[Sealer<S>]>,
         cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
         term_length: usize,
-    ) -> Result<Vec<(PrimaryKeyParts, Vec<Sealed>)>, SealError> {
+    ) -> Result<Vec<Sealed>, SealError> {
         let records = records.as_ref();
         let protected_attributes = S::protected_attributes();
         let protected_indexes = S::protected_indexes();
@@ -64,27 +128,11 @@ impl<T> Sealer<T> {
         let mut table_entries = Vec::with_capacity(records.len());
 
         for record in records.iter() {
-            let mut pk = record.inner.partition_key();
-            let mut sk = record.inner.sort_key();
-
-            if S::is_partition_key_encrypted() {
-                pk = b64_encode(hmac(&pk, None, cipher)?);
-            }
-
-            if S::is_sort_key_encrypted() {
-                sk = b64_encode(hmac(&sk, Some(pk.as_str()), cipher)?);
-            }
+            let PrimaryKeyParts { pk, sk } = record.inner.get_primary_key_parts(cipher)?;
 
             for attr in protected_attributes.iter() {
                 protected.push(record.unsealed.protected_with_descriptor(attr)?);
             }
-
-            let table_entry = TableEntry::new_with_attributes(
-                pk.clone(),
-                sk.clone(),
-                None,
-                record.unsealed.unprotected(),
-            );
 
             let terms: Vec<(&&str, IndexType, Vec<u8>)> = protected_indexes
                 .iter()
@@ -122,22 +170,26 @@ impl<T> Sealer<T> {
                 .flatten_ok()
                 .try_collect()?;
 
-            table_entries.push((PrimaryKeyParts { pk, sk }, table_entry, terms));
+            table_entries.push((
+                PrimaryKeyParts { pk, sk },
+                record.unsealed.unprotected(),
+                terms,
+            ));
         }
 
         let encrypted = cipher.encrypt(protected).await?;
 
-        for (encrypted, (_, table_entry, _)) in encrypted
+        for (encrypted, (_, attributes, _)) in encrypted
             .chunks_exact(protected_attributes.len())
             .zip(table_entries.iter_mut())
         {
             for (enc, name) in encrypted.iter().zip(protected_attributes.iter()) {
-                table_entry.add_attribute(
-                    match *name {
+                attributes.insert(
+                    String::from(match *name {
                         "pk" => "__pk",
                         "sk" => "__sk",
                         _ => name,
-                    },
+                    }),
                     TableAttribute::Bytes(enc.to_vec().map_err(|_| {
                         SealError::InvalidCiphertext(
                             "Failed to serialize encrypted record as bytes".into(),
@@ -149,23 +201,27 @@ impl<T> Sealer<T> {
 
         let mut output = Vec::with_capacity(records.len());
 
-        for (primary_key, table_entry, terms) in table_entries.into_iter() {
-            let table_entries = terms
+        for (PrimaryKeyParts { pk, sk }, attributes, terms) in table_entries.into_iter() {
+            let terms = terms
                 .into_iter()
                 .enumerate()
                 .map(|(i, (index_name, index_type, term))| {
-                    Ok(Sealed(table_entry.clone().set_term(term).set_sk(
-                        b64_encode(hmac(
-                            &format_term_key(&primary_key.sk, index_name, index_type, i),
-                            Some(primary_key.pk.as_str()),
-                            cipher,
-                        )?),
-                    )))
+                    let sk = b64_encode(hmac(
+                        &format_term_key(sk.as_str(), index_name, index_type, i),
+                        Some(pk.as_str()),
+                        cipher,
+                    )?);
+
+                    Ok::<_, SealError>(Term { sk, value: term })
                 })
-                .chain(once(Ok(Sealed(table_entry.clone()))))
                 .collect::<Result<_, SealError>>()?;
 
-            output.push((primary_key, table_entries));
+            output.push(Sealed {
+                pk,
+                sk,
+                attributes,
+                terms,
+            });
         }
 
         Ok(output)
@@ -175,10 +231,10 @@ impl<T> Sealer<T> {
         self,
         cipher: &Encryption<C>,
         term_length: usize,
-    ) -> Result<(PrimaryKeyParts, Vec<Sealed>), SealError>
+    ) -> Result<Sealed, SealError>
     where
         C: Credentials<Token = ServiceToken>,
-        T: Searchable,
+        T: Searchable + Identifiable,
     {
         let mut vec = Self::seal_all([self], cipher, term_length).await?;
 

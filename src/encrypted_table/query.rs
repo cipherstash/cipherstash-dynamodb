@@ -7,25 +7,31 @@ use itertools::Itertools;
 use std::marker::PhantomData;
 
 use crate::{
-    encrypted_table::Sealed,
+    encrypted_table::SealedTableEntry,
     traits::{Decryptable, Searchable},
     IndexType, SingleIndex,
 };
 use cipherstash_client::encryption::{compound_indexer::CompoundIndex, IndexTerm};
 
-use super::{EncryptedTable, QueryError};
+use super::{Dynamo, EncryptedTable, QueryError};
 
-pub struct QueryBuilder<'t, T> {
+/*
+ * S = Searchable
+ * T = Decryptable type
+ * D = Database
+ *
+ */
+pub struct QueryBuilder<'t, S, D = Dynamo> {
     parts: Vec<(String, SingleIndex, Plaintext)>,
-    table: &'t EncryptedTable,
-    __table: PhantomData<T>,
+    table: &'t EncryptedTable<D>,
+    __table: PhantomData<S>,
 }
 
-impl<'t, T> QueryBuilder<'t, T>
+impl<'t, S, D> QueryBuilder<'t, S, D>
 where
-    T: Searchable + Decryptable,
+    S: Searchable,
 {
-    pub fn new(table: &'t EncryptedTable) -> Self {
+    pub fn new(table: &'t EncryptedTable<D>) -> Self {
         Self {
             parts: vec![],
             table,
@@ -43,50 +49,6 @@ where
         self.parts
             .push((name.into(), SingleIndex::Prefix, plaintext.into()));
         self
-    }
-
-    pub async fn send(self) -> Result<Vec<T>, QueryError> {
-        let (index_name, index, plaintext, builder) = self.build()?;
-
-        let index_term = builder.table.cipher.compound_query(
-            &CompoundIndex::new(index),
-            plaintext,
-            Some(format!("{}#{}", T::type_name(), index_name)),
-            12,
-        )?;
-
-        // With DynamoDB queries must always return a single term
-        let term = if let IndexTerm::Binary(x) = index_term {
-            AttributeValue::B(Blob::new(x))
-        } else {
-            Err(QueryError::Other(format!(
-                "Returned IndexTerm had invalid type: {index_term:?}"
-            )))?
-        };
-
-        let query = builder
-            .table
-            .db
-            .query()
-            .table_name(&builder.table.table_name)
-            .index_name("TermIndex")
-            .key_condition_expression("term = :term")
-            .expression_attribute_values(":term", term);
-
-        let result = query
-            .send()
-            .await
-            .map_err(|e| QueryError::AwsError(format!("{e:?}")))?;
-
-        let items = result
-            .items
-            .ok_or_else(|| QueryError::AwsError("Expected items entry on aws response".into()))?;
-
-        let table_entries = Sealed::vec_from(items)?;
-
-        let results = Sealed::unseal_all(table_entries, &builder.table.cipher).await?;
-
-        Ok(results)
     }
 
     fn build(
@@ -131,7 +93,7 @@ where
                 }
             };
 
-            if let Some(index) = T::index_by_name(name.as_str(), index_type) {
+            if let Some(index) = S::index_by_name(name.as_str(), index_type) {
                 let mut plaintext = ComposablePlaintext::new(plaintexts[0].clone());
 
                 for p in plaintexts[1..].iter() {
@@ -149,5 +111,63 @@ where
         Err(QueryError::InvalidQuery(format!(
             "Could not build query for fields: {fields}"
         )))
+    }
+}
+
+impl<'t, S> QueryBuilder<'t, S, Dynamo>
+where
+    S: Searchable,
+{
+    pub async fn load<T: Decryptable>(self) -> Result<Vec<T>, QueryError> {
+        let (index_name, index, plaintext, builder) = self.build()?;
+
+        let index_term = builder.table.cipher.compound_query(
+            &CompoundIndex::new(index),
+            plaintext,
+            Some(format!("{}#{}", S::type_name(), index_name)),
+            12,
+        )?;
+
+        // With DynamoDB queries must always return a single term
+        let term = if let IndexTerm::Binary(x) = index_term {
+            AttributeValue::B(Blob::new(x))
+        } else {
+            Err(QueryError::Other(format!(
+                "Returned IndexTerm had invalid type: {index_term:?}"
+            )))?
+        };
+
+        let query = builder
+            .table
+            .db
+            .query()
+            .table_name(&builder.table.db.table_name)
+            .index_name("TermIndex")
+            .key_condition_expression("term = :term")
+            .expression_attribute_values(":term", term);
+
+        let result = query
+            .send()
+            .await
+            .map_err(|e| QueryError::AwsError(format!("{e:?}")))?;
+
+        let items = result
+            .items
+            .ok_or_else(|| QueryError::AwsError("Expected items entry on aws response".into()))?;
+
+        let table_entries = SealedTableEntry::vec_from(items)?;
+
+        let results = SealedTableEntry::unseal_all(table_entries, &builder.table.cipher).await?;
+
+        Ok(results)
+    }
+}
+
+impl<'t, S> QueryBuilder<'t, S, Dynamo>
+where
+    S: Searchable + Decryptable,
+{
+    pub async fn send(self) -> Result<Vec<S>, QueryError> {
+        self.load::<S>().await
     }
 }

@@ -307,9 +307,9 @@
 //! To store a record in the table, use the [`EncryptedTable::put`] method:
 //!
 //! ```no_run
-//! # use cipherstash_dynamodb::{Encryptable, Searchable, Decryptable, EncryptedTable};
+//! # use cipherstash_dynamodb::*;
 //! #
-//! # #[derive(Debug, Encryptable, Searchable, Decryptable)]
+//! # #[derive(Debug, Identifiable, Encryptable, Searchable, Decryptable)]
 //! # struct User {
 //! #    #[partition_key]
 //! #    email: String,
@@ -337,9 +337,9 @@
 //! To get a record, use the [`EncryptedTable::get`] method:
 //!
 //! ```no_run
-//! # use cipherstash_dynamodb::{EncryptedTable, Decryptable, Encryptable, Key};
+//! # use cipherstash_dynamodb::*;
 //! #
-//! # #[derive(Debug, Decryptable, Encryptable)]
+//! # #[derive(Debug, Identifiable, Decryptable, Encryptable)]
 //! # struct User {
 //! #    #[partition_key]
 //! #    email: String,
@@ -367,9 +367,9 @@
 //! To delete a record, use the [`EncryptedTable::delete`] method:
 //!
 //! ```no_run
-//! # use cipherstash_dynamodb::{Decryptable, Searchable, Encryptable, EncryptedTable};
+//! # use cipherstash_dynamodb::*;
 //! #
-//! # #[derive(Debug, Decryptable, Searchable, Encryptable)]
+//! # #[derive(Debug, Identifiable, Decryptable, Searchable, Encryptable)]
 //! # struct User {
 //! #    #[partition_key]
 //! #    email: String,
@@ -498,8 +498,8 @@
 //! To use the view, you can first `put` and then `query` the value.
 //!
 //! ```no_run
-//! # use cipherstash_dynamodb::{Searchable, Encryptable, Decryptable, EncryptedTable};
-//! # #[derive(Debug, Searchable, Encryptable, Decryptable)]
+//! # use cipherstash_dynamodb::*;
+//! # #[derive(Debug, Identifiable, Searchable, Encryptable, Decryptable)]
 //! # pub struct UserView {
 //! #     #[cipherstash(skip)]
 //! #     #[partition_key]
@@ -576,14 +576,15 @@ pub mod encrypted_table;
 pub mod traits;
 pub use encrypted_table::{EncryptedTable, QueryBuilder};
 pub use traits::{
-    Decryptable, Encryptable, IndexType, Pk, PkSk, PrimaryKey, Searchable, SingleIndex,
+    Decryptable, Encryptable, Identifiable, IndexType, Pk, PkSk, PrimaryKey, Searchable,
+    SingleIndex,
 };
 
 pub mod errors;
 pub use errors::Error;
 
 #[doc(hidden)]
-pub use cipherstash_dynamodb_derive::{Decryptable, Encryptable, Searchable};
+pub use cipherstash_dynamodb_derive::{Decryptable, Encryptable, Identifiable, Searchable};
 
 // Re-exports
 pub use cipherstash_client::encryption;
