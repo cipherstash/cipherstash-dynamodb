@@ -35,7 +35,7 @@ jobs:
           toolchain: stable
 
       - name: "Run tests"
-        run: cargo test --all-targets --ignored
+        run: cargo test --all-targets -- --ignored
         env:
           CS_WORKSPACE_ID: ${{ secrets.CS_WORKSPACE_ID }}
           CS_CLIENT_ACCESS_KEY: ${{ secrets.CS_CLIENT_ACCESS_KEY }}
