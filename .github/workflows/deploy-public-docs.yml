@@ -29,6 +29,8 @@ jobs:
           fetch-depth: 0 # Necessary for pushing commits
 
       - name: Generate Docs
+        env:
+          CARGO_REGISTRIES_CIPHERSTASH_TOKEN: ${{ secrets.CARGO_REGISTRIES_CIPHERSTASH_TOKEN }}
         run: |
           cd cipherstash-dynamodb
           cargo doc --no-deps
