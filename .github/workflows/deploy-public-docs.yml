@@ -1,0 +1,68 @@
+name: Deploy public docs to dynamodb.rustdoc.cipherstash.com
+
+on:
+  push:
+    branches:
+      - main # Trigger the workflow on push to the main branch
+
+jobs:
+  copy-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Repo
+        id: source
+        uses: actions/checkout@v4
+        with:
+          path: cipherstash-dynamodb
+
+      - name: Get Source Commit Hash
+        id: get-source-hash
+        run: echo "::set-output name=hash::$(git -C cipherstash-dynamodb rev-parse --short HEAD)"
+
+      - name: Checkout Dest Repo
+        uses: actions/checkout@v4
+        with:
+          repository: "cipherstash/dynamodb-rustdoc-cipherstash-com"
+          path: dynamodb-rustdoc-cipherstash-com
+          ssh-key: ${{ secrets.CS_DOCS_SYNC_DEST_REPO_DEPLOY_KEY }}
+          fetch-depth: 0 # Necessary for pushing commits
+
+      - name: Generate Docs
+        run: |
+          cd cipherstash-dynamodb
+          cargo doc --no-deps
+          cd ..
+
+      - name: Copy Docs
+        run: |
+          cd cipherstash-dynamodb/
+          cp -r target/doc/static.files ../dynamodb-rustdoc-cipherstash-com/
+          cd target/doc/cipherstash_dynamodb/
+          truncate -s 0 crates.js
+          cp -r * ../../../../dynamodb-rustdoc-cipherstash-com/
+
+      - name: Check for Changes
+        id: check-changes
+        run: |
+          cd dynamodb-rustdoc-cipherstash-com
+          git add .
+          if git diff --cached --quiet; then
+            echo "::set-output name=changes::false"
+          else
+            echo "::set-output name=changes::true"
+          fi
+
+      - name: Commit Changes
+        if: steps.check-changes.outputs.changes == 'true'
+        run: |
+          cd dynamodb-rustdoc-cipherstash-com
+          git config --global user.name 'github-actions-cj-vercel-account[bot]'
+          git config --global user.email 'cj@cipherstash.com'
+          git commit -m "Update docs from source repo at commit ${{ steps.get-source-hash.outputs.hash }}"
+
+      - name: Push Changes
+        if: steps.check-changes.outputs.changes == 'true'
+        run: |
+          cd dynamodb-rustdoc-cipherstash-com
+          git push origin main
