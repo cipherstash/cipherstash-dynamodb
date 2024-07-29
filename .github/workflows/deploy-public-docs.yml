@@ -57,7 +57,7 @@ jobs:
         if: steps.check-changes.outputs.changes == 'true'
         run: |
           cd dynamodb-rustdoc-cipherstash-com
-          git config --global user.name 'github-actions-cj-vercel-acount[bot]'
+          git config --global user.name 'github-actions-cj-vercel-account[bot]'
           git config --global user.email 'cj@cipherstash.com'
           git commit -m "Update docs from source repo at commit ${{ steps.get-source-hash.outputs.hash }}"
 
