@@ -5,6 +5,11 @@
 //! Based on the CipherStash SDK and ZeroKMS key service, CipherStash for DynamoDB provides a simple interface for
 //! storing and retrieving encrypted data in DynamoDB.
 //!
+//! ### Requesting access to CipherStash for DynamoDB
+//!
+//! CipherStash for DynamoDB requires an access token to use.
+//! If you would like to request access, please email us at [sales@cipherstash.com](mailto:sales@cipherstash.com) and we will be in touch.
+//!
 //! ## Usage
 //!
 //! To use CipherStash for DynamoDB, you must first create a table in DynamoDB.

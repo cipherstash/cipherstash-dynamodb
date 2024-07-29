@@ -5,6 +5,10 @@
 Based on the CipherStash SDK and ZeroKMS key service, CipherStash for DynamoDB provides a simple interface for
 storing and retrieving encrypted data in DynamoDB.
 
+### Requesting access to CipherStash for DynamoDB
+
+CipherStash for DynamoDB requires an access token to use. If you would like to request access, please email us at [sales@cipherstash.com](mailto:sales@cipherstash.com) and we will be in touch.
+
 ---
 
 ## Prerequisites
@@ -21,7 +25,7 @@ Run `stash signup` and follow the on screen instructions.
 
 ### Login and create a Dataset
 
-*The pages linked to below contain information that is generally applicable even though it is framed within the context of a Rails application*
+_The pages linked to below contain information that is generally applicable even though it is framed within the context of a Rails application_
 
 1. [Ensure `stash` is logged in](https://docs.cipherstash.com/tutorials/rails-getting-started/define.html#1-log-in)
 
@@ -103,9 +107,9 @@ struct User {
 
 These derive macros will generate implementations for the following traits of the same name:
 
-* `Decryptable` - a trait that allows you to decrypt a record from DynamoDB
-* `Encryptable` - a trait that allows you to encrypt a record for storage in DynamoDB
-* `Searchable`  - a trait that allows you to search for records in DynamoDB
+- `Decryptable` - a trait that allows you to decrypt a record from DynamoDB
+- `Encryptable` - a trait that allows you to encrypt a record for storage in DynamoDB
+- `Searchable` - a trait that allows you to search for records in DynamoDB
 
 The above example is the minimum required to use CipherStash for DynamoDB however you can expand capabilities via several macros.
 
@@ -203,7 +207,7 @@ struct User {
     #[cipherstash(query = "exact")]
     #[partition_key]
     email: String,
-    
+
    #[cipherstash(query = "prefix")]
     name: String,
 }
@@ -224,7 +228,7 @@ struct User {
     #[cipherstash(query = "exact", compound = "email#name")]
     #[partition_key]
     email: String,
-    
+
    #[cipherstash(query = "prefix", compound = "email#name")]
     name: String,
 }
@@ -232,7 +236,6 @@ struct User {
 
 It's also possible to add more than one query attribute to support querying records in multiple
 different ways.
-
 
 ```rust
 use cipherstash_dynamodb::Encryptable;
@@ -243,13 +246,14 @@ struct User {
     #[cipherstash(query = "exact", compound = "email#name")]
     #[partition_key]
     email: String,
-    
+
    #[cipherstash(query = "prefix")]
    #[cipherstash(query = "exact")]
    #[cipherstash(query = "prefix", compound = "email#name")]
     name: String,
 }
 ```
+
 It's important to note that the more annotations that are added to a field the more index terms that will be generated.
 Adding too many attributes could result in a proliferation of terms and data.
 
@@ -376,7 +380,7 @@ pub struct UserView {
     #[cipherstash(skip)]
     #[partition_key]
     email: String,
-    
+
     #[cipherstash(query = "prefix")]
     name: String,
 }
