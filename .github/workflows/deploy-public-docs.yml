@@ -23,8 +23,8 @@ jobs:
       - name: Checkout Dest Repo
         uses: actions/checkout@v4
         with:
-          repository: "cipherstash/dynamodb-rustdoc-cipherstash-com"
-          path: dynamodb-rustdoc-cipherstash-com
+          repository: "cipherstash/www-cipherstash-com"
+          path: www-cipherstash-com
           ssh-key: ${{ secrets.CS_DOCS_SYNC_DEST_REPO_DEPLOY_KEY }}
           fetch-depth: 0 # Necessary for pushing commits
 
@@ -34,20 +34,20 @@ jobs:
         run: |
           cd cipherstash-dynamodb
           cargo doc --no-deps
-          cd ..
 
       - name: Copy Docs
         run: |
           cd cipherstash-dynamodb/
-          cp -r target/doc/static.files ../dynamodb-rustdoc-cipherstash-com/
+          cp -r target/doc/static.files ../www-cipherstash-com/public/rustdoc/
+          mkdir -p ../www-cipherstash-com/public/rustdoc/cipherstash_dynamodb/
           cd target/doc/cipherstash_dynamodb/
           truncate -s 0 crates.js
-          cp -r * ../../../../dynamodb-rustdoc-cipherstash-com/
+          cp -r * ../../../../www-cipherstash-com/public/rustdoc/cipherstash_dynamodb/
 
       - name: Check for Changes
         id: check-changes
         run: |
-          cd dynamodb-rustdoc-cipherstash-com
+          cd www-cipherstash-com
           git add .
           if git diff --cached --quiet; then
             echo "::set-output name=changes::false"
@@ -58,7 +58,7 @@ jobs:
       - name: Commit Changes
         if: steps.check-changes.outputs.changes == 'true'
         run: |
-          cd dynamodb-rustdoc-cipherstash-com
+          cd www-cipherstash-com
           git config --global user.name 'github-actions-cj-vercel-account[bot]'
           git config --global user.email 'cj@cipherstash.com'
           git commit -m "Update docs from source repo at commit ${{ steps.get-source-hash.outputs.hash }}"
@@ -66,5 +66,5 @@ jobs:
       - name: Push Changes
         if: steps.check-changes.outputs.changes == 'true'
         run: |
-          cd dynamodb-rustdoc-cipherstash-com
+          cd www-cipherstash-com
           git push origin main
