@@ -37,9 +37,10 @@ jobs:
 
       - name: Copy Docs
         run: |
+          mkdir -p www-cipherstash-com/public/rustdoc/cipherstash_dynamodb/
+          mkdir -p www-cipherstash-com/public/rustdoc/static.files/
           cd cipherstash-dynamodb/
-          cp -r target/doc/static.files ../www-cipherstash-com/public/rustdoc/
-          mkdir -p ../www-cipherstash-com/public/rustdoc/cipherstash_dynamodb/
+          cp -r target/doc/static.files/* ../www-cipherstash-com/public/rustdoc/static.files/
           cd target/doc/cipherstash_dynamodb/
           truncate -s 0 crates.js
           cp -r * ../../../../www-cipherstash-com/public/rustdoc/cipherstash_dynamodb/
