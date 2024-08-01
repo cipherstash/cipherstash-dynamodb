@@ -36,14 +36,12 @@ pub enum PutError {
 pub enum GetError {
     #[error("PrimaryKeyError: {0}")]
     PrimaryKeyError(#[from] PrimaryKeyError),
-    #[error("SealError: {0}")]
-    Seal(#[from] SealError),
+    #[error("Decrypt Error: {0}")]
+    DecryptError(#[from] DecryptError),
     #[error("Encryption Error: {0}")]
     Encryption(#[from] EncryptionError),
     #[error("AwsError: {0}")]
     Aws(String),
-    #[error("Read Conversion Error: {0}")]
-    ReadConversion(#[from] ReadConversionError),
 }
 
 /// Error returned by `EncryptedTable::delete` when indexing and deleting records in DynamoDB
@@ -61,6 +59,15 @@ pub enum DeleteError {
 
 /// Error returned by `EncryptedTable::query` when indexing, retrieving and decrypting records from DynamoDB
 #[derive(Error, Debug)]
+pub enum DecryptError {
+    #[error("ReadConversionError: {0}")]
+    ReadConversionError(#[from] ReadConversionError),
+    #[error("SealError: {0}")]
+    SealError(#[from] SealError),
+}
+
+/// Error returned by [`EncryptedTable::query`] when indexing, retrieving and decrypting records from DynamoDB
+#[derive(Error, Debug)]
 pub enum QueryError {
     #[error("PrimaryKeyError: {0}")]
     PrimaryKeyError(#[from] PrimaryKeyError),
@@ -68,14 +75,12 @@ pub enum QueryError {
     InvalidQuery(String),
     #[error("CryptoError: {0}")]
     CryptoError(#[from] CryptoError),
-    #[error("SealError: {0}")]
-    SealError(#[from] SealError),
     #[error("EncryptionError: {0}")]
     EncryptionError(#[from] EncryptionError),
+    #[error("Decrypt Error: {0}")]
+    DecryptError(#[from] DecryptError),
     #[error("AwsError: {0}")]
     AwsError(String),
-    #[error("ReadConversionError: {0}")]
-    ReadConversionError(#[from] ReadConversionError),
     #[error("{0}")]
     Other(String),
 }

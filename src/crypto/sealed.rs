@@ -17,7 +17,7 @@ pub struct SealedTableEntry(pub(super) TableEntry);
 
 impl SealedTableEntry {
     pub fn vec_from<O: TryInto<Self>>(
-        items: Vec<O>,
+        items: impl IntoIterator<Item = O>,
     ) -> Result<Vec<Self>, <O as TryInto<Self>>::Error> {
         items.into_iter().map(Self::from_inner).collect()
     }
