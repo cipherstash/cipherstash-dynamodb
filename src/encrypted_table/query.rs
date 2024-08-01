@@ -7,7 +7,6 @@ use itertools::Itertools;
 use std::marker::PhantomData;
 
 use crate::{
-    encrypted_table::SealedTableEntry,
     traits::{Decryptable, Searchable},
     IndexType, SingleIndex,
 };
@@ -155,9 +154,7 @@ where
             .items
             .ok_or_else(|| QueryError::AwsError("Expected items entry on aws response".into()))?;
 
-        let table_entries = SealedTableEntry::vec_from(items)?;
-
-        let results = SealedTableEntry::unseal_all(table_entries, &builder.table.cipher).await?;
+        let results = builder.table.decrypt_all(items).await?;
 
         Ok(results)
     }

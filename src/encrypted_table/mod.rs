@@ -145,6 +145,24 @@ impl<D> EncryptedTable<D> {
         QueryBuilder::new(self)
     }
 
+    pub async fn decrypt_all<T: Decryptable>(
+        &self,
+        items: impl IntoIterator<Item = HashMap<String, AttributeValue>>,
+    ) -> Result<Vec<T>, DecryptError> {
+        let table_entries = SealedTableEntry::vec_from(items)?;
+        let results = SealedTableEntry::unseal_all(table_entries, &self.cipher).await?;
+        Ok(results)
+    }
+
+    pub async fn decrypt<T: Decryptable>(
+        &self,
+        item: HashMap<String, AttributeValue>,
+    ) -> Result<T, DecryptError> {
+        let table_entry = SealedTableEntry::try_from(item)?;
+        let result = table_entry.unseal(&self.cipher).await?;
+        Ok(result)
+    }
+
     pub async fn create_delete_patch<E: Searchable + Identifiable>(
         &self,
         k: impl Into<E::PrimaryKey>,
@@ -259,11 +277,8 @@ impl EncryptedTable<Dynamo> {
             .await
             .map_err(|e| GetError::Aws(format!("{e:?}")))?;
 
-        let sealed: Option<SealedTableEntry> =
-            result.item.map(SealedTableEntry::try_from).transpose()?;
-
-        if let Some(sealed) = sealed {
-            Ok(Some(sealed.unseal(&self.cipher).await?))
+        if let Some(item) = result.item {
+            Ok(Some(self.decrypt(item).await?))
         } else {
             Ok(None)
         }
