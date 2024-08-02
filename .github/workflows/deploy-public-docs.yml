@@ -33,17 +33,26 @@ jobs:
           CARGO_REGISTRIES_CIPHERSTASH_TOKEN: ${{ secrets.CARGO_REGISTRIES_CIPHERSTASH_TOKEN }}
         run: |
           cd cipherstash-dynamodb
-          cargo doc --no-deps
+          cargo doc --no-deps -p cipherstash_dynamodb -p cipherstash_client
 
       - name: Copy Docs
         run: |
+          set -e
+
           mkdir -p www-cipherstash-com/public/rustdoc/cipherstash_dynamodb/
+          mkdir -p www-cipherstash-com/public/rustdoc/cipherstash_client/
           mkdir -p www-cipherstash-com/public/rustdoc/static.files/
+
           cd cipherstash-dynamodb/
           cp -r target/doc/static.files/* ../www-cipherstash-com/public/rustdoc/static.files/
+
           cd target/doc/cipherstash_dynamodb/
           truncate -s 0 crates.js
           cp -r * ../../../../www-cipherstash-com/public/rustdoc/cipherstash_dynamodb/
+
+          cd ../cipherstash_client/
+          truncate -s 0 crates.js
+          cp -r * ../../../../www-cipherstash-com/public/rustdoc/cipherstash_client/
 
       - name: Check for Changes
         id: check-changes
