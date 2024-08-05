@@ -3,10 +3,52 @@ pub struct PrimaryKeyParts {
     pub sk: String,
 }
 
-pub trait PrimaryKey: private::Sealed {}
+pub trait PrimaryKey: private::Sealed {
+    type Pk;
+    type Sk;
 
-impl PrimaryKey for Pk {}
-impl PrimaryKey for PkSk {}
+    fn into_parts(
+        self,
+        type_name: &'static str,
+        sort_key_prefix: Option<&'static str>,
+    ) -> PrimaryKeyParts;
+}
+
+impl PrimaryKey for Pk {
+    type Pk = String;
+    type Sk = ();
+
+    fn into_parts(
+        self,
+        type_name: &'static str,
+        _sort_key_prefix: Option<&'static str>,
+    ) -> PrimaryKeyParts {
+        PrimaryKeyParts {
+            pk: self.0,
+            sk: type_name.into(),
+        }
+    }
+}
+
+impl PrimaryKey for PkSk {
+    type Pk = String;
+    type Sk = String;
+
+    fn into_parts(
+        self,
+        _type_name: &'static str,
+        sort_key_prefix: Option<&'static str>,
+    ) -> PrimaryKeyParts {
+        PrimaryKeyParts {
+            pk: self.0,
+            sk: if let Some(prefix) = sort_key_prefix {
+                format!("{prefix}#{}", self.1)
+            } else {
+                self.1
+            },
+        }
+    }
+}
 
 pub struct Pk(pub String);
 
@@ -44,24 +86,3 @@ mod private {
     impl Sealed for Pk {}
     impl Sealed for PkSk {}
 }
-
-// impl PrimaryKey for Pk
-// where
-//     <PrimaryKey::Model as Identifiable>::PrimaryKey = Pk,
-// {
-//     fn into_parts<I: Identifiable>(
-//         self,
-//         cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
-//     ) -> Result<PrimaryKeyParts, EncryptionError> {
-//         Ok(I::get_primary_key_parts_from_key(self, cipher))
-//     }
-// }
-//
-// impl PrimaryKey for PkSk {
-//     fn into_parts<I: Identifiable>(
-//         self,
-//         cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
-//     ) -> Result<PrimaryKeyParts, EncryptionError> {
-//         Ok(I::get_primary_key_parts_from_key(self, cipher))
-//     }
-// }

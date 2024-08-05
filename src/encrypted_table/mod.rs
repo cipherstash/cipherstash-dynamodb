@@ -7,7 +7,7 @@ pub use self::{
 use crate::{
     crypto::*,
     errors::*,
-    traits::{Decryptable, PrimaryKeyError, PrimaryKeyParts, Searchable},
+    traits::{Decryptable, PrimaryKeyParts, Searchable},
     Identifiable,
 };
 use aws_sdk_dynamodb::types::{AttributeValue, Delete, Put, TransactWriteItem};
@@ -167,7 +167,8 @@ impl<D> EncryptedTable<D> {
         &self,
         k: impl Into<E::PrimaryKey>,
     ) -> Result<DynamoRecordPatch, DeleteError> {
-        let PrimaryKeyParts { pk, sk } = self.get_primary_key_parts::<E>(k)?;
+        let PrimaryKeyParts { pk, sk } =
+            encrypt_primary_key::<E>(k, E::type_name(), E::sort_key_prefix(), &self.cipher)?;
 
         let delete_records = all_index_keys::<E>(&sk)
             .into_iter()
@@ -236,13 +237,6 @@ impl<D> EncryptedTable<D> {
             delete_records,
         })
     }
-
-    fn get_primary_key_parts<I: Identifiable>(
-        &self,
-        k: impl Into<I::PrimaryKey>,
-    ) -> Result<PrimaryKeyParts, PrimaryKeyError> {
-        I::get_primary_key_parts_from_key(k.into(), &self.cipher)
-    }
 }
 
 impl EncryptedTable<Dynamo> {
@@ -265,7 +259,8 @@ impl EncryptedTable<Dynamo> {
     where
         T: Decryptable + Identifiable,
     {
-        let PrimaryKeyParts { pk, sk } = self.get_primary_key_parts::<T>(k)?;
+        let PrimaryKeyParts { pk, sk } =
+            encrypt_primary_key::<T>(k, T::type_name(), T::sort_key_prefix(), &self.cipher)?;
 
         let result = self
             .db

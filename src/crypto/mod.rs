@@ -4,8 +4,11 @@ mod sealer;
 mod unsealed;
 
 use crate::{
-    traits::{Encryptable, PrimaryKeyError, ReadConversionError, Searchable, WriteConversionError},
-    IndexType,
+    traits::{
+        Encryptable, PrimaryKeyError, PrimaryKeyParts, ReadConversionError, Searchable,
+        WriteConversionError,
+    },
+    Identifiable, IndexType, PrimaryKey,
 };
 use cipherstash_client::{
     credentials::{service_credentials::ServiceToken, Credentials},
@@ -98,4 +101,23 @@ where
         .ok_or(EncryptionError::IndexingError(
             "Invalid term type".to_string(),
         ))
+}
+
+pub fn encrypt_primary_key<I: Identifiable>(
+    k: impl Into<I::PrimaryKey>,
+    type_name: &'static str,
+    sort_key_prefix: Option<&'static str>,
+    cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+) -> Result<PrimaryKeyParts, PrimaryKeyError> {
+    let PrimaryKeyParts { mut pk, mut sk } = k.into().into_parts(type_name, sort_key_prefix);
+
+    if I::is_pk_encrypted() {
+        pk = b64_encode(hmac(&pk, None, cipher)?);
+    }
+
+    if I::is_sk_encrypted() {
+        sk = b64_encode(hmac(&sk, Some(pk.as_str()), cipher)?);
+    }
+
+    Ok(PrimaryKeyParts { pk, sk })
 }

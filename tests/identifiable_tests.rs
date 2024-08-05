@@ -17,24 +17,8 @@ impl Searchable for User {}
 impl Identifiable for User {
     type PrimaryKey = PkSk;
 
-    fn get_primary_key_parts(
-        &self,
-        _cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
-    ) -> Result<PrimaryKeyParts, PrimaryKeyError> {
-        Ok(PrimaryKeyParts {
-            pk: "user".to_string(),
-            sk: self.name.to_string(),
-        })
-    }
-
-    fn get_primary_key_parts_from_key(
-        primary_key: Self::PrimaryKey,
-        _cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
-    ) -> Result<PrimaryKeyParts, PrimaryKeyError> {
-        Ok(PrimaryKeyParts {
-            pk: primary_key.0,
-            sk: primary_key.1,
-        })
+    fn get_primary_key(&self) -> Self::PrimaryKey {
+        PkSk("user".to_string(), self.name.to_string())
     }
 }
 
