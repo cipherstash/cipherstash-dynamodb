@@ -14,6 +14,14 @@ pub(crate) fn derive_decryptable(input: DeriveInput) -> Result<TokenStream, syn:
     let skipped_attributes = settings.skipped_attributes();
     let ident = settings.ident();
 
+    let type_name = &settings.type_name;
+
+    let sort_key_prefix_impl = if let Some(prefix) = &settings.sort_key_prefix {
+        quote! { Some(#prefix) }
+    } else {
+        quote! { None }
+    };
+
     let from_unsealed_impl = protected_attributes
         .iter()
         .map(|attr| {
@@ -41,6 +49,16 @@ pub(crate) fn derive_decryptable(input: DeriveInput) -> Result<TokenStream, syn:
     let expanded = quote! {
         #[automatically_derived]
         impl cipherstash_dynamodb::traits::Decryptable for #ident {
+            #[inline]
+            fn type_name() -> &'static str {
+                #type_name
+            }
+
+            #[inline]
+            fn sort_key_prefix() -> Option<&'static str> {
+                #sort_key_prefix_impl
+            }
+
             fn protected_attributes() -> Vec<&'static str> {
                 vec![#(#protected_attributes,)*]
             }

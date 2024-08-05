@@ -79,19 +79,20 @@ pub enum PrimaryKeyError {
 pub trait Identifiable {
     type PrimaryKey: PrimaryKey;
 
-    fn get_primary_key_parts(
-        &self,
-        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
-    ) -> Result<PrimaryKeyParts, PrimaryKeyError>;
+    fn get_primary_key(&self) -> Self::PrimaryKey;
 
-    fn get_primary_key_parts_from_key(
-        primary_key: Self::PrimaryKey,
-        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
-    ) -> Result<PrimaryKeyParts, PrimaryKeyError>;
+    fn is_sk_encrypted() -> bool {
+        false
+    }
+
+    fn is_pk_encrypted() -> bool {
+        false
+    }
 }
 
 pub trait Encryptable: Debug + Sized {
     fn type_name() -> &'static str;
+    fn sort_key_prefix() -> Option<&'static str>;
 
     /// Defines what attributes are protected and should be encrypted for this type.
     ///
@@ -128,8 +129,10 @@ pub trait Searchable: Encryptable {
 }
 
 pub trait Decryptable: Sized {
-    /// Convert an `Unsealed` into a `Self`.
+    fn type_name() -> &'static str;
+    fn sort_key_prefix() -> Option<&'static str>;
 
+    /// Convert an `Unsealed` into a `Self`.
     fn from_unsealed(unsealed: Unsealed) -> Result<Self, SealError>;
 
     /// Defines what attributes are protected and decryptable for this type.

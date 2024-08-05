@@ -1,5 +1,6 @@
 use super::{
-    b64_encode, format_term_key, hmac, SealError, SealedTableEntry, Unsealed, MAX_TERMS_PER_INDEX,
+    b64_encode, encrypt_primary_key, format_term_key, hmac, SealError, SealedTableEntry, Unsealed,
+    MAX_TERMS_PER_INDEX,
 };
 use crate::{
     encrypted_table::{TableAttribute, TableEntry},
@@ -128,7 +129,12 @@ impl<T> Sealer<T> {
         let mut table_entries = Vec::with_capacity(records.len());
 
         for record in records.iter() {
-            let PrimaryKeyParts { pk, sk } = record.inner.get_primary_key_parts(cipher)?;
+            let PrimaryKeyParts { pk, sk } = encrypt_primary_key::<S>(
+                record.inner.get_primary_key(),
+                S::type_name(),
+                S::sort_key_prefix(),
+                cipher,
+            )?;
 
             for attr in protected_attributes.iter() {
                 protected.push(record.unsealed.protected_with_descriptor(attr)?);

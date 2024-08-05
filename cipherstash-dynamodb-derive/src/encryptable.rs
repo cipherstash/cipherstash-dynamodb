@@ -11,6 +11,12 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
 
     let type_name = settings.type_name.clone();
 
+    let sort_key_prefix_impl = if let Some(prefix) = &settings.sort_key_prefix {
+        quote! { Some(#prefix) }
+    } else {
+        quote! { None }
+    };
+
     let protected_attributes = settings.protected_attributes();
     let plaintext_attributes = settings.plaintext_attributes();
     let ident = settings.ident();
@@ -40,6 +46,11 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
                 #type_name
             }
 
+            #[inline]
+            fn sort_key_prefix() -> Option<&'static str> {
+                #sort_key_prefix_impl
+            }
+
             fn protected_attributes() -> Vec<&'static str> {
                 vec![#(#protected_attributes,)*]
             }
@@ -50,7 +61,7 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
 
             #[allow(clippy::needless_question_mark)]
             fn into_sealer(self) -> Result<cipherstash_dynamodb::crypto::Sealer<Self>, cipherstash_dynamodb::crypto::SealError> {
-                Ok(cipherstash_dynamodb::crypto::Sealer::new_with_descriptor(self, Self::type_name())
+                Ok(cipherstash_dynamodb::crypto::Sealer::new_with_descriptor(self, <Self as cipherstash_dynamodb::traits::Encryptable>::type_name())
                     #(#into_unsealed_impl?)*)
             }
         }

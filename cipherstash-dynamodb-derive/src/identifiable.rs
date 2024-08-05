@@ -18,10 +18,6 @@ pub(crate) fn derive_identifiable(input: DeriveInput) -> Result<TokenStream, syn
 
     let partition_key_attr = format_ident!("{partition_key_field}");
 
-    let sort_key_prefix = settings.sort_key_prefix.as_ref();
-
-    let type_name = settings.type_name.clone();
-
     let protected_attributes = settings.protected_attributes();
     let ident = settings.ident();
 
@@ -33,72 +29,28 @@ pub(crate) fn derive_identifiable(input: DeriveInput) -> Result<TokenStream, syn
         .map(|x| protected_attributes.contains(&x.as_str()))
         .unwrap_or(true);
 
-    let sort_key_impl = if let Some(sort_key_field) = &settings.sort_key_field {
+    let primary_key_impl = if let Some(sort_key_field) = &settings.sort_key_field {
         let sort_key_attr = format_ident!("{sort_key_field}");
 
-        if let Some(prefix) = sort_key_prefix {
-            quote! {
-                format!("{}#{}", #prefix, self.#sort_key_attr)
-            }
-        } else {
-            quote! {
-                self.#sort_key_attr.to_string()
-            }
-        }
-    } else {
-        quote! { #type_name }
-    };
-
-    let pk_parts_impl = if is_partition_key_encrypted {
         quote! {
-            let pk = cipherstash_dynamodb::crypto::b64_encode(
-                cipherstash_dynamodb::crypto::hmac(
-                    &pk,
-                    None,
-                    cipher
-                )?
-            );
-        }
-    } else {
-        quote! {}
-    };
+            type PrimaryKey = cipherstash_dynamodb::PkSk;
 
-    let sk_parts_impl = if is_sort_key_encrypted {
-        quote! {
-            let sk = cipherstash_dynamodb::crypto::b64_encode(
-                cipherstash_dynamodb::crypto::hmac(
-                    &sk,
-                    Some(pk.as_str()),
-                    cipher
-                )?
-            );
-        }
-    } else {
-        quote! {}
-    };
-
-    let primary_key_impl = if settings.sort_key_field.is_some() {
-        quote! { type PrimaryKey = cipherstash_dynamodb::PkSk; }
-    } else {
-        quote! { type PrimaryKey = cipherstash_dynamodb::Pk; }
-    };
-
-    let primary_key_pk_sk_impl = if settings.sort_key_field.is_some() {
-        if let Some(sort_key_prefix) = sort_key_prefix {
-            quote! {
-                let pk = primary_key.0;
-                let sk = format!("{}#{}", #sort_key_prefix, primary_key.1);
-            }
-        } else {
-            quote! {
-                let pk = primary_key.0;
-                let sk = primary_key.1;
+            fn get_primary_key(&self) -> Self::PrimaryKey {
+                cipherstash_dynamodb::PkSk(
+                    self.#partition_key_attr.to_string(),
+                    self.#sort_key_attr.to_string()
+                )
             }
         }
     } else {
         quote! {
-            let pk = primary_key.0;
-            let sk = #type_name.to_string();
+            type PrimaryKey = cipherstash_dynamodb::Pk;
+
+            fn get_primary_key(&self) -> Self::PrimaryKey {
+                cipherstash_dynamodb::Pk(
+                    self.#partition_key_attr.to_string()
+                )
+            }
         }
     };
 
@@ -106,29 +58,12 @@ pub(crate) fn derive_identifiable(input: DeriveInput) -> Result<TokenStream, syn
         impl cipherstash_dynamodb::traits::Identifiable for #ident {
             #primary_key_impl
 
-            fn get_primary_key_parts(
-                &self,
-                cipher: &cipherstash_dynamodb::traits::Encryption<impl cipherstash_dynamodb::traits::Credentials<Token = cipherstash_dynamodb::traits::ServiceToken>>,
-            ) -> Result<cipherstash_dynamodb::traits::PrimaryKeyParts, cipherstash_dynamodb::traits::PrimaryKeyError> {
-                let pk = self.#partition_key_attr.to_string();
-                let sk = { #sort_key_impl };
-
-                #pk_parts_impl
-                #sk_parts_impl
-
-                Ok(cipherstash_dynamodb::traits::PrimaryKeyParts { pk, sk })
+            fn is_pk_encrypted() -> bool {
+                #is_partition_key_encrypted
             }
 
-            fn get_primary_key_parts_from_key(
-                primary_key: Self::PrimaryKey,
-                cipher: &cipherstash_dynamodb::traits::Encryption<impl cipherstash_dynamodb::traits::Credentials<Token = cipherstash_dynamodb::traits::ServiceToken>>,
-            ) -> Result<cipherstash_dynamodb::traits::PrimaryKeyParts, cipherstash_dynamodb::traits::PrimaryKeyError> {
-                #primary_key_pk_sk_impl
-
-                #pk_parts_impl
-                #sk_parts_impl
-
-                Ok(cipherstash_dynamodb::traits::PrimaryKeyParts { pk, sk })
+            fn is_sk_encrypted() -> bool {
+                #is_sort_key_encrypted
             }
         }
     };
