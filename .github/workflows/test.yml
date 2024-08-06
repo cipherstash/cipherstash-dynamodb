@@ -42,8 +42,8 @@ jobs:
           CS_CLIENT_ID: ${{ secrets.CS_CLIENT_ID }}
           CS_CLIENT_KEY: ${{ secrets.CS_CLIENT_KEY }}
           CS_VITUR_IDP_HOST: "https://ap-southeast-2.aws.auth.viturhosted.net"
-          AWS_ACCESS_KEY_ID: cipherstash-dynamodo
-          AWS_SECRET_ACCESS_KEY: cipherstash-dynamodo
+          AWS_ACCESS_KEY_ID: cryptonamo
+          AWS_SECRET_ACCESS_KEY: cryptonamo
           AWS_REGION: ap-southeast-2
           RUST_BACKTRACE: full
 
