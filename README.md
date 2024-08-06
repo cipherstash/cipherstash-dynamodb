@@ -89,7 +89,7 @@ aws dynamodb create-table \
 
 See below for more information on schema design for CipherStash for DynamoDB tables.
 
-### Annotating a Cryptanomo Type
+### Annotating a cipherstash-dynamodb Type
 
 To use CipherStash for DynamoDB, you must first annotate a struct with the `Encryptable`, `Searchable` and
 `Decryptable` derive macros.
@@ -153,7 +153,7 @@ If you implement the `Decryptable` trait these skipped fields need to implement 
 
 ### Sort keys
 
-Cryptanomo requires every record to have a sort key. By default this will be derived based on the name of the struct.
+cipherstash-dynamodb requires every record to have a sort key. By default this will be derived based on the name of the struct.
 However, if you want to specify your own, you can use the `sort_key_prefix` attribute:
 
 ```rust
@@ -195,7 +195,7 @@ Sort keys will contain that value and will be prefixed by the sort key prefix.
 
 ## Indexing
 
-Cryptanomo supports indexing of encrypted fields for searching.
+cipherstash-dynamodb supports indexing of encrypted fields for searching.
 Exact, prefix and compound match types are currently supported.
 To index a field, use the `query` attribute:
 
