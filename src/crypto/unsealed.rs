@@ -15,7 +15,7 @@ pub struct Unsealed {
 }
 
 impl Unsealed {
-    pub(super) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             descriptor: None,
             protected: Default::default(),
@@ -23,7 +23,7 @@ impl Unsealed {
         }
     }
 
-    pub(super) fn new_with_descriptor(descriptor: impl Into<String>) -> Self {
+    pub fn new_with_descriptor(descriptor: impl Into<String>) -> Self {
         Self {
             descriptor: Some(descriptor.into()),
             protected: Default::default(),
@@ -47,13 +47,13 @@ impl Unsealed {
             .ok_or_else(|| SealError::MissingAttribute(name.to_string()))
     }
 
-    pub(super) fn add_protected(&mut self, name: impl Into<String>, plaintext: Plaintext) {
+    pub fn add_protected(&mut self, name: impl Into<String>, plaintext: Plaintext) {
         let name = name.into();
         let descriptor = format!("{}/{}", self.descriptor.as_deref().unwrap_or(""), &name);
         self.protected.insert(name, (plaintext, descriptor));
     }
 
-    pub(super) fn add_unprotected(&mut self, name: impl Into<String>, attribute: TableAttribute) {
+    pub fn add_unprotected(&mut self, name: impl Into<String>, attribute: TableAttribute) {
         self.unprotected.insert(name.into(), attribute);
     }
 
@@ -61,16 +61,17 @@ impl Unsealed {
         self.unprotected.clone()
     }
 
-    /// Returns a reference to the protected value along with its descriptor.
-    pub(crate) fn protected_with_descriptor(
-        &self,
+    /// Remove and return a protected value along with its descriptor.
+    pub(crate) fn remove_protected_with_descriptor(
+        &mut self,
         name: &str,
-    ) -> Result<(&Plaintext, &str), SealError> {
+    ) -> Result<(Plaintext, String), SealError> {
         let out = self
             .protected
-            .get(name)
+            .remove(name)
             .ok_or(SealError::MissingAttribute(name.to_string()))?;
-        Ok((&out.0, &out.1))
+
+        Ok(out)
     }
 
     pub fn into_value<T: Decryptable>(self) -> Result<T, SealError> {

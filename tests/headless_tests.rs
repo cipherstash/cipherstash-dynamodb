@@ -58,8 +58,12 @@ async fn test_headless_roundtrip() {
             .await
             .expect("failed to init table");
 
+        let user_record = table
+            .prepare_record(user.clone())
+            .expect("failed to prepare record");
+
         let patch = table
-            .create_put_patch(user.clone(), |_, _| true)
+            .create_put_patch(user_record, |_, _| true)
             .await
             .expect("failed to encrypt");
 

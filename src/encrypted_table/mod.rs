@@ -9,7 +9,7 @@ use crate::{
     crypto::*,
     errors::*,
     traits::{Decryptable, PrimaryKeyParts, Searchable},
-    Identifiable,
+    Identifiable, IndexType, PrimaryKey,
 };
 use aws_sdk_dynamodb::types::{AttributeValue, Delete, Put, TransactWriteItem};
 use cipherstash_client::{
@@ -20,6 +20,7 @@ use cipherstash_client::{
 };
 use log::info;
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
     ops::Deref,
 };
@@ -94,6 +95,12 @@ impl EncryptedTable<Headless> {
 pub struct DynamoRecordPatch {
     pub put_records: Vec<HashMap<String, AttributeValue>>,
     pub delete_records: Vec<PrimaryKeyParts>,
+}
+
+pub struct PreparedRecord {
+    protected_indexes: Cow<'static, [(Cow<'static, str>, IndexType)]>,
+    protected_attributes: Cow<'static, [Cow<'static, str>]>,
+    sealer: Sealer,
 }
 
 impl DynamoRecordPatch {
@@ -201,7 +208,7 @@ impl<D> EncryptedTable<D> {
             &self.cipher,
         )?;
 
-        let delete_records = all_index_keys::<E>(&sk)
+        let delete_records = all_index_keys(&sk, E::protected_indexes())
             .into_iter()
             .map(|x| Ok::<_, DeleteError>(b64_encode(hmac(&x, Some(pk.as_str()), &self.cipher)?)))
             .chain([Ok(sk)])
@@ -217,6 +224,55 @@ impl<D> EncryptedTable<D> {
         })
     }
 
+    pub fn prepare_record<E: Searchable + Identifiable>(
+        &self,
+        record: E,
+    ) -> Result<PreparedRecord, SealError> {
+        let type_name = E::type_name();
+
+        let PrimaryKeyParts { pk, sk } = record
+            .get_primary_key()
+            .into_parts(&type_name, E::sort_key_prefix().as_deref());
+
+        let protected_indexes = E::protected_indexes();
+        let protected_attributes = E::protected_attributes();
+
+        let unsealed_indexes = protected_indexes
+            .iter()
+            .map(|(index_name, index_type)| {
+                record
+                    .attribute_for_index(index_name, *index_type)
+                    .and_then(|attr| {
+                        E::index_by_name(index_name, *index_type)
+                            .map(|index| (attr, index, index_name.clone(), *index_type))
+                    })
+                    .ok_or(SealError::MissingAttribute(index_name.to_string()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let unsealed = record.into_unsealed();
+
+        let sealer = Sealer {
+            pk,
+            sk,
+
+            is_sk_encrypted: E::is_sk_encrypted(),
+            is_pk_encrypted: E::is_pk_encrypted(),
+
+            type_name,
+
+            unsealed_indexes,
+
+            unsealed,
+        };
+
+        Ok(PreparedRecord {
+            protected_indexes,
+            protected_attributes,
+            sealer,
+        })
+    }
+
     /// Create a [`DynamoRecordPatch`] used to insert records into DynamoDB.
     ///
     /// This will create a root record with all attributes and index records that only include
@@ -225,15 +281,20 @@ impl<D> EncryptedTable<D> {
     ///
     /// This patch will also include multiple delete items to remove any index keys that could be
     /// remaining in the database after updating a record.
-    pub async fn create_put_patch<E: Searchable + Identifiable>(
+    pub async fn create_put_patch(
         &self,
-        record: E,
+        record: PreparedRecord,
         index_predicate: impl FnMut(&str, &TableAttribute) -> bool,
     ) -> Result<DynamoRecordPatch, PutError> {
         let mut seen_sk = HashSet::new();
 
-        let sealer: Sealer<E> = record.into_sealer()?;
-        let sealed = sealer.seal(&self.cipher, 12).await?;
+        let PreparedRecord {
+            protected_attributes,
+            protected_indexes,
+            sealer,
+        } = record;
+
+        let sealed = sealer.seal(protected_attributes, &self.cipher, 12).await?;
 
         let mut put_records = Vec::with_capacity(sealed.len());
         let mut delete_records = vec![];
@@ -250,7 +311,7 @@ impl<D> EncryptedTable<D> {
             put_records.push(entry.try_into()?);
         }
 
-        for index_sk in all_index_keys::<E>(&sk) {
+        for index_sk in all_index_keys(&sk, protected_indexes) {
             let index_sk = b64_encode(hmac(&index_sk, Some(pk.as_str()), &self.cipher)?);
 
             if seen_sk.contains(&index_sk) {
@@ -340,6 +401,8 @@ impl EncryptedTable<Dynamo> {
     where
         T: Searchable + Identifiable,
     {
+        let record = self.prepare_record(record)?;
+
         let transact_items = self
             .create_put_patch(
                 record,
@@ -348,8 +411,6 @@ impl EncryptedTable<Dynamo> {
             )
             .await?
             .into_transact_write_items(&self.db.table_name)?;
-
-        println!("ITEMS {:#?}", transact_items);
 
         // Dynamo has a limit of 100 items per transaction
         for items in transact_items.chunks(100) {

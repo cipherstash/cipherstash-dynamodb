@@ -37,14 +37,14 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                .add_protected(#attr, |x| cipherstash_dynamodb::traits::Plaintext::from(x.#attr_ident.to_owned()))
+                unsealed.add_protected(#attr, cipherstash_dynamodb::traits::Plaintext::from(self.#attr_ident.to_owned()));
             }
         })
         .chain(plaintext_attributes.iter().map(|attr| {
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                .add_plaintext(#attr, |x| cipherstash_dynamodb::traits::TableAttribute::from(x.#attr_ident.clone()))
+                unsealed.add_unprotected(#attr, cipherstash_dynamodb::traits::TableAttribute::from(self.#attr_ident.clone()));
             }
         }));
 
@@ -70,9 +70,12 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
             }
 
             #[allow(clippy::needless_question_mark)]
-            fn into_sealer(self) -> Result<cipherstash_dynamodb::crypto::Sealer<Self>, cipherstash_dynamodb::crypto::SealError> {
-                Ok(cipherstash_dynamodb::crypto::Sealer::new_with_descriptor(self, <Self as cipherstash_dynamodb::traits::Encryptable>::type_name())
-                    #(#into_unsealed_impl?)*)
+            fn into_unsealed(self) -> cipherstash_dynamodb::crypto::Unsealed {
+                let mut unsealed = cipherstash_dynamodb::crypto::Unsealed::new_with_descriptor(<Self as cipherstash_dynamodb::traits::Encryptable>::type_name());
+
+                #(#into_unsealed_impl)*
+
+                unsealed
             }
         }
     };
