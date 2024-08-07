@@ -95,9 +95,9 @@ struct User {
 
 These derive macros will generate implementations for the following traits of the same name:
 
-- `Decryptable` - a trait that allows you to decrypt a record from DynamoDB
-- `Encryptable` - a trait that allows you to encrypt a record for storage in DynamoDB
-- `Searchable` - a trait that allows you to search for records in DynamoDB
+* `Decryptable` - a trait that allows you to decrypt a record from DynamoDB
+* `Encryptable` - a trait that allows you to encrypt a record for storage in DynamoDB
+* `Searchable`  - a trait that allows you to search for records in DynamoDB
 
 The above example is the minimum required to use CipherStash for DynamoDB however you can expand capabilities via several macros.
 
@@ -181,6 +181,27 @@ struct User {
 
 Sort keys will contain that value and will be prefixed by the sort key prefix.
 
+#### Explicit `pk` and `sk` fields
+
+It's common in DynamoDB to use fields on your records called `pk` and `sk` for your partition
+and sort keys. To support this behaviour these are treated as special keywords in cipherstash-dynamodb.
+If your field contains a `pk` or an `sk` field they must be annotated with the `#[partition_key]` and `#[sort_key]` attributes respectively.
+
+```rust
+use cipherstash_dynamodb::Encryptable;
+
+#[derive(Debug, Encryptable)]
+struct User {
+    #[partition_key]
+    pk: String,
+    #[sort_key]
+    sk: String,
+
+    #[cipherstash(skip)]
+    not_required: String,
+}
+```
+
 ## Indexing
 
 cipherstash-dynamodb supports indexing of encrypted fields for searching.
@@ -195,7 +216,7 @@ struct User {
     #[cipherstash(query = "exact")]
     #[partition_key]
     email: String,
-
+    
    #[cipherstash(query = "prefix")]
     name: String,
 }
@@ -216,7 +237,7 @@ struct User {
     #[cipherstash(query = "exact", compound = "email#name")]
     #[partition_key]
     email: String,
-
+    
    #[cipherstash(query = "prefix", compound = "email#name")]
     name: String,
 }
@@ -224,6 +245,7 @@ struct User {
 
 It's also possible to add more than one query attribute to support querying records in multiple
 different ways.
+
 
 ```rust
 use cipherstash_dynamodb::Encryptable;
@@ -234,14 +256,13 @@ struct User {
     #[cipherstash(query = "exact", compound = "email#name")]
     #[partition_key]
     email: String,
-
+    
    #[cipherstash(query = "prefix")]
    #[cipherstash(query = "exact")]
    #[cipherstash(query = "prefix", compound = "email#name")]
     name: String,
 }
 ```
-
 It's important to note that the more annotations that are added to a field the more index terms that will be generated.
 Adding too many attributes could result in a proliferation of terms and data.
 
@@ -368,7 +389,7 @@ pub struct UserView {
     #[cipherstash(skip)]
     #[partition_key]
     email: String,
-
+    
     #[cipherstash(query = "prefix")]
     name: String,
 }
@@ -419,13 +440,6 @@ Key generation is performed using the ZeroKMS key service and bulk operations ar
 ZeroKMS's root keys are encrypted using AWS KMS and stored in DynamoDB (separate database to the data).
 
 When self-hosting ZeroKMS, we recommend running it in different account to your main application workloads.
-
-## Early access
-
-Get early access to CipherStash for DynamoDB for JavaScript or Python:
-
-- [JavaScript](https://github.com/cipherstash/cipherstash-dynamodb/discussions/50)
-- [Python](https://github.com/cipherstash/cipherstash-dynamodb/discussions/51)
 
 ## Issues and TODO
 
