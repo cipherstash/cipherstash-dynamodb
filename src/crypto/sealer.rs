@@ -1,17 +1,16 @@
 use super::{
-    b64_encode, encrypt_primary_key, format_term_key, hmac, SealError, SealedTableEntry,
-    UnsealSpec, Unsealed, MAX_TERMS_PER_INDEX,
+    b64_encode, format_term_key, hmac, SealError, SealedTableEntry, Unsealed, MAX_TERMS_PER_INDEX,
 };
 use crate::{
     encrypted_table::{TableAttribute, TableEntry},
     traits::PrimaryKeyParts,
-    Identifiable, IndexType, Searchable,
+    IndexType,
 };
 use cipherstash_client::{
     credentials::{service_credentials::ServiceToken, Credentials},
     encryption::{
         compound_indexer::{ComposableIndex, ComposablePlaintext, CompoundIndex},
-        Encryption, IndexTerm, Plaintext,
+        Encryption, IndexTerm,
     },
 };
 use itertools::Itertools;
