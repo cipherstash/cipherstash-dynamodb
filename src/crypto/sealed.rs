@@ -8,7 +8,7 @@ use cipherstash_client::{
     credentials::{service_credentials::ServiceToken, Credentials},
     encryption::Encryption,
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 
 use super::{SealError, Unsealed};
 
@@ -55,7 +55,7 @@ impl SealedTableEntry {
             let ciphertexts = decryptable_attributes
                 .iter()
                 .map(|name| {
-                    let attribute = item.inner().attributes.get(match *name {
+                    let attribute = item.inner().attributes.get(match name.deref() {
                         "pk" => "__pk",
                         "sk" => "__sk",
                         _ => name,
@@ -71,7 +71,7 @@ impl SealedTableEntry {
             let unprotected = plaintext_attributes
                 .iter()
                 .map(|name| {
-                    let attr = match *name {
+                    let attr = match name.deref() {
                         "sk" => "__sk",
                         _ => name,
                     };
@@ -100,13 +100,13 @@ impl SealedTableEntry {
                 let mut unsealed = Unsealed::new();
 
                 for (name, plaintext) in decryptable_attributes.iter().zip(decrypted_plaintext) {
-                    unsealed.add_protected(*name, plaintext.clone());
+                    unsealed.add_protected(name.to_string(), plaintext.clone());
                 }
 
                 for (name, plaintext) in
                     plaintext_attributes.iter().zip(plaintext_items.into_iter())
                 {
-                    unsealed.add_unprotected(*name, plaintext.clone());
+                    unsealed.add_unprotected(name.to_string(), plaintext.clone());
                 }
 
                 unsealed.into_value()

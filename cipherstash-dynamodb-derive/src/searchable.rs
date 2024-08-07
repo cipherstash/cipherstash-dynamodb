@@ -19,7 +19,7 @@ pub(crate) fn derive_searchable(input: DeriveInput) -> Result<TokenStream, syn::
             let index_type = index.to_cipherstash_dynamodb_type()?;
 
             Ok::<_, syn::Error>(quote! {
-                ( #index_name, #index_type )
+                ( std::borrow::Cow::Borrowed(#index_name), #index_type )
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -53,8 +53,8 @@ pub(crate) fn derive_searchable(input: DeriveInput) -> Result<TokenStream, syn::
     let expanded = quote! {
         #[automatically_derived]
         impl cipherstash_dynamodb::traits::Searchable for #ident {
-            fn protected_indexes() -> Vec<( &'static str, cipherstash_dynamodb::IndexType )> {
-                vec![#(#protected_indexes_impl,)*]
+            fn protected_indexes() -> std::borrow::Cow<'static, [( std::borrow::Cow<'static, str>, cipherstash_dynamodb::IndexType )]> {
+                std::borrow::Cow::Borrowed(&[#(#protected_indexes_impl,)*])
             }
 
             fn index_by_name(index_name: &str, index_type: cipherstash_dynamodb::IndexType) -> Option<Box<dyn cipherstash_dynamodb::traits::ComposableIndex>> {

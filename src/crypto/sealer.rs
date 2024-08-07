@@ -12,7 +12,7 @@ use cipherstash_client::{
     encryption::{compound_indexer::CompoundIndex, Encryption, IndexTerm, Plaintext},
 };
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap, ops::Deref};
 
 /// Builder pattern for sealing a record of type, `T`.
 pub struct Sealer<T> {
@@ -131,8 +131,8 @@ impl<T> Sealer<T> {
         for record in records.iter() {
             let PrimaryKeyParts { pk, sk } = encrypt_primary_key::<S>(
                 record.inner.get_primary_key(),
-                S::type_name(),
-                S::sort_key_prefix(),
+                &S::type_name(),
+                S::sort_key_prefix().as_deref(),
                 cipher,
             )?;
 
@@ -140,7 +140,7 @@ impl<T> Sealer<T> {
                 protected.push(record.unsealed.protected_with_descriptor(attr)?);
             }
 
-            let terms: Vec<(&&str, IndexType, Vec<u8>)> = protected_indexes
+            let terms: Vec<(&Cow<'_, str>, IndexType, Vec<u8>)> = protected_indexes
                 .iter()
                 .map(|(index_name, index_type)| {
                     record
@@ -190,8 +190,10 @@ impl<T> Sealer<T> {
             .zip(table_entries.iter_mut())
         {
             for (enc, name) in encrypted.iter().zip(protected_attributes.iter()) {
+                let name: &str = name.deref();
+
                 attributes.insert(
-                    String::from(match *name {
+                    String::from(match name {
                         "pk" => "__pk",
                         "sk" => "__sk",
                         _ => name,
@@ -213,7 +215,7 @@ impl<T> Sealer<T> {
                 .enumerate()
                 .map(|(i, (index_name, index_type, term))| {
                     let sk = b64_encode(hmac(
-                        &format_term_key(sk.as_str(), index_name, index_type, i),
+                        &format_term_key(sk.as_str(), &index_name, index_type, i),
                         Some(pk.as_str()),
                         cipher,
                     )?);

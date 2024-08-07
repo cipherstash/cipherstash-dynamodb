@@ -168,7 +168,7 @@ impl<D> EncryptedTable<D> {
         k: impl Into<E::PrimaryKey>,
     ) -> Result<DynamoRecordPatch, DeleteError> {
         let PrimaryKeyParts { pk, sk } =
-            encrypt_primary_key::<E>(k, E::type_name(), E::sort_key_prefix(), &self.cipher)?;
+            encrypt_primary_key::<E>(k, &E::type_name(), E::sort_key_prefix().as_deref(), &self.cipher)?;
 
         let delete_records = all_index_keys::<E>(&sk)
             .into_iter()
@@ -260,7 +260,7 @@ impl EncryptedTable<Dynamo> {
         T: Decryptable + Identifiable,
     {
         let PrimaryKeyParts { pk, sk } =
-            encrypt_primary_key::<T>(k, T::type_name(), T::sort_key_prefix(), &self.cipher)?;
+            encrypt_primary_key::<T>(k, &T::type_name(), T::sort_key_prefix().as_deref(), &self.cipher)?;
 
         let result = self
             .db

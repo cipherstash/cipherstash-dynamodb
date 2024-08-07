@@ -9,8 +9,8 @@ pub trait PrimaryKey: private::Sealed {
 
     fn into_parts(
         self,
-        type_name: &'static str,
-        sort_key_prefix: Option<&'static str>,
+        type_name: &str,
+        sort_key_prefix: Option<&str>,
     ) -> PrimaryKeyParts;
 }
 
@@ -20,8 +20,8 @@ impl PrimaryKey for Pk {
 
     fn into_parts(
         self,
-        type_name: &'static str,
-        _sort_key_prefix: Option<&'static str>,
+        type_name: &str,
+        _sort_key_prefix: Option<&str>,
     ) -> PrimaryKeyParts {
         PrimaryKeyParts {
             pk: self.0,
@@ -36,8 +36,8 @@ impl PrimaryKey for PkSk {
 
     fn into_parts(
         self,
-        _type_name: &'static str,
-        sort_key_prefix: Option<&'static str>,
+        _type_name: &str,
+        sort_key_prefix: Option<&str>,
     ) -> PrimaryKeyParts {
         PrimaryKeyParts {
             pk: self.0,

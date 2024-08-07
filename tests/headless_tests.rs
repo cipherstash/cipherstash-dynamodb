@@ -50,7 +50,7 @@ async fn run_test<F: Future<Output = ()>>(f: impl FnOnce(Client, String) -> F) {
 
 #[tokio::test]
 #[serial]
-async fn test_roundtrip() {
+async fn test_headless_roundtrip() {
     run_test(|client, table_name| async move {
         let user = User::new("john@john.co", "john", "tag");
 
