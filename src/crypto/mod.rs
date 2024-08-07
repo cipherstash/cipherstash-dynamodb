@@ -6,10 +6,7 @@ mod unsealed;
 use std::borrow::Cow;
 
 use crate::{
-    traits::{
-        Encryptable, PrimaryKeyError, PrimaryKeyParts, ReadConversionError, Searchable,
-        WriteConversionError,
-    },
+    traits::{PrimaryKeyError, PrimaryKeyParts, ReadConversionError, WriteConversionError},
     Identifiable, IndexType, PrimaryKey,
 };
 use cipherstash_client::{

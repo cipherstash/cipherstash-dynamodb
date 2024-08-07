@@ -1,5 +1,7 @@
 use aws_sdk_dynamodb::Client;
-use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Identifiable, Searchable};
+use cipherstash_dynamodb::{
+    traits::Preparable, Decryptable, Encryptable, EncryptedTable, Identifiable, Searchable,
+};
 use serial_test::serial;
 use std::future::Future;
 
@@ -58,8 +60,9 @@ async fn test_headless_roundtrip() {
             .await
             .expect("failed to init table");
 
-        let user_record = table
-            .prepare_record(user.clone())
+        let user_record = user
+            .clone()
+            .prepare_record()
             .expect("failed to prepare record");
 
         let patch = table

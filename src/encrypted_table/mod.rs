@@ -8,8 +8,8 @@ pub use self::{
 use crate::{
     crypto::*,
     errors::*,
-    traits::{Decryptable, PrimaryKeyParts, Searchable},
-    Identifiable, IndexType, PrimaryKey,
+    traits::{Decryptable, Preparable, PrimaryKeyParts, Searchable},
+    Identifiable, IndexType,
 };
 use aws_sdk_dynamodb::types::{AttributeValue, Delete, Put, TransactWriteItem};
 use cipherstash_client::{
@@ -101,6 +101,20 @@ pub struct PreparedRecord {
     protected_indexes: Cow<'static, [(Cow<'static, str>, IndexType)]>,
     protected_attributes: Cow<'static, [Cow<'static, str>]>,
     sealer: Sealer,
+}
+
+impl PreparedRecord {
+    pub(crate) fn new(
+        protected_indexes: Cow<'static, [(Cow<'static, str>, IndexType)]>,
+        protected_attributes: Cow<'static, [Cow<'static, str>]>,
+        sealer: Sealer,
+    ) -> Self {
+        Self {
+            protected_indexes,
+            protected_attributes,
+            sealer,
+        }
+    }
 }
 
 impl DynamoRecordPatch {
@@ -221,55 +235,6 @@ impl<D> EncryptedTable<D> {
         Ok(DynamoRecordPatch {
             put_records: vec![],
             delete_records,
-        })
-    }
-
-    pub fn prepare_record<E: Searchable + Identifiable>(
-        &self,
-        record: E,
-    ) -> Result<PreparedRecord, SealError> {
-        let type_name = E::type_name();
-
-        let PrimaryKeyParts { pk, sk } = record
-            .get_primary_key()
-            .into_parts(&type_name, E::sort_key_prefix().as_deref());
-
-        let protected_indexes = E::protected_indexes();
-        let protected_attributes = E::protected_attributes();
-
-        let unsealed_indexes = protected_indexes
-            .iter()
-            .map(|(index_name, index_type)| {
-                record
-                    .attribute_for_index(index_name, *index_type)
-                    .and_then(|attr| {
-                        E::index_by_name(index_name, *index_type)
-                            .map(|index| (attr, index, index_name.clone(), *index_type))
-                    })
-                    .ok_or(SealError::MissingAttribute(index_name.to_string()))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let unsealed = record.into_unsealed();
-
-        let sealer = Sealer {
-            pk,
-            sk,
-
-            is_sk_encrypted: E::is_sk_encrypted(),
-            is_pk_encrypted: E::is_pk_encrypted(),
-
-            type_name,
-
-            unsealed_indexes,
-
-            unsealed,
-        };
-
-        Ok(PreparedRecord {
-            protected_indexes,
-            protected_attributes,
-            sealer,
         })
     }
 
@@ -401,7 +366,7 @@ impl EncryptedTable<Dynamo> {
     where
         T: Searchable + Identifiable,
     {
-        let record = self.prepare_record(record)?;
+        let record = record.prepare_record()?;
 
         let transact_items = self
             .create_put_patch(
