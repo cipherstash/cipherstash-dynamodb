@@ -8,12 +8,26 @@ use cipherstash_client::{
     credentials::{service_credentials::ServiceToken, Credentials},
     encryption::Encryption,
 };
-use std::{collections::HashMap, ops::Deref};
+use std::{borrow::Cow, collections::HashMap, ops::Deref};
 
 use super::{SealError, Unsealed};
 
 /// Wrapped to indicate that the value is encrypted
 pub struct SealedTableEntry(pub(super) TableEntry);
+
+pub struct UnsealSpec<'a> {
+    pub protected_attributes: Cow<'a, [Cow<'a, str>]>,
+    pub plaintext_attributes: Cow<'a, [Cow<'a, str>]>,
+}
+
+impl UnsealSpec<'static> {
+    pub fn new_for_decryptable<D: Decryptable>() -> Self {
+        Self {
+            protected_attributes: D::protected_attributes(),
+            plaintext_attributes: D::plaintext_attributes(),
+        }
+    }
+}
 
 impl SealedTableEntry {
     pub fn vec_from<O: TryInto<Self>>(
@@ -36,23 +50,23 @@ impl SealedTableEntry {
     /// decryptions
     ///
     /// This should be used over [`Sealed::unseal`] when multiple values need to be unsealed.
-    pub(crate) async fn unseal_all<T, C>(
+    pub(crate) async fn unseal_all(
         items: impl AsRef<[SealedTableEntry]>,
-        cipher: &Encryption<C>,
-    ) -> Result<Vec<T>, SealError>
-    where
-        C: Credentials<Token = ServiceToken>,
-        T: Decryptable,
-    {
+        spec: UnsealSpec<'_>,
+        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+    ) -> Result<Vec<Unsealed>, SealError> {
         let items = items.as_ref();
-        let plaintext_attributes = T::plaintext_attributes();
-        let decryptable_attributes = T::protected_attributes();
+
+        let UnsealSpec {
+            protected_attributes,
+            plaintext_attributes,
+        } = spec;
 
         let mut plaintext_items: Vec<Vec<&TableAttribute>> = Vec::with_capacity(items.len());
-        let mut decryptable_items = Vec::with_capacity(items.len() * decryptable_attributes.len());
+        let mut decryptable_items = Vec::with_capacity(items.len() * protected_attributes.len());
 
         for item in items.iter() {
-            let ciphertexts = decryptable_attributes
+            let ciphertexts = protected_attributes
                 .iter()
                 .map(|name| {
                     let attribute = item.inner().attributes.get(match name.deref() {
@@ -94,12 +108,12 @@ impl SealedTableEntry {
         let decrypted = cipher.decrypt(decryptable_items).await?;
 
         let unsealed = decrypted
-            .chunks_exact(decryptable_attributes.len())
+            .chunks_exact(protected_attributes.len())
             .zip(plaintext_items)
             .map(|(decrypted_plaintext, plaintext_items)| {
                 let mut unsealed = Unsealed::new();
 
-                for (name, plaintext) in decryptable_attributes.iter().zip(decrypted_plaintext) {
+                for (name, plaintext) in protected_attributes.iter().zip(decrypted_plaintext) {
                     unsealed.add_protected(name.to_string(), plaintext.clone());
                 }
 
@@ -109,9 +123,9 @@ impl SealedTableEntry {
                     unsealed.add_unprotected(name.to_string(), plaintext.clone());
                 }
 
-                unsealed.into_value()
+                unsealed
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Vec<_>>();
 
         Ok(unsealed)
     }
@@ -119,12 +133,12 @@ impl SealedTableEntry {
     /// Unseal the current value and return it's plaintext representation
     ///
     /// If you need to unseal multiple values at once use [`Sealed::unseal_all`]
-    pub(crate) async fn unseal<C, T>(self, cipher: &Encryption<C>) -> Result<T, SealError>
-    where
-        C: Credentials<Token = ServiceToken>,
-        T: Decryptable,
-    {
-        let mut vec = Self::unseal_all([self], cipher).await?;
+    pub(crate) async fn unseal(
+        self,
+        spec: UnsealSpec<'_>,
+        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+    ) -> Result<Unsealed, SealError> {
+        let mut vec = Self::unseal_all([self], spec, cipher).await?;
 
         if vec.len() != 1 {
             let actual = vec.len();

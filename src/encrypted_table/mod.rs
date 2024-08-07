@@ -1,3 +1,4 @@
+pub mod prepared_record;
 pub mod query;
 mod table_entry;
 pub use self::{
@@ -145,30 +146,60 @@ impl<D> EncryptedTable<D> {
         QueryBuilder::new(self)
     }
 
+    pub async fn unseal_all(
+        &self,
+        items: impl IntoIterator<Item = HashMap<String, AttributeValue>>,
+        spec: UnsealSpec<'_>,
+    ) -> Result<Vec<Unsealed>, DecryptError> {
+        let table_entries = SealedTableEntry::vec_from(items)?;
+        let results = SealedTableEntry::unseal_all(table_entries, spec, &self.cipher).await?;
+        Ok(results)
+    }
+
+    pub async fn unseal(
+        &self,
+        item: HashMap<String, AttributeValue>,
+        spec: UnsealSpec<'_>,
+    ) -> Result<Unsealed, DecryptError> {
+        let table_entry = SealedTableEntry::try_from(item)?;
+        let result = table_entry.unseal(spec, &self.cipher).await?;
+        Ok(result)
+    }
+
     pub async fn decrypt_all<T: Decryptable>(
         &self,
         items: impl IntoIterator<Item = HashMap<String, AttributeValue>>,
     ) -> Result<Vec<T>, DecryptError> {
-        let table_entries = SealedTableEntry::vec_from(items)?;
-        let results = SealedTableEntry::unseal_all(table_entries, &self.cipher).await?;
-        Ok(results)
+        let items = self
+            .unseal_all(items, UnsealSpec::new_for_decryptable::<T>())
+            .await?;
+
+        Ok(items
+            .into_iter()
+            .map(|x| x.into_value::<T>())
+            .collect::<Result<Vec<_>, _>>()?)
     }
 
     pub async fn decrypt<T: Decryptable>(
         &self,
         item: HashMap<String, AttributeValue>,
     ) -> Result<T, DecryptError> {
-        let table_entry = SealedTableEntry::try_from(item)?;
-        let result = table_entry.unseal(&self.cipher).await?;
-        Ok(result)
+        let item = self
+            .unseal(item, UnsealSpec::new_for_decryptable::<T>())
+            .await?;
+        Ok(item.into_value()?)
     }
 
     pub async fn create_delete_patch<E: Searchable + Identifiable>(
         &self,
         k: impl Into<E::PrimaryKey>,
     ) -> Result<DynamoRecordPatch, DeleteError> {
-        let PrimaryKeyParts { pk, sk } =
-            encrypt_primary_key::<E>(k, &E::type_name(), E::sort_key_prefix().as_deref(), &self.cipher)?;
+        let PrimaryKeyParts { pk, sk } = encrypt_primary_key::<E>(
+            k,
+            &E::type_name(),
+            E::sort_key_prefix().as_deref(),
+            &self.cipher,
+        )?;
 
         let delete_records = all_index_keys::<E>(&sk)
             .into_iter()
@@ -259,8 +290,12 @@ impl EncryptedTable<Dynamo> {
     where
         T: Decryptable + Identifiable,
     {
-        let PrimaryKeyParts { pk, sk } =
-            encrypt_primary_key::<T>(k, &T::type_name(), T::sort_key_prefix().as_deref(), &self.cipher)?;
+        let PrimaryKeyParts { pk, sk } = encrypt_primary_key::<T>(
+            k,
+            &T::type_name(),
+            T::sort_key_prefix().as_deref(),
+            &self.cipher,
+        )?;
 
         let result = self
             .db

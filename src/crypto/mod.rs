@@ -20,7 +20,7 @@ use cipherstash_client::{
 use thiserror::Error;
 
 pub use b64_encode::*;
-pub use sealed::SealedTableEntry;
+pub use sealed::{SealedTableEntry, UnsealSpec};
 pub use sealer::Sealer;
 pub use unsealed::Unsealed;
 
