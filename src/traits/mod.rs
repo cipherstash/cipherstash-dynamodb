@@ -14,7 +14,10 @@ pub use cipherstash_client::{
 mod primary_key;
 pub use primary_key::*;
 
-use std::{borrow::Cow, fmt::{Debug, Display}};
+use std::{
+    borrow::Cow,
+    fmt::{Debug, Display},
+};
 use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -104,7 +107,7 @@ pub trait Encryptable: Debug + Sized {
     /// Must be equal to or a superset of plaintext_attributes on the [`Decryptable`] type.
     fn plaintext_attributes() -> Cow<'static, [Cow<'static, str>]>;
 
-    fn into_sealer(self) -> Result<Sealer<Self>, SealError>;
+    fn into_unsealed(self) -> Unsealed;
 }
 
 pub trait Searchable: Encryptable {

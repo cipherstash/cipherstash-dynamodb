@@ -3,6 +3,8 @@ mod sealed;
 mod sealer;
 mod unsealed;
 
+use std::borrow::Cow;
+
 use crate::{
     traits::{
         Encryptable, PrimaryKeyError, PrimaryKeyParts, ReadConversionError, Searchable,
@@ -66,8 +68,12 @@ pub fn format_term_key(
     format!("{sort_key}#{index_name}#{index_type}#{counter}")
 }
 
-pub(crate) fn all_index_keys<E: Searchable + Encryptable>(sort_key: &str) -> Vec<String> {
-    E::protected_indexes()
+pub(crate) fn all_index_keys<'a>(
+    sort_key: &str,
+    protected_indexes: impl AsRef<[(Cow<'a, str>, IndexType)]>,
+) -> Vec<String> {
+    protected_indexes
+        .as_ref()
         .iter()
         .flat_map(|(index_name, index_type)| {
             (0..)
