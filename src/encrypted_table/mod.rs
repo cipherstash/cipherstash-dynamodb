@@ -8,7 +8,7 @@ pub use self::{
 use crate::{
     crypto::*,
     errors::*,
-    traits::{Decryptable, Preparable, PrimaryKeyParts, Searchable},
+    traits::{Decryptable, PrimaryKey, PrimaryKeyParts, Searchable},
     Identifiable, IndexType,
 };
 use aws_sdk_dynamodb::types::{AttributeValue, Delete, Put, TransactWriteItem};
@@ -114,6 +114,55 @@ impl PreparedRecord {
             protected_attributes,
             sealer,
         }
+    }
+
+    pub fn prepare_record<R>(record: R) -> Result<Self, SealError>
+    where
+        R: Searchable + Identifiable,
+    {
+        let type_name = R::type_name();
+
+        let PrimaryKeyParts { pk, sk } = record
+            .get_primary_key()
+            .into_parts(&type_name, R::sort_key_prefix().as_deref());
+
+        let protected_indexes = R::protected_indexes();
+        let protected_attributes = R::protected_attributes();
+
+        let unsealed_indexes = protected_indexes
+            .iter()
+            .map(|(index_name, index_type)| {
+                record
+                    .attribute_for_index(index_name, *index_type)
+                    .and_then(|attr| {
+                        R::index_by_name(index_name, *index_type)
+                            .map(|index| (attr, index, index_name.clone(), *index_type))
+                    })
+                    .ok_or(SealError::MissingAttribute(index_name.to_string()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let unsealed = record.into_unsealed();
+
+        let sealer = Sealer {
+            pk,
+            sk,
+
+            is_sk_encrypted: R::is_sk_encrypted(),
+            is_pk_encrypted: R::is_pk_encrypted(),
+
+            type_name,
+
+            unsealed_indexes,
+
+            unsealed,
+        };
+
+        Ok(PreparedRecord::new(
+            protected_indexes,
+            protected_attributes,
+            sealer,
+        ))
     }
 }
 
@@ -366,7 +415,7 @@ impl EncryptedTable<Dynamo> {
     where
         T: Searchable + Identifiable,
     {
-        let record = record.prepare_record()?;
+        let record = PreparedRecord::prepare_record(record)?;
 
         let transact_items = self
             .create_put_patch(
