@@ -82,7 +82,7 @@
 //! To use CipherStash for DynamoDB, you must first annotate a struct with the `Encryptable`, `Searchable` and
 //! `Decryptable` derive macros.
 //!
-//! ```rust
+//! ```
 //! use cipherstash_dynamodb::{Searchable, Decryptable, Encryptable};
 //!
 //! #[derive(Debug, Searchable, Decryptable, Encryptable)]
@@ -107,7 +107,7 @@
 //!
 //! To store a field as a plaintext, you can use the `plaintext` attribute:
 //!
-//! ```rust
+//! ```
 //! use cipherstash_dynamodb::{Searchable, Decryptable, Encryptable};
 //!
 //! #[derive(Debug, Searchable, Decryptable, Encryptable)]
@@ -123,7 +123,7 @@
 //!
 //! If you don't want a field stored in the the database at all, you can annotate the field with `#[cipherstash(skip)]`.
 //!
-//! ```rust
+//! ```
 //! use cipherstash_dynamodb::{Searchable, Encryptable, Decryptable};
 //!
 //! #[derive(Debug, Searchable, Encryptable, Decryptable)]
@@ -144,7 +144,7 @@
 //! cipherstash-dynamodb requires every record to have a sort key. By default this will be derived based on the name of the struct.
 //! However, if you want to specify your own, you can use the `sort_key_prefix` attribute:
 //!
-//! ```rust
+//! ```
 //! use cipherstash_dynamodb::Encryptable;
 //!
 //! #[derive(Debug, Encryptable)]
@@ -164,7 +164,7 @@
 //! CipherStash for DynamoDB also supports specifying the sort key dynamically based on a field on the struct.
 //! You can choose the field using the `#[sort_key]` attribute.
 //!
-//! ```rust
+//! ```
 //! use cipherstash_dynamodb::Encryptable;
 //!
 //! #[derive(Debug, Encryptable)]
@@ -187,7 +187,7 @@
 //! Exact, prefix and compound match types are currently supported.
 //! To index a field, use the `query` attribute:
 //!
-//! ```rust
+//! ```
 //! use cipherstash_dynamodb::Encryptable;
 //!
 //! #[derive(Debug, Encryptable)]
@@ -208,7 +208,7 @@
 //! Fields mentioned in the compound index name that aren't correctly annotated will result in a
 //! compilation error.
 //!
-//! ```rust
+//! ```
 //! use cipherstash_dynamodb::Encryptable;
 //!
 //! #[derive(Debug, Encryptable)]
@@ -225,7 +225,7 @@
 //! It's also possible to add more than one query attribute to support querying records in multiple
 //! different ways.
 //!
-//! ```rust
+//! ```
 //! use cipherstash_dynamodb::Encryptable;
 //!
 //! #[derive(Debug, Encryptable)]
@@ -258,7 +258,7 @@
 //!
 //! Interacting with a table in DynamoDB is done via the [EncryptedTable] struct.
 //!
-//! ```rust
+//! ```
 //! use cipherstash_dynamodb::{EncryptedTable, Key};
 //!
 //! #[tokio::main]
@@ -283,14 +283,14 @@
 //!
 //! To store a record in the table, use the [`EncryptedTable::put`] method:
 //!
-//! ```rust
+//! ```
 //! let user = User::new("dan@coderdan", "Dan Draper");
 //! table.put(user).await?;
 //! ```
 //!
 //! To get a record, use the [`EncryptedTable::get`] method:
 //!
-//! ```rust
+//! ```
 //!
 //! let user: Option<User> = table.get("dan@coderdan.co").await?;
 //! ```
@@ -302,7 +302,7 @@
 //!
 //! To delete a record, use the [`EncryptedTable::delete`] method:
 //!
-//! ```rust
+//! ```
 //! table.delete::<User>("jane@smith.org").await?;
 //! ```
 //!
@@ -310,7 +310,7 @@
 //!
 //! To query records, use the [`EncryptedTable::query`] method which returns a builder:
 //!
-//! ```rust
+//! ```
 //! let results: Vec<User> = table
 //!     .query()
 //!     .starts_with("name", "Dan")
@@ -320,7 +320,7 @@
 //!
 //! If you have a compound index defined, CipherStash for DynamoDB will automatically use it when querying.
 //!
-//! ```rust
+//! ```
 //! let results: Vec<User> = table
 //!     .query()
 //!     .eq("email", "dan@coderdan")
@@ -339,7 +339,7 @@
 //!
 //! For example, you might want to store related records to `User` such as `License`.
 //!
-//! ```rust
+//! ```
 //! use cipherstash_dynamodb::{ Searchable, Encryptable, Decryptable };
 //!
 //! #[derive(Debug, Searchable, Encryptable, Decryptable)]
@@ -361,7 +361,7 @@
 //! In some cases, these types might simply be a different representation of the same data based on query requirements.
 //! For example, you might want to query users by name using a prefix (say for using a "type ahead") but only return the name.
 //!
-//! ```rust
+//! ```
 //!
 //! #[derive(Debug, Searchable, Encryptable, Decryptable)]
 //! pub struct UserView {
@@ -376,7 +376,7 @@
 //!
 //! To use the view, you can first `put` and then `query` the value.
 //!
-//! ```rust
+//! ```
 //! let user = UserView::new("dan@coderdan", "Dan Draper");
 //! table.put(user).await?;
 //! let results: Vec<UserView> = table
