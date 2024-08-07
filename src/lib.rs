@@ -82,7 +82,7 @@
 //! To use CipherStash for DynamoDB, you must first annotate a struct with the `Encryptable`, `Searchable` and
 //! `Decryptable` derive macros.
 //!
-//! ```
+//! ```rust
 //! use cipherstash_dynamodb::{Searchable, Decryptable, Encryptable};
 //!
 //! #[derive(Debug, Searchable, Decryptable, Encryptable)]
@@ -95,9 +95,9 @@
 //!
 //! These derive macros will generate implementations for the following traits of the same name:
 //!
-//! - `Decryptable` - a trait that allows you to decrypt a record from DynamoDB
-//! - `Encryptable` - a trait that allows you to encrypt a record for storage in DynamoDB
-//! - `Searchable` - a trait that allows you to search for records in DynamoDB
+//! * `Decryptable` - a trait that allows you to decrypt a record from DynamoDB
+//! * `Encryptable` - a trait that allows you to encrypt a record for storage in DynamoDB
+//! * `Searchable`  - a trait that allows you to search for records in DynamoDB
 //!
 //! The above example is the minimum required to use CipherStash for DynamoDB however you can expand capabilities via several macros.
 //!
@@ -107,7 +107,7 @@
 //!
 //! To store a field as a plaintext, you can use the `plaintext` attribute:
 //!
-//! ```
+//! ```rust
 //! use cipherstash_dynamodb::{Searchable, Decryptable, Encryptable};
 //!
 //! #[derive(Debug, Searchable, Decryptable, Encryptable)]
@@ -123,7 +123,7 @@
 //!
 //! If you don't want a field stored in the the database at all, you can annotate the field with `#[cipherstash(skip)]`.
 //!
-//! ```
+//!```rust
 //! use cipherstash_dynamodb::{Searchable, Encryptable, Decryptable};
 //!
 //! #[derive(Debug, Searchable, Encryptable, Decryptable)]
@@ -144,7 +144,7 @@
 //! cipherstash-dynamodb requires every record to have a sort key. By default this will be derived based on the name of the struct.
 //! However, if you want to specify your own, you can use the `sort_key_prefix` attribute:
 //!
-//! ```
+//!```rust
 //! use cipherstash_dynamodb::Encryptable;
 //!
 //! #[derive(Debug, Encryptable)]
@@ -164,7 +164,7 @@
 //! CipherStash for DynamoDB also supports specifying the sort key dynamically based on a field on the struct.
 //! You can choose the field using the `#[sort_key]` attribute.
 //!
-//! ```
+//! ```rust
 //! use cipherstash_dynamodb::Encryptable;
 //!
 //! #[derive(Debug, Encryptable)]
@@ -181,13 +181,34 @@
 //!
 //! Sort keys will contain that value and will be prefixed by the sort key prefix.
 //!
+//! #### Explicit `pk` and `sk` fields
+//!
+//! It's common in DynamoDB to use fields on your records called `pk` and `sk` for your partition
+//! and sort keys. To support this behaviour these are treated as special keywords in cipherstash-dynamodb.
+//! If your field contains a `pk` or an `sk` field they must be annotated with the `#[partition_key]` and `#[sort_key]` attributes respectively.
+//!
+//! ```rust
+//! use cipherstash_dynamodb::Encryptable;
+//!
+//! #[derive(Debug, Encryptable)]
+//! struct User {
+//!     #[partition_key]
+//!     pk: String,
+//!     #[sort_key]
+//!     sk: String,
+//!
+//!     #[cipherstash(skip)]
+//!     not_required: String,
+//! }
+//! ```
+//!
 //! ## Indexing
 //!
 //! cipherstash-dynamodb supports indexing of encrypted fields for searching.
 //! Exact, prefix and compound match types are currently supported.
 //! To index a field, use the `query` attribute:
 //!
-//! ```
+//! ```rust
 //! use cipherstash_dynamodb::Encryptable;
 //!
 //! #[derive(Debug, Encryptable)]
@@ -195,7 +216,7 @@
 //!     #[cipherstash(query = "exact")]
 //!     #[partition_key]
 //!     email: String,
-//!
+//!     
 //!    #[cipherstash(query = "prefix")]
 //!     name: String,
 //! }
@@ -208,7 +229,7 @@
 //! Fields mentioned in the compound index name that aren't correctly annotated will result in a
 //! compilation error.
 //!
-//! ```
+//! ```rust
 //! use cipherstash_dynamodb::Encryptable;
 //!
 //! #[derive(Debug, Encryptable)]
@@ -216,7 +237,7 @@
 //!     #[cipherstash(query = "exact", compound = "email#name")]
 //!     #[partition_key]
 //!     email: String,
-//!
+//!     
 //!    #[cipherstash(query = "prefix", compound = "email#name")]
 //!     name: String,
 //! }
@@ -225,7 +246,8 @@
 //! It's also possible to add more than one query attribute to support querying records in multiple
 //! different ways.
 //!
-//! ```
+//!
+//! ```rust
 //! use cipherstash_dynamodb::Encryptable;
 //!
 //! #[derive(Debug, Encryptable)]
@@ -234,14 +256,13 @@
 //!     #[cipherstash(query = "exact", compound = "email#name")]
 //!     #[partition_key]
 //!     email: String,
-//!
+//!     
 //!    #[cipherstash(query = "prefix")]
 //!    #[cipherstash(query = "exact")]
 //!    #[cipherstash(query = "prefix", compound = "email#name")]
 //!     name: String,
 //! }
 //! ```
-//!
 //! It's important to note that the more annotations that are added to a field the more index terms that will be generated.
 //! Adding too many attributes could result in a proliferation of terms and data.
 //!
@@ -258,7 +279,7 @@
 //!
 //! Interacting with a table in DynamoDB is done via the [EncryptedTable] struct.
 //!
-//! ```
+//! ```no_run
 //! use cipherstash_dynamodb::{EncryptedTable, Key};
 //!
 //! #[tokio::main]
@@ -283,16 +304,57 @@
 //!
 //! To store a record in the table, use the [`EncryptedTable::put`] method:
 //!
-//! ```
+//! ```no_run
+//! # use cipherstash_dynamodb::{Encryptable, Searchable, Decryptable, EncryptedTable};
+//! #
+//! # #[derive(Debug, Encryptable, Searchable, Decryptable)]
+//! # struct User {
+//! #    #[partition_key]
+//! #    email: String,
+//! #    name: String,
+//! # }
+//! # impl User {
+//! #   fn new(email: impl Into<String>, name: impl Into<String>) -> Self {
+//! #       Self { email: email.into(), name: name.into() }
+//! #   }
+//! # }
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! #    let config = aws_config::from_env()
+//! #        .endpoint_url("http://localhost:8000")
+//! #        .load()
+//! #        .await;
+//! #   let client = aws_sdk_dynamodb::Client::new(&config);
+//! #   let table = EncryptedTable::init(client, "users").await?;
 //! let user = User::new("dan@coderdan", "Dan Draper");
 //! table.put(user).await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! To get a record, use the [`EncryptedTable::get`] method:
 //!
-//! ```
+//! ```no_run
+//! # use cipherstash_dynamodb::{EncryptedTable, Decryptable, Encryptable, Key};
+//! #
+//! # #[derive(Debug, Decryptable, Encryptable)]
+//! # struct User {
+//! #    #[partition_key]
+//! #    email: String,
+//! #    name: String,
+//! # }
 //!
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! #    let config = aws_config::from_env()
+//! #        .endpoint_url("http://localhost:8000")
+//! #        .load()
+//! #        .await;
+//! #   let client = aws_sdk_dynamodb::Client::new(&config);
+//! #   let table = EncryptedTable::init(client, "users").await?;
 //! let user: Option<User> = table.get("dan@coderdan.co").await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! The `get` method will return `None` if the record does not exist.
@@ -302,31 +364,87 @@
 //!
 //! To delete a record, use the [`EncryptedTable::delete`] method:
 //!
-//! ```
+//! ```no_run
+//! # use cipherstash_dynamodb::{Decryptable, Searchable, Encryptable, EncryptedTable};
+//! #
+//! # #[derive(Debug, Decryptable, Searchable, Encryptable)]
+//! # struct User {
+//! #    #[partition_key]
+//! #    email: String,
+//! #    name: String,
+//! # }
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! #    let config = aws_config::from_env()
+//! #        .endpoint_url("http://localhost:8000")
+//! #        .load()
+//! #        .await;
+//! #   let client = aws_sdk_dynamodb::Client::new(&config);
+//! #   let table = EncryptedTable::init(client, "users").await?;
 //! table.delete::<User>("jane@smith.org").await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ### Querying Records
 //!
 //! To query records, use the [`EncryptedTable::query`] method which returns a builder:
 //!
-//! ```
+//! ```no_run
+//! # use cipherstash_dynamodb::{Searchable, Decryptable, Encryptable, EncryptedTable};
+//! #
+//! # #[derive(Debug, Decryptable, Searchable, Encryptable)]
+//! # struct User {
+//! #    #[partition_key]
+//! #    email: String,
+//! #    name: String,
+//! # }
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! #    let config = aws_config::from_env()
+//! #        .endpoint_url("http://localhost:8000")
+//! #        .load()
+//! #        .await;
+//! #   let client = aws_sdk_dynamodb::Client::new(&config);
+//! #   let table = EncryptedTable::init(client, "users").await?;
 //! let results: Vec<User> = table
 //!     .query()
 //!     .starts_with("name", "Dan")
 //!     .send()
 //!     .await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! If you have a compound index defined, CipherStash for DynamoDB will automatically use it when querying.
 //!
-//! ```
+//! ```no_run
+//! # use cipherstash_dynamodb::{Encryptable, Searchable, Decryptable, EncryptedTable, Key};
+//! #
+//! # #[derive(Debug, Encryptable, Searchable, Decryptable)]
+//! # struct User {
+//! #    #[partition_key]
+//! #    #[cipherstash(query = "exact")]
+//! #    email: String,
+//! #    #[cipherstash(query = "prefix")]
+//! #    name: String,
+//! # }
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! #    let config = aws_config::from_env()
+//! #        .endpoint_url("http://localhost:8000")
+//! #        .load()
+//! #        .await;
+//! #   let client = aws_sdk_dynamodb::Client::new(&config);
+//! #   let table = EncryptedTable::init(client, "users").await?;
 //! let results: Vec<User> = table
 //!     .query()
 //!     .eq("email", "dan@coderdan")
 //!     .starts_with("name", "Dan")
 //!     .send()
 //!     .await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! Note: if you don't have the correct indexes defined this query builder will return a runtime
@@ -339,7 +457,7 @@
 //!
 //! For example, you might want to store related records to `User` such as `License`.
 //!
-//! ```
+//! ```rust
 //! use cipherstash_dynamodb::{ Searchable, Encryptable, Decryptable };
 //!
 //! #[derive(Debug, Searchable, Encryptable, Decryptable)]
@@ -361,14 +479,15 @@
 //! In some cases, these types might simply be a different representation of the same data based on query requirements.
 //! For example, you might want to query users by name using a prefix (say for using a "type ahead") but only return the name.
 //!
-//! ```
+//! ```rust
+//! # use cipherstash_dynamodb::{Searchable, Encryptable, Decryptable};
 //!
 //! #[derive(Debug, Searchable, Encryptable, Decryptable)]
 //! pub struct UserView {
 //!     #[cipherstash(skip)]
 //!     #[partition_key]
 //!     email: String,
-//!
+//!     
 //!     #[cipherstash(query = "prefix")]
 //!     name: String,
 //! }
@@ -376,7 +495,31 @@
 //!
 //! To use the view, you can first `put` and then `query` the value.
 //!
-//! ```
+//! ```no_run
+//! # use cipherstash_dynamodb::{Searchable, Encryptable, Decryptable, EncryptedTable};
+//! # #[derive(Debug, Searchable, Encryptable, Decryptable)]
+//! # pub struct UserView {
+//! #     #[cipherstash(skip)]
+//! #     #[partition_key]
+//! #     email: String,
+//! #     
+//! #     #[cipherstash(query = "prefix")]
+//! #     name: String,
+//! # }
+//! # impl UserView {
+//! #     fn new(email: impl Into<String>, name: impl Into<String>) -> Self {
+//! #         Self { email: email.into(), name: name.into() }
+//! #     }
+//! # }
+//! #
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! #    let config = aws_config::from_env()
+//! #        .endpoint_url("http://localhost:8000")
+//! #        .load()
+//! #        .await;
+//! #   let client = aws_sdk_dynamodb::Client::new(&config);
+//! #   let table = EncryptedTable::init(client, "users").await?;
 //! let user = UserView::new("dan@coderdan", "Dan Draper");
 //! table.put(user).await?;
 //! let results: Vec<UserView> = table
@@ -384,6 +527,8 @@
 //!     .starts_with("name", "Dan")
 //!     .send()
 //!     .await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! So long as the indexes are equivalent, you can mix and match types.
@@ -420,16 +565,10 @@
 //!
 //! When self-hosting ZeroKMS, we recommend running it in different account to your main application workloads.
 //!
-//! ## Early access
-//!
-//! Get early access to CipherStash for DynamoDB for JavaScript or Python:
-//!
-//! - [JavaScript](https://github.com/cipherstash/cipherstash-dynamodb/discussions/50)
-//! - [Python](https://github.com/cipherstash/cipherstash-dynamodb/discussions/51)
-//!
 //! ## Issues and TODO
 //!
 //! - [ ] Sort keys are not currently hashed (and should be)
+//!
 pub mod crypto;
 pub mod encrypted_table;
 pub mod traits;
