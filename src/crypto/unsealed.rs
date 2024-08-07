@@ -73,10 +73,7 @@ impl Unsealed {
         Ok((&out.0, &out.1))
     }
 
-    pub(super) fn into_value<T>(self) -> Result<T, SealError>
-    where
-        T: Decryptable,
-    {
+    pub fn into_value<T: Decryptable>(self) -> Result<T, SealError> {
         T::from_unsealed(self)
     }
 }
