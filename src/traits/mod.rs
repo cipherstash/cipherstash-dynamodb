@@ -1,5 +1,8 @@
-use crate::crypto::{SealError, Sealer, Unsealed};
 pub use crate::encrypted_table::{TableAttribute, TryFromTableAttr};
+use crate::{
+    crypto::{SealError, Sealer, Unsealed},
+    encrypted_table::PreparedRecord,
+};
 use cipherstash_client::encryption::EncryptionError;
 pub use cipherstash_client::{
     credentials::{service_credentials::ServiceToken, Credentials},
@@ -147,4 +150,58 @@ pub trait Decryptable: Sized {
     ///
     /// Must be equal to or a subset of protected_attributes on the [`Encryptable`] type.
     fn plaintext_attributes() -> Cow<'static, [Cow<'static, str>]>;
+}
+
+pub trait Preparable {
+    fn prepare_record(self) -> Result<PreparedRecord, SealError>;
+}
+
+impl<R> Preparable for R
+where
+    R: Searchable + Identifiable,
+{
+    fn prepare_record(self) -> Result<PreparedRecord, SealError> {
+        let type_name = Self::type_name();
+
+        let PrimaryKeyParts { pk, sk } = self
+            .get_primary_key()
+            .into_parts(&type_name, Self::sort_key_prefix().as_deref());
+
+        let protected_indexes = Self::protected_indexes();
+        let protected_attributes = Self::protected_attributes();
+
+        let unsealed_indexes = protected_indexes
+            .iter()
+            .map(|(index_name, index_type)| {
+                self.attribute_for_index(index_name, *index_type)
+                    .and_then(|attr| {
+                        Self::index_by_name(index_name, *index_type)
+                            .map(|index| (attr, index, index_name.clone(), *index_type))
+                    })
+                    .ok_or(SealError::MissingAttribute(index_name.to_string()))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let unsealed = self.into_unsealed();
+
+        let sealer = Sealer {
+            pk,
+            sk,
+
+            is_sk_encrypted: Self::is_sk_encrypted(),
+            is_pk_encrypted: Self::is_pk_encrypted(),
+
+            type_name,
+
+            unsealed_indexes,
+
+            unsealed,
+        };
+
+        Ok(PreparedRecord::new(
+            protected_indexes,
+            protected_attributes,
+            sealer,
+        ))
+    }
 }
