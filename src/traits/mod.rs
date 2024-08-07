@@ -14,7 +14,7 @@ pub use cipherstash_client::{
 mod primary_key;
 pub use primary_key::*;
 
-use std::fmt::{Debug, Display};
+use std::{borrow::Cow, fmt::{Debug, Display}};
 use thiserror::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -91,18 +91,18 @@ pub trait Identifiable {
 }
 
 pub trait Encryptable: Debug + Sized {
-    fn type_name() -> &'static str;
-    fn sort_key_prefix() -> Option<&'static str>;
+    fn type_name() -> Cow<'static, str>;
+    fn sort_key_prefix() -> Option<Cow<'static, str>>;
 
     /// Defines what attributes are protected and should be encrypted for this type.
     ///
     /// Must be equal to or a superset of protected_attributes on the [`Decryptable`] type.
-    fn protected_attributes() -> Vec<&'static str>;
+    fn protected_attributes() -> Cow<'static, [Cow<'static, str>]>;
 
     /// Defines what attributes are plaintext for this type.
     ///
     /// Must be equal to or a superset of plaintext_attributes on the [`Decryptable`] type.
-    fn plaintext_attributes() -> Vec<&'static str>;
+    fn plaintext_attributes() -> Cow<'static, [Cow<'static, str>]>;
 
     fn into_sealer(self) -> Result<Sealer<Self>, SealError>;
 }
@@ -116,8 +116,8 @@ pub trait Searchable: Encryptable {
         None
     }
 
-    fn protected_indexes() -> Vec<(&'static str, IndexType)> {
-        vec![]
+    fn protected_indexes() -> Cow<'static, [(Cow<'static, str>, IndexType)]> {
+        Cow::Borrowed(&[])
     }
 
     fn index_by_name(
@@ -129,8 +129,8 @@ pub trait Searchable: Encryptable {
 }
 
 pub trait Decryptable: Sized {
-    fn type_name() -> &'static str;
-    fn sort_key_prefix() -> Option<&'static str>;
+    fn type_name() -> Cow<'static, str>;
+    fn sort_key_prefix() -> Option<Cow<'static, str>>;
 
     /// Convert an `Unsealed` into a `Self`.
     fn from_unsealed(unsealed: Unsealed) -> Result<Self, SealError>;
@@ -138,10 +138,10 @@ pub trait Decryptable: Sized {
     /// Defines what attributes are protected and decryptable for this type.
     ///
     /// Must be equal to or a subset of protected_attributes on the [`Encryptable`] type.
-    fn protected_attributes() -> Vec<&'static str>;
+    fn protected_attributes() -> Cow<'static, [Cow<'static, str>]>;
 
     /// Defines what attributes are plaintext for this type.
     ///
     /// Must be equal to or a subset of protected_attributes on the [`Encryptable`] type.
-    fn plaintext_attributes() -> Vec<&'static str>;
+    fn plaintext_attributes() -> Cow<'static, [Cow<'static, str>]>;
 }

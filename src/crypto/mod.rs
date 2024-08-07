@@ -105,8 +105,8 @@ where
 
 pub fn encrypt_primary_key<I: Identifiable>(
     k: impl Into<I::PrimaryKey>,
-    type_name: &'static str,
-    sort_key_prefix: Option<&'static str>,
+    type_name: &str,
+    sort_key_prefix: Option<&str>,
     cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
 ) -> Result<PrimaryKeyParts, PrimaryKeyError> {
     let PrimaryKeyParts { mut pk, mut sk } = k.into().into_parts(type_name, sort_key_prefix);
