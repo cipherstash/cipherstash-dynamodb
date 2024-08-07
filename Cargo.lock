@@ -727,7 +727,29 @@ dependencies = [
 ]
 
 [[package]]
-name = "cipherstash-dynamodb"
+name = "cipherstash-dynamodb-derive"
+version = "0.5.0"
+dependencies = [
+ "itertools",
+ "paste",
+ "proc",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.72",
+]
+
+[[package]]
+name = "cipherstash-stats"
+version = "0.1.0"
+source = "sparse+https://cargo.cloudsmith.io/cipherstash/cipherstash/"
+checksum = "9b24095300064077c1781e876f1e405a414012f2c1b0e48046fdb3fb8b7380f1"
+dependencies = [
+ "lazy_static",
+ "prometheus",
+]
+
+[[package]]
+name = "cipherstash_dynamodb"
 version = "0.5.0"
 dependencies = [
  "async-trait",
@@ -748,28 +770,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "trybuild",
-]
-
-[[package]]
-name = "cipherstash-dynamodb-derive"
-version = "0.5.0"
-dependencies = [
- "itertools",
- "paste",
- "proc",
- "proc-macro2",
- "quote",
- "syn 2.0.72",
-]
-
-[[package]]
-name = "cipherstash-stats"
-version = "0.1.0"
-source = "sparse+https://cargo.cloudsmith.io/cipherstash/cipherstash/"
-checksum = "9b24095300064077c1781e876f1e405a414012f2c1b0e48046fdb3fb8b7380f1"
-dependencies = [
- "lazy_static",
- "prometheus",
 ]
 
 [[package]]
