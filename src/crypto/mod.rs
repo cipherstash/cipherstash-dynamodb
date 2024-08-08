@@ -122,6 +122,13 @@ impl PreparedPrimaryKey {
             .into()
             .into_parts(&R::type_name(), R::sort_key_prefix().as_deref());
 
+        Self::new_from_parts::<R>(primary_key_parts)
+    }
+
+    pub fn new_from_parts<R>(primary_key_parts: PrimaryKeyParts) -> Self
+    where
+        R: Identifiable,
+    {
         Self {
             primary_key_parts,
             is_pk_encrypted: R::is_pk_encrypted(),
