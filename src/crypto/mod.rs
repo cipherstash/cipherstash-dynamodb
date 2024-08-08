@@ -129,22 +129,3 @@ impl PreparedPrimaryKey {
         }
     }
 }
-
-pub fn encrypt_primary_key<I: Identifiable>(
-    k: impl Into<I::PrimaryKey>,
-    type_name: &str,
-    sort_key_prefix: Option<&str>,
-    cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
-) -> Result<PrimaryKeyParts, PrimaryKeyError> {
-    let PrimaryKeyParts { mut pk, mut sk } = k.into().into_parts(type_name, sort_key_prefix);
-
-    if I::is_pk_encrypted() {
-        pk = b64_encode(hmac(&pk, None, cipher)?);
-    }
-
-    if I::is_sk_encrypted() {
-        sk = b64_encode(hmac(&sk, Some(pk.as_str()), cipher)?);
-    }
-
-    Ok(PrimaryKeyParts { pk, sk })
-}
