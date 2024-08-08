@@ -17,6 +17,14 @@ impl Searchable for User {}
 impl Identifiable for User {
     type PrimaryKey = PkSk;
 
+    fn type_name() -> std::borrow::Cow<'static, str> {
+        std::any::type_name::<Self>().to_lowercase().into()
+    }
+
+    fn sort_key_prefix() -> Option<std::borrow::Cow<'static, str>> {
+        Some(Self::type_name())
+    }
+
     fn get_primary_key(&self) -> Self::PrimaryKey {
         PkSk("user".to_string(), self.name.to_string())
     }
