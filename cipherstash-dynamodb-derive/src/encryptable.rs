@@ -9,25 +9,18 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
         .field_attributes(&input)?
         .build()?;
 
-    let type_name = settings.type_name.clone();
-
-    let sort_key_prefix_impl = if let Some(prefix) = &settings.sort_key_prefix {
-        quote! { Some(std::borrow::Cow::Borrowed(#prefix)) }
-    } else {
-        quote! { None }
-    };
-
     let protected_attributes = settings.protected_attributes();
     let plaintext_attributes = settings.plaintext_attributes();
 
-    let protected_attributes_cow = settings.protected_attributes()
+    let protected_attributes_cow = settings
+        .protected_attributes()
         .into_iter()
-        .map(|x| quote!{ std::borrow::Cow::Borrowed(#x) });
+        .map(|x| quote! { std::borrow::Cow::Borrowed(#x) });
 
-    let plaintext_attributes_cow = settings.plaintext_attributes()
+    let plaintext_attributes_cow = settings
+        .plaintext_attributes()
         .into_iter()
-        .map(|x| quote!{ std::borrow::Cow::Borrowed(#x) });
-
+        .map(|x| quote! { std::borrow::Cow::Borrowed(#x) });
 
     let ident = settings.ident();
 
@@ -51,16 +44,6 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
     let expanded = quote! {
         #[automatically_derived]
         impl cipherstash_dynamodb::traits::Encryptable for #ident {
-            #[inline]
-            fn type_name() -> std::borrow::Cow<'static, str> {
-                std::borrow::Cow::Borrowed(#type_name)
-            }
-
-            #[inline]
-            fn sort_key_prefix() -> Option<std::borrow::Cow<'static, str>> {
-                #sort_key_prefix_impl
-            }
-
             fn protected_attributes() -> std::borrow::Cow<'static, [std::borrow::Cow<'static, str>]> {
                 std::borrow::Cow::Borrowed(&[#(#protected_attributes_cow,)*])
             }
@@ -71,7 +54,7 @@ pub(crate) fn derive_encryptable(input: DeriveInput) -> Result<TokenStream, syn:
 
             #[allow(clippy::needless_question_mark)]
             fn into_unsealed(self) -> cipherstash_dynamodb::crypto::Unsealed {
-                let mut unsealed = cipherstash_dynamodb::crypto::Unsealed::new_with_descriptor(<Self as cipherstash_dynamodb::traits::Encryptable>::type_name());
+                let mut unsealed = cipherstash_dynamodb::crypto::Unsealed::new_with_descriptor(<Self as cipherstash_dynamodb::traits::Identifiable>::type_name());
 
                 #(#into_unsealed_impl)*
 

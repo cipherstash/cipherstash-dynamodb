@@ -91,12 +91,12 @@ pub trait Identifiable {
     fn is_pk_encrypted() -> bool {
         false
     }
-}
 
-pub trait Encryptable: Debug + Sized {
     fn type_name() -> Cow<'static, str>;
     fn sort_key_prefix() -> Option<Cow<'static, str>>;
+}
 
+pub trait Encryptable: Debug + Sized + Identifiable {
     /// Defines what attributes are protected and should be encrypted for this type.
     ///
     /// Must be equal to or a superset of protected_attributes on the [`Decryptable`] type.
@@ -132,9 +132,6 @@ pub trait Searchable: Encryptable {
 }
 
 pub trait Decryptable: Sized {
-    fn type_name() -> Cow<'static, str>;
-    fn sort_key_prefix() -> Option<Cow<'static, str>>;
-
     /// Convert an `Unsealed` into a `Self`.
     fn from_unsealed(unsealed: Unsealed) -> Result<Self, SealError>;
 

@@ -106,21 +106,33 @@ where
         ))
 }
 
-pub fn encrypt_primary_key<I: Identifiable>(
-    k: impl Into<I::PrimaryKey>,
-    type_name: &str,
-    sort_key_prefix: Option<&str>,
-    cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
-) -> Result<PrimaryKeyParts, PrimaryKeyError> {
-    let PrimaryKeyParts { mut pk, mut sk } = k.into().into_parts(type_name, sort_key_prefix);
+// Contains all the necessary information to encrypt the primary key pair
+pub struct PreparedPrimaryKey {
+    pub primary_key_parts: PrimaryKeyParts,
+    pub is_pk_encrypted: bool,
+    pub is_sk_encrypted: bool,
+}
 
-    if I::is_pk_encrypted() {
-        pk = b64_encode(hmac(&pk, None, cipher)?);
+impl PreparedPrimaryKey {
+    pub fn new<R>(k: impl Into<R::PrimaryKey>) -> Self
+    where
+        R: Identifiable,
+    {
+        let primary_key_parts = k
+            .into()
+            .into_parts(&R::type_name(), R::sort_key_prefix().as_deref());
+
+        Self::new_from_parts::<R>(primary_key_parts)
     }
 
-    if I::is_sk_encrypted() {
-        sk = b64_encode(hmac(&sk, Some(pk.as_str()), cipher)?);
+    pub fn new_from_parts<R>(primary_key_parts: PrimaryKeyParts) -> Self
+    where
+        R: Identifiable,
+    {
+        Self {
+            primary_key_parts,
+            is_pk_encrypted: R::is_pk_encrypted(),
+            is_sk_encrypted: R::is_sk_encrypted(),
+        }
     }
-
-    Ok(PrimaryKeyParts { pk, sk })
 }

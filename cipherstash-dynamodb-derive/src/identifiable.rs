@@ -53,10 +53,27 @@ pub(crate) fn derive_identifiable(input: DeriveInput) -> Result<TokenStream, syn
             }
         }
     };
+    let type_name = &settings.type_name;
+
+    let sort_key_prefix_impl = if let Some(prefix) = &settings.sort_key_prefix {
+        quote! { Some(std::borrow::Cow::Borrowed(#prefix)) }
+    } else {
+        quote! { None }
+    };
 
     let expanded = quote! {
         impl cipherstash_dynamodb::traits::Identifiable for #ident {
             #primary_key_impl
+
+            #[inline]
+            fn type_name() -> std::borrow::Cow<'static, str> {
+                std::borrow::Cow::Borrowed(#type_name)
+            }
+
+            #[inline]
+            fn sort_key_prefix() -> Option<std::borrow::Cow<'static, str>> {
+                #sort_key_prefix_impl
+            }
 
             fn is_pk_encrypted() -> bool {
                 #is_partition_key_encrypted
