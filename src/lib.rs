@@ -1,14 +1,54 @@
 #![doc(html_no_source)]
 #![doc(html_favicon_url = "https://cipherstash.com/favicon.ico")]
-//! ## CipherStash for DynamoDB: Encrypted Tables for DynamoDB
+//! # CipherStash for DynamoDB
 //!
 //! Based on the CipherStash SDK and ZeroKMS key service, CipherStash for DynamoDB provides a simple interface for
 //! storing and retrieving encrypted data in DynamoDB.
 //!
-//! ### Requesting access to CipherStash for DynamoDB
+//! ## Code status
 //!
-//! CipherStash for DynamoDB requires an access token to use.
-//! If you would like to request access, please email us at [sales@cipherstash.com](mailto:sales@cipherstash.com) and we will be in touch.
+//! [![Test suite](https://github.com/cipherstash/cipherstash-dynamodb/actions/workflows/test.yml/badge.svg)](https://github.com/cipherstash/cipherstash-dynamodb/actions/workflows/test.yml) [![Published documentation](https://github.com/cipherstash/cipherstash-dynamodb/actions/workflows/deploy-public-docs.yml/badge.svg)](https://github.com/cipherstash/cipherstash-dynamodb/actions/workflows/deploy-public-docs.yml)
+//!
+//! Code documentation is available [here](https://cipherstash.com/rustdoc/cipherstash_dynamodb/index.html).
+//!
+//! ## Prerequisites
+//!
+//! You will need to have completed the following steps before using CipherStash for DynamoDB:
+//!
+//! 1. [Create a CipherStash account](#step-1---create-a-cipherstash-account)
+//! 2. [Install the CLI](#step-2---install-the-cli)
+//! 3. [Login and create a Dataset](#step-3---create-a-dataset)
+//! 4. [Init ZeroKMS](#step-4---init-zerokms)
+//!
+//! ### Step 1 - Create a CipherStash account
+//!
+//! To use CipherStash for DynamoDB, you must first [create a CipherStash account](https://cipherstash.com/signup).
+//!
+//! ### Step 2 - Install the CLI
+//!
+//! The `stash` CLI tool is required to create and manage datasets and keys used for encryption and decryption.
+//! Install the CLI by following the instructions in the [CLI reference doc](https://cipherstash.com/docs/reference/cli).
+//!
+//! ### Step 3 - Create a dataset and client key
+//!
+//! To use CipherStash for DynamoDB, you must create a dataset and a client key.
+//!
+//! 1. [Create a dataset](https://cipherstash.com/docs/how-to/creating-datasets)
+//! 2. [Create a client key](https://cipherstash.com/docs/how-to/creating-clients)
+//!
+//! ### Step 4 - Init ZeroKMS
+//!
+//! ZeroKMS uses a root key to encrypt and decrypt data.
+//! This key is initialized on upload of a Dataset configuration.
+//! This step is an artifact of the SQL implementation of CipherStash.
+//! For now, it is sufficient to upload an empty configuration.
+//!
+//! There is an empty `dataset.yml` in the root of the repository, ready to be uploaded.
+//! Upload it to ZeroKMS using the following command:
+//!
+//! ```bash
+//! stash datasets config upload --file dataset.yml --client-id $CS_CLIENT_ID --client-key $CS_CLIENT_KEY
+//! ```
 //!
 //! ## Usage
 //!

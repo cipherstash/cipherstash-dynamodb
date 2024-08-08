@@ -1,66 +1,54 @@
-# cipherstash-dynamodb
+<!-- cargo-rdme start -->
 
-## CipherStash for DynamoDB: Encrypted Tables for DynamoDB
+# CipherStash for DynamoDB
 
 Based on the CipherStash SDK and ZeroKMS key service, CipherStash for DynamoDB provides a simple interface for
 storing and retrieving encrypted data in DynamoDB.
 
-### Requesting access to CipherStash for DynamoDB
+## Code status
 
-CipherStash for DynamoDB requires an access token to use. If you would like to request access, please email us at [sales@cipherstash.com](mailto:sales@cipherstash.com) and we will be in touch.
+[![Test suite](https://github.com/cipherstash/cipherstash-dynamodb/actions/workflows/test.yml/badge.svg)](https://github.com/cipherstash/cipherstash-dynamodb/actions/workflows/test.yml) [![Published documentation](https://github.com/cipherstash/cipherstash-dynamodb/actions/workflows/deploy-public-docs.yml/badge.svg)](https://github.com/cipherstash/cipherstash-dynamodb/actions/workflows/deploy-public-docs.yml)
 
----
+Code documentation is available [here](https://cipherstash.com/rustdoc/cipherstash_dynamodb/index.html).
 
 ## Prerequisites
 
-### Install Stash CLI
+You will need to have completed the following steps before using CipherStash for DynamoDB:
 
-The `stash` CLI tool is required for creating an account and security credentials so that CipherStash for DynamoDB can interact with the ZeroKMS key server.
+1. [Create a CipherStash account](#step-1---create-a-cipherstash-account)
+2. [Install the CLI](#step-2---install-the-cli)
+3. [Login and create a Dataset](#step-3---create-a-dataset)
+4. [Init ZeroKMS](#step-4---init-zerokms)
 
-See [here](https://docs.cipherstash.com/reference/cli.html#install-the-cipherstash-cli) for instructions on how to download and install the `stash` CLI tool.
+### Step 1 - Create a CipherStash account
 
-### Sign up to create an account
+To use CipherStash for DynamoDB, you must first [create a CipherStash account](https://cipherstash.com/signup).
 
-Run `stash signup` and follow the on screen instructions.
+### Step 2 - Install the CLI
 
-### Login and create a Dataset
+The `stash` CLI tool is required to create and manage datasets and keys used for encryption and decryption.
+Install the CLI by following the instructions in the [CLI reference doc](https://cipherstash.com/docs/reference/cli).
 
-_The pages linked to below contain information that is generally applicable even though it is framed within the context of a Rails application_
+### Step 3 - Create a dataset and client key
 
-1. [Ensure `stash` is logged in](https://docs.cipherstash.com/tutorials/rails-getting-started/define.html#1-log-in)
+To use CipherStash for DynamoDB, you must create a dataset and a client key.
 
-2. [Create a Dataset](https://docs.cipherstash.com/tutorials/rails-getting-started/define.html#2-create-a-dataset)
+1. [Create a dataset](https://cipherstash.com/docs/how-to/creating-datasets)
+2. [Create a client key](https://cipherstash.com/docs/how-to/creating-clients)
 
-   In ZeroKMS, a Dataset contains a root key from which the cryptographic keys used to encrypt data and indexes are derived. Additionally, a Dataset describes the encryption settings for your data.
+### Step 4 - Init ZeroKMS
 
-   Since Cryptanamo manages the encryption & search settings itself using Rust traits and derive macros the ability to store encryption settings in a Dataset is not applicable.
-
-**IMPORTANT** : the following step will generate a secret that must be retained and will not be displayed again. Please ensure that the instructions are followed.
-
-3. [Create a Client](https://docs.cipherstash.com/tutorials/rails-getting-started/define.html#3-create-a-client)
-
-### Upload a dataset config
-
-CipherStash for DynamoDB fully manages the encrypted record and index settings.
-
-However, ZeroKMS currently only initializes the the root key material on upload of a Dataset configuration. This step should not be necessary and we are planning on changing ZeroKMS to initialize the key material on creation of a Dataset.
-
+ZeroKMS uses a root key to encrypt and decrypt data.
+This key is initialized on upload of a Dataset configuration.
+This step is an artifact of the SQL implementation of CipherStash.
 For now, it is sufficient to upload an empty configuration.
 
 There is an empty `dataset.yml` in the root of the repository, ready to be uploaded.
-
 Upload it to ZeroKMS using the following command:
 
-`stash datasets config upload --file dataset.yml --client-id $CS_CLIENT_ID --client-key $CS_CLIENT_KEY`
-
----
-
-<!-- cargo-rdme start -->
-
-## CipherStash for DynamoDB: Encrypted Tables for DynamoDB
-
-Based on the CipherStash SDK and ZeroKMS key service, CipherStash for DynamoDB provides a simple interface for
-storing and retrieving encrypted data in DynamoDB.
+```bash
+stash datasets config upload --file dataset.yml --client-id $CS_CLIENT_ID --client-key $CS_CLIENT_KEY
+```
 
 ## Usage
 
@@ -107,9 +95,9 @@ struct User {
 
 These derive macros will generate implementations for the following traits of the same name:
 
-- `Decryptable` - a trait that allows you to decrypt a record from DynamoDB
-- `Encryptable` - a trait that allows you to encrypt a record for storage in DynamoDB
-- `Searchable` - a trait that allows you to search for records in DynamoDB
+* `Decryptable` - a trait that allows you to decrypt a record from DynamoDB
+* `Encryptable` - a trait that allows you to encrypt a record for storage in DynamoDB
+* `Searchable`  - a trait that allows you to search for records in DynamoDB
 
 The above example is the minimum required to use CipherStash for DynamoDB however you can expand capabilities via several macros.
 
@@ -193,6 +181,27 @@ struct User {
 
 Sort keys will contain that value and will be prefixed by the sort key prefix.
 
+#### Explicit `pk` and `sk` fields
+
+It's common in DynamoDB to use fields on your records called `pk` and `sk` for your partition
+and sort keys. To support this behaviour these are treated as special keywords in cipherstash-dynamodb.
+If your field contains a `pk` or an `sk` field they must be annotated with the `#[partition_key]` and `#[sort_key]` attributes respectively.
+
+```rust
+use cipherstash_dynamodb::Encryptable;
+
+#[derive(Debug, Encryptable)]
+struct User {
+    #[partition_key]
+    pk: String,
+    #[sort_key]
+    sk: String,
+
+    #[cipherstash(skip)]
+    not_required: String,
+}
+```
+
 ## Indexing
 
 cipherstash-dynamodb supports indexing of encrypted fields for searching.
@@ -207,7 +216,7 @@ struct User {
     #[cipherstash(query = "exact")]
     #[partition_key]
     email: String,
-
+    
    #[cipherstash(query = "prefix")]
     name: String,
 }
@@ -228,7 +237,7 @@ struct User {
     #[cipherstash(query = "exact", compound = "email#name")]
     #[partition_key]
     email: String,
-
+    
    #[cipherstash(query = "prefix", compound = "email#name")]
     name: String,
 }
@@ -236,6 +245,7 @@ struct User {
 
 It's also possible to add more than one query attribute to support querying records in multiple
 different ways.
+
 
 ```rust
 use cipherstash_dynamodb::Encryptable;
@@ -246,14 +256,13 @@ struct User {
     #[cipherstash(query = "exact", compound = "email#name")]
     #[partition_key]
     email: String,
-
+    
    #[cipherstash(query = "prefix")]
    #[cipherstash(query = "exact")]
    #[cipherstash(query = "prefix", compound = "email#name")]
     name: String,
 }
 ```
-
 It's important to note that the more annotations that are added to a field the more index terms that will be generated.
 Adding too many attributes could result in a proliferation of terms and data.
 
@@ -380,7 +389,7 @@ pub struct UserView {
     #[cipherstash(skip)]
     #[partition_key]
     email: String,
-
+    
     #[cipherstash(query = "prefix")]
     name: String,
 }
@@ -437,3 +446,8 @@ When self-hosting ZeroKMS, we recommend running it in different account to your 
 - [ ] Sort keys are not currently hashed (and should be)
 
 <!-- cargo-rdme end -->
+
+## Contributing
+
+We welcome contributions to CipherStash for DynamoDB.
+We use `rdme` to generate the README and documentation, and there is a helper script to regenerate the README in the `scripts` directory `./scripts/generate-readme.sh`.
