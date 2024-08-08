@@ -264,13 +264,6 @@ impl<D> EncryptedTable<D> {
         &self,
         k: impl Into<E::PrimaryKey>,
     ) -> Result<DynamoRecordPatch, DeleteError> {
-        // let PrimaryKeyParts { pk, sk } = encrypt_primary_key::<E>(
-        //     k,
-        //     &E::type_name(),
-        //     E::sort_key_prefix().as_deref(),
-        //     &self.cipher,
-        // )?;
-
         let PrimaryKeyParts { pk, sk } =
             self.encrypt_primary_key_parts(PreparedPrimaryKey::new::<E>(k))?;
 
