@@ -8,7 +8,7 @@ pub use self::{
 use crate::{
     crypto::*,
     errors::*,
-    traits::{Decryptable, PrimaryKey, PrimaryKeyParts, Searchable},
+    traits::{Decryptable, PrimaryKey, PrimaryKeyError, PrimaryKeyParts, Searchable},
     Identifiable, IndexType,
 };
 use aws_sdk_dynamodb::types::{AttributeValue, Delete, Put, TransactWriteItem};
@@ -264,12 +264,15 @@ impl<D> EncryptedTable<D> {
         &self,
         k: impl Into<E::PrimaryKey>,
     ) -> Result<DynamoRecordPatch, DeleteError> {
-        let PrimaryKeyParts { pk, sk } = encrypt_primary_key::<E>(
-            k,
-            &E::type_name(),
-            E::sort_key_prefix().as_deref(),
-            &self.cipher,
-        )?;
+        // let PrimaryKeyParts { pk, sk } = encrypt_primary_key::<E>(
+        //     k,
+        //     &E::type_name(),
+        //     E::sort_key_prefix().as_deref(),
+        //     &self.cipher,
+        // )?;
+
+        let PrimaryKeyParts { pk, sk } =
+            self.encrypt_primary_key_parts(PreparedPrimaryKey::new::<E>(k))?;
 
         let delete_records = all_index_keys(&sk, E::protected_indexes())
             .into_iter()
@@ -343,6 +346,23 @@ impl<D> EncryptedTable<D> {
             delete_records,
         })
     }
+
+    pub fn encrypt_primary_key_parts(
+        &self,
+        prepared_primary_key: PreparedPrimaryKey,
+    ) -> Result<PrimaryKeyParts, PrimaryKeyError> {
+        let PrimaryKeyParts { mut pk, mut sk } = prepared_primary_key.primary_key_parts;
+
+        if prepared_primary_key.is_pk_encrypted {
+            pk = b64_encode(hmac(&pk, None, &self.cipher)?);
+        }
+
+        if prepared_primary_key.is_sk_encrypted {
+            sk = b64_encode(hmac(&sk, Some(pk.as_str()), &self.cipher)?);
+        }
+
+        Ok(PrimaryKeyParts { pk, sk })
+    }
 }
 
 impl EncryptedTable<Dynamo> {
@@ -365,12 +385,8 @@ impl EncryptedTable<Dynamo> {
     where
         T: Decryptable + Identifiable,
     {
-        let PrimaryKeyParts { pk, sk } = encrypt_primary_key::<T>(
-            k,
-            &T::type_name(),
-            T::sort_key_prefix().as_deref(),
-            &self.cipher,
-        )?;
+        let PrimaryKeyParts { pk, sk } =
+            self.encrypt_primary_key_parts(PreparedPrimaryKey::new::<T>(k))?;
 
         let result = self
             .db

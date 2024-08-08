@@ -106,6 +106,30 @@ where
         ))
 }
 
+// Contains all the necessary information to encrypt the primary key pair
+pub struct PreparedPrimaryKey {
+    pub primary_key_parts: PrimaryKeyParts,
+    pub is_pk_encrypted: bool,
+    pub is_sk_encrypted: bool,
+}
+
+impl PreparedPrimaryKey {
+    pub fn new<R>(k: impl Into<R::PrimaryKey>) -> Self
+    where
+        R: Identifiable,
+    {
+        let primary_key_parts = k
+            .into()
+            .into_parts(&R::type_name(), R::sort_key_prefix().as_deref());
+
+        Self {
+            primary_key_parts,
+            is_pk_encrypted: R::is_pk_encrypted(),
+            is_sk_encrypted: R::is_sk_encrypted(),
+        }
+    }
+}
+
 pub fn encrypt_primary_key<I: Identifiable>(
     k: impl Into<I::PrimaryKey>,
     type_name: &str,

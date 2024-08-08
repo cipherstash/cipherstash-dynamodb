@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 
 use crate::{
     traits::{Decryptable, Searchable},
-    IndexType, SingleIndex,
+    Identifiable, IndexType, SingleIndex,
 };
 use cipherstash_client::encryption::{compound_indexer::CompoundIndex, IndexTerm};
 
@@ -115,7 +115,7 @@ where
 
 impl<'t, S> QueryBuilder<'t, S, Dynamo>
 where
-    S: Searchable,
+    S: Searchable + Identifiable,
 {
     pub async fn load<T: Decryptable>(self) -> Result<Vec<T>, QueryError> {
         let (index_name, index, plaintext, builder) = self.build()?;
@@ -162,7 +162,7 @@ where
 
 impl<'t, S> QueryBuilder<'t, S, Dynamo>
 where
-    S: Searchable + Decryptable,
+    S: Searchable + Decryptable + Identifiable,
 {
     pub async fn send(self) -> Result<Vec<S>, QueryError> {
         self.load::<S>().await
