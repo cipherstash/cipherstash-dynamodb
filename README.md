@@ -13,7 +13,7 @@ Code documentation is available [here](https://cipherstash.com/rustdoc/ciphersta
 
 ## Prerequisites
 
-You will need to have completed the following steps before using CipherStash for DynamoDB:
+Complete the following steps before using CipherStash for DynamoDB:
 
 1. [Create a CipherStash account](#step-1---create-a-cipherstash-account)
 2. [Install the CLI](#step-2---install-the-cli)
@@ -22,7 +22,7 @@ You will need to have completed the following steps before using CipherStash for
 
 ### Step 1 - Create a CipherStash account
 
-To use CipherStash for DynamoDB, you must first [create a CipherStash account](https://cipherstash.com/signup).
+To use CipherStash for DynamoDB, first [create a CipherStash account](https://cipherstash.com/signup).
 
 ### Step 2 - Install the CLI
 
@@ -31,7 +31,7 @@ Install the CLI by following the instructions in the [CLI reference doc](https:/
 
 ### Step 3 - Create a dataset and client key
 
-To use CipherStash for DynamoDB, you must create a dataset and a client key.
+To use CipherStash for DynamoDB, first create a dataset and a client key.
 
 1. [Create a dataset](https://cipherstash.com/docs/how-to/creating-datasets)
 2. [Create a client key](https://cipherstash.com/docs/how-to/creating-clients)
@@ -50,10 +50,10 @@ Upload it to ZeroKMS using the following command:
 stash datasets config upload --file dataset.yml --client-id $CS_CLIENT_ID --client-key $CS_CLIENT_KEY
 ```
 
-## Usage
+## Using CipherStash for DynamoDB
 
-To use CipherStash for DynamoDB, you must first create a table in DynamoDB.
-The table must have a at least partition key, sort key, and term field - all of type String.
+First, create a table in DynamoDB.
+The table must have at least a partition key, a sort key, and a term field - all of type String.
 
 CipherStash for DynamoDB also expects a Global Secondary Index called "TermIndex" to exist if you want to
 search and query against records. This index should project all fields and have a key schema
@@ -77,9 +77,9 @@ aws dynamodb create-table \
 
 See below for more information on schema design for CipherStash for DynamoDB tables.
 
-### Annotating a cipherstash-dynamodb Type
+### Annotating a cipherstash-dynamodb type
 
-To use CipherStash for DynamoDB, you must first annotate a struct with the `Encryptable`, `Searchable` and
+Next, annotate a struct with the `Encryptable`, `Searchable` and
 `Decryptable` derive macros.
 
 ```rust
@@ -99,9 +99,9 @@ These derive macros will generate implementations for the following traits of th
 * `Encryptable` - a trait that allows you to encrypt a record for storage in DynamoDB
 * `Searchable`  - a trait that allows you to search for records in DynamoDB
 
-The above example is the minimum required to use CipherStash for DynamoDB however you can expand capabilities via several macros.
+The above example is the minimum required to use CipherStash for DynamoDB, however you can expand capabilities via several macros.
 
-### Controlling Encryption
+### Controlling encryption
 
 By default, all fields on an annotated struct are stored encrypted in the table.
 
@@ -159,7 +159,7 @@ struct User {
 }
 ```
 
-#### Dynamic Sort keys
+#### Dynamic sort keys
 
 CipherStash for DynamoDB also supports specifying the sort key dynamically based on a field on the struct.
 You can choose the field using the `#[sort_key]` attribute.
@@ -205,7 +205,7 @@ struct User {
 ## Indexing
 
 cipherstash-dynamodb supports indexing of encrypted fields for searching.
-Exact, prefix and compound match types are currently supported.
+Exact, prefix, and compound match types are currently supported.
 To index a field, use the `query` attribute:
 
 ```rust
@@ -275,7 +275,7 @@ The previous example for example would have the following terms generated:
 
 This would mean a total of 53 records would be inserted.
 
-## Storing and Retrieving Records
+## Storing and retrieving records
 
 Interacting with a table in DynamoDB is done via the [EncryptedTable] struct.
 
@@ -296,11 +296,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-All operations on the table are `async` and so you will need a runtime to execute them.
+All operations on the table are `async`, so you will need a runtime to execute them.
 In the above example, we connect to a DynamoDB running in a local container and initialize an `EncryptedTable` struct
 for the "users" table.
 
-### Putting Records
+### Putting records
 
 To store a record in the table, use the [`EncryptedTable::put`] method:
 
@@ -327,7 +327,7 @@ To delete a record, use the [`EncryptedTable::delete`] method:
 table.delete::<User>("jane@smith.org").await?;
 ```
 
-### Querying Records
+### Querying records
 
 To query records, use the [`EncryptedTable::query`] method which returns a builder:
 
@@ -353,7 +353,7 @@ let results: Vec<User> = table
 Note: if you don't have the correct indexes defined this query builder will return a runtime
 error.
 
-## Table Verticalization
+## Table verticalization
 
 CipherStash for DynamoDB uses a technique called "verticalization" which is a popular approach to storing data in DynamoDB.
 In practice, this means you can store multiple types in the same table.
@@ -377,7 +377,7 @@ struct License {
 }
 ```
 
-### Data Views
+### Data views
 
 In some cases, these types might simply be a different representation of the same data based on query requirements.
 For example, you might want to query users by name using a prefix (say for using a "type ahead") but only return the name.
@@ -411,7 +411,7 @@ So long as the indexes are equivalent, you can mix and match types.
 
 ## Internals
 
-### Table Schema
+### Table schema
 
 Tables created by CipherStash for DynamoDB have the following schema:
 
