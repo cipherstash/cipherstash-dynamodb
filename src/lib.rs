@@ -1,5 +1,7 @@
-#![doc(html_no_source)]
-#![doc(html_favicon_url = "https://cipherstash.com/favicon.ico")]
+#![doc(
+    html_favicon_url = "https://cipherstash.com/favicon.ico",
+    html_logo_url = "https://raw.githubusercontent.com/cipherstash/meta/main/cipherstash-logo.svg"
+)]
 //! # CipherStash for DynamoDB
 //!
 //! Based on the CipherStash SDK and ZeroKMS key service, CipherStash for DynamoDB provides a simple interface for
@@ -567,7 +569,7 @@
 //!
 //! ## Issues and TODO
 //!
-//! - [ ] Sort keys are not currently hashed (and should be)
+//! - [ ] Sort keys are not currently hashed (but this may change in the future)
 //!
 pub mod crypto;
 pub mod encrypted_table;
