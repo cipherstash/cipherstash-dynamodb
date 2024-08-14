@@ -11,7 +11,7 @@ pub use cipherstash_client::{
 
 pub use aws_sdk_dynamodb::error::BuildError;
 
-/// Error returned by [`EncryptedTable::put`] when indexing, encrypting and inserting records into DynamoDB
+/// Error returned by `EncryptedTable::put` when indexing, encrypting and inserting records into DynamoDB
 #[derive(Error, Debug)]
 pub enum PutError {
     #[error("AwsError: {0}")]
@@ -28,7 +28,7 @@ pub enum PutError {
     Encryption(#[from] EncryptionError),
 }
 
-/// Error returned by [`EncryptedTable::get`] when retrieving and decrypting records from DynamoDB
+/// Error returned by `EncryptedTable::get` when retrieving and decrypting records from DynamoDB
 #[derive(Error, Debug)]
 pub enum GetError {
     #[error("SealError: {0}")]
@@ -41,7 +41,7 @@ pub enum GetError {
     ReadConversion(#[from] ReadConversionError),
 }
 
-/// Error returned by [`EncryptedTable::delete`] when indexing and deleting records in DynamoDB
+/// Error returned by `EncryptedTable::delete` when indexing and deleting records in DynamoDB
 #[derive(Error, Debug)]
 pub enum DeleteError {
     #[error("Encryption Error: {0}")]
@@ -52,7 +52,7 @@ pub enum DeleteError {
     Aws(String),
 }
 
-/// Error returned by [`EncryptedTable::query`] when indexing, retrieving and decrypting records from DynamoDB
+/// Error returned by `EncryptedTable::query` when indexing, retrieving and decrypting records from DynamoDB
 #[derive(Error, Debug)]
 pub enum QueryError {
     #[error("InvaldQuery: {0}")]
@@ -71,7 +71,7 @@ pub enum QueryError {
     Other(String),
 }
 
-/// Error returned by [`EncryptedTable::init`] when connecting to CipherStash services
+/// Error returned by `EncryptedTable::init` when connecting to CipherStash services
 #[derive(Error, Debug)]
 pub enum InitError {
     #[error("ConfigError: {0}")]
@@ -80,7 +80,7 @@ pub enum InitError {
     LoadConfig(#[from] LoadConfigError),
 }
 
-/// The [`Error`] type abstracts all errors returned by `cipherstash-dynamodb` for easy use with the `?` operator.
+/// The [`enum@Error`] type abstracts all errors returned by `cipherstash-dynamodb` for easy use with the `?` operator.
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("InitError: {0}")]
