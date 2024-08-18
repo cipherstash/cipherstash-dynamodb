@@ -14,6 +14,7 @@ defaults:
 
 env:
   CARGO_REGISTRIES_CIPHERSTASH_TOKEN: "Token ${{ secrets.CLOUDSMITH_CARGO_TOKEN }}"
+  RUSTFLAGS: "-D warnings"
 
 jobs:
   test:

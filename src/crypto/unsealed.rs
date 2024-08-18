@@ -14,6 +14,12 @@ pub struct Unsealed {
     unprotected: HashMap<String, TableAttribute>,
 }
 
+impl Default for Unsealed {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Unsealed {
     pub fn new() -> Self {
         Self {

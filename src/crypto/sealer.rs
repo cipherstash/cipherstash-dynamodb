@@ -16,6 +16,14 @@ use cipherstash_client::{
 use itertools::Itertools;
 use std::{borrow::Cow, collections::HashMap, ops::Deref};
 
+/// The combination of plaintext, index, name and index type for a particular field
+pub type UnsealedIndex = (
+    ComposablePlaintext,
+    Box<dyn ComposableIndex>,
+    Cow<'static, str>,
+    IndexType,
+);
+
 /// Builder pattern for sealing a record of type, `T`.
 pub struct Sealer {
     pub(crate) pk: String,
@@ -26,12 +34,7 @@ pub struct Sealer {
 
     pub(crate) type_name: Cow<'static, str>,
 
-    pub(crate) unsealed_indexes: Vec<(
-        ComposablePlaintext,
-        Box<dyn ComposableIndex>,
-        Cow<'static, str>,
-        IndexType,
-    )>,
+    pub(crate) unsealed_indexes: Vec<UnsealedIndex>,
 
     pub(crate) unsealed: Unsealed,
 }
