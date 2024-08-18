@@ -7,22 +7,14 @@ pub trait PrimaryKey: private::Sealed {
     type Pk;
     type Sk;
 
-    fn into_parts(
-        self,
-        type_name: &str,
-        sort_key_prefix: Option<&str>,
-    ) -> PrimaryKeyParts;
+    fn into_parts(self, type_name: &str, sort_key_prefix: Option<&str>) -> PrimaryKeyParts;
 }
 
 impl PrimaryKey for Pk {
     type Pk = String;
     type Sk = ();
 
-    fn into_parts(
-        self,
-        type_name: &str,
-        _sort_key_prefix: Option<&str>,
-    ) -> PrimaryKeyParts {
+    fn into_parts(self, type_name: &str, _sort_key_prefix: Option<&str>) -> PrimaryKeyParts {
         PrimaryKeyParts {
             pk: self.0,
             sk: type_name.into(),
@@ -34,11 +26,7 @@ impl PrimaryKey for PkSk {
     type Pk = String;
     type Sk = String;
 
-    fn into_parts(
-        self,
-        _type_name: &str,
-        sort_key_prefix: Option<&str>,
-    ) -> PrimaryKeyParts {
+    fn into_parts(self, _type_name: &str, sort_key_prefix: Option<&str>) -> PrimaryKeyParts {
         PrimaryKeyParts {
             pk: self.0,
             sk: if let Some(prefix) = sort_key_prefix {
