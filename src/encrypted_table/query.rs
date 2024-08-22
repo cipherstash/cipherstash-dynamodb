@@ -23,10 +23,10 @@ use super::{Dynamo, EncryptedTable, QueryError};
  * D = Database
  *
  */
-pub struct QueryBuilder<'t, S, D = Dynamo> {
+pub struct QueryBuilder<S, B = ()> {
     parts: Vec<(String, SingleIndex, Plaintext)>,
-    table: &'t EncryptedTable<D>,
-    __table: PhantomData<S>,
+    backend: B,
+    __searchable: PhantomData<S>,
 }
 
 pub struct PreparedQuery {
@@ -94,15 +94,22 @@ impl PreparedQuery {
     }
 }
 
-impl<'t, S, D> QueryBuilder<'t, S, D>
-where
-    S: Searchable,
-{
-    pub fn new(table: &'t EncryptedTable<D>) -> Self {
+impl<S> QueryBuilder<S> {
+    pub fn new() -> Self {
         Self {
             parts: vec![],
-            table,
-            __table: Default::default(),
+            backend: Default::default(),
+            __searchable: Default::default(),
+        }
+    }
+}
+
+impl<S, B> QueryBuilder<S, B> {
+    pub fn with_backend(backend: B) -> Self {
+        Self {
+            parts: vec![],
+            backend,
+            __searchable: Default::default(),
         }
     }
 
@@ -117,8 +124,13 @@ where
             .push((name.into(), SingleIndex::Prefix, plaintext.into()));
         self
     }
+}
 
-    fn build(self) -> Result<PreparedQuery, QueryError> {
+impl<S, B> QueryBuilder<S, B>
+where
+    S: Searchable,
+{
+    pub fn build(self) -> Result<PreparedQuery, QueryError> {
         let items_len = self.parts.len();
 
         // this is the simplest way to brute force the index names but relies on some gross
@@ -184,12 +196,12 @@ where
     }
 }
 
-impl<'t, S> QueryBuilder<'t, S, Dynamo>
+impl<S> QueryBuilder<S, &EncryptedTable<Dynamo>>
 where
     S: Searchable + Identifiable,
 {
     pub async fn load<T: Decryptable>(self) -> Result<Vec<T>, QueryError> {
-        let table = self.table;
+        let table = self.backend;
         let query = self.build()?;
 
         let items = query.send(table).await?;
@@ -199,7 +211,7 @@ where
     }
 }
 
-impl<'t, S> QueryBuilder<'t, S, Dynamo>
+impl<S> QueryBuilder<S, &EncryptedTable<Dynamo>>
 where
     S: Searchable + Decryptable + Identifiable,
 {

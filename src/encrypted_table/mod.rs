@@ -14,7 +14,11 @@ use crate::{
 use aws_sdk_dynamodb::types::{AttributeValue, Delete, Put, TransactWriteItem};
 use cipherstash_client::{
     config::{console_config::ConsoleConfig, zero_kms_config::ZeroKMSConfig},
-    credentials::{auto_refresh::AutoRefresh, service_credentials::ServiceCredentials},
+    credentials::{
+        auto_refresh::AutoRefresh,
+        service_credentials::{ServiceCredentials, ServiceToken},
+        Credentials,
+    },
     encryption::Encryption,
     zero_kms::ZeroKMS,
 };
@@ -46,9 +50,9 @@ pub struct EncryptedTable<D = Dynamo> {
 }
 
 impl<D> EncryptedTable<D> {
-    // option here to generate query params
-
-    // option here to seal
+    pub fn cipher(&self) -> &Encryption<impl Credentials<Token = ServiceToken>> {
+        self.cipher.as_ref()
+    }
 }
 
 impl EncryptedTable<Headless> {
@@ -209,11 +213,11 @@ impl DynamoRecordPatch {
 }
 
 impl<D> EncryptedTable<D> {
-    pub fn query<S>(&self) -> QueryBuilder<S, D>
+    pub fn query<S>(&self) -> QueryBuilder<S, &Self>
     where
         S: Searchable,
     {
-        QueryBuilder::new(self)
+        QueryBuilder::with_backend(self)
     }
 
     pub async fn unseal_all(
