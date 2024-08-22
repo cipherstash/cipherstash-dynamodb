@@ -1,10 +1,13 @@
 use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
-use cipherstash_client::encryption::{
-    compound_indexer::{ComposableIndex, ComposablePlaintext},
-    Plaintext,
+use cipherstash_client::{
+    credentials::{service_credentials::ServiceToken, Credentials},
+    encryption::{
+        compound_indexer::{ComposableIndex, ComposablePlaintext},
+        Encryption, Plaintext,
+    },
 };
 use itertools::Itertools;
-use std::marker::PhantomData;
+use std::{collections::HashMap, marker::PhantomData};
 
 use crate::{
     traits::{Decryptable, Searchable},
@@ -24,6 +27,71 @@ pub struct QueryBuilder<'t, S, D = Dynamo> {
     parts: Vec<(String, SingleIndex, Plaintext)>,
     table: &'t EncryptedTable<D>,
     __table: PhantomData<S>,
+}
+
+pub struct PreparedQuery {
+    index_name: String,
+    type_name: String,
+    composed_index: Box<dyn ComposableIndex>,
+    plaintext: ComposablePlaintext,
+}
+
+impl PreparedQuery {
+    pub async fn encrypt(
+        self,
+        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+    ) -> Result<AttributeValue, QueryError> {
+        let PreparedQuery {
+            index_name,
+            composed_index,
+            plaintext,
+            type_name,
+        } = self;
+
+        let index_term = cipher.compound_query(
+            &CompoundIndex::new(composed_index),
+            plaintext,
+            Some(format!("{}#{}", type_name, index_name)),
+            12,
+        )?;
+
+        // With DynamoDB queries must always return a single term
+        let term = if let IndexTerm::Binary(x) = index_term {
+            AttributeValue::B(Blob::new(x))
+        } else {
+            Err(QueryError::Other(format!(
+                "Returned IndexTerm had invalid type: {index_term:?}"
+            )))?
+        };
+
+        Ok(term)
+    }
+
+    pub async fn send(
+        self,
+        table: &EncryptedTable<Dynamo>,
+    ) -> Result<Vec<HashMap<String, AttributeValue>>, QueryError> {
+        let term = self.encrypt(&table.cipher).await?;
+
+        let query = table
+            .db
+            .query()
+            .table_name(&table.db.table_name)
+            .index_name("TermIndex")
+            .key_condition_expression("term = :term")
+            .expression_attribute_values(":term", term);
+
+        let result = query
+            .send()
+            .await
+            .map_err(|e| QueryError::AwsError(format!("{e:?}")))?;
+
+        let items = result
+            .items
+            .ok_or_else(|| QueryError::AwsError("Expected items entry on aws response".into()))?;
+
+        Ok(items)
+    }
 }
 
 impl<'t, S, D> QueryBuilder<'t, S, D>
@@ -50,9 +118,7 @@ where
         self
     }
 
-    fn build(
-        self,
-    ) -> Result<(String, Box<dyn ComposableIndex>, ComposablePlaintext, Self), QueryError> {
+    fn build(self) -> Result<PreparedQuery, QueryError> {
         let items_len = self.parts.len();
 
         // this is the simplest way to brute force the index names but relies on some gross
@@ -61,7 +127,7 @@ where
             let (indexes, plaintexts): (Vec<(&String, &SingleIndex)>, Vec<&Plaintext>) =
                 perm.into_iter().map(|x| ((&x.0, &x.1), &x.2)).unzip();
 
-            let name = indexes.iter().map(|(index_name, _)| index_name).join("#");
+            let index_name = indexes.iter().map(|(index_name, _)| index_name).join("#");
 
             let mut indexes_iter = indexes.iter().map(|(_, index)| **index);
 
@@ -92,7 +158,7 @@ where
                 }
             };
 
-            if let Some(index) = S::index_by_name(name.as_str(), index_type) {
+            if let Some(composed_index) = S::index_by_name(index_name.as_str(), index_type) {
                 let mut plaintext = ComposablePlaintext::new(plaintexts[0].clone());
 
                 for p in plaintexts[1..].iter() {
@@ -101,7 +167,12 @@ where
                         .expect("Failed to compose");
                 }
 
-                return Ok((name, index, plaintext, self));
+                return Ok(PreparedQuery {
+                    index_name,
+                    type_name: S::type_name().to_string(),
+                    plaintext,
+                    composed_index,
+                });
             }
         }
 
@@ -118,43 +189,11 @@ where
     S: Searchable + Identifiable,
 {
     pub async fn load<T: Decryptable>(self) -> Result<Vec<T>, QueryError> {
-        let (index_name, index, plaintext, builder) = self.build()?;
+        let table = self.table;
+        let query = self.build()?;
 
-        let index_term = builder.table.cipher.compound_query(
-            &CompoundIndex::new(index),
-            plaintext,
-            Some(format!("{}#{}", S::type_name(), index_name)),
-            12,
-        )?;
-
-        // With DynamoDB queries must always return a single term
-        let term = if let IndexTerm::Binary(x) = index_term {
-            AttributeValue::B(Blob::new(x))
-        } else {
-            Err(QueryError::Other(format!(
-                "Returned IndexTerm had invalid type: {index_term:?}"
-            )))?
-        };
-
-        let query = builder
-            .table
-            .db
-            .query()
-            .table_name(&builder.table.db.table_name)
-            .index_name("TermIndex")
-            .key_condition_expression("term = :term")
-            .expression_attribute_values(":term", term);
-
-        let result = query
-            .send()
-            .await
-            .map_err(|e| QueryError::AwsError(format!("{e:?}")))?;
-
-        let items = result
-            .items
-            .ok_or_else(|| QueryError::AwsError("Expected items entry on aws response".into()))?;
-
-        let results = builder.table.decrypt_all(items).await?;
+        let items = query.send(table).await?;
+        let results = table.decrypt_all(items).await?;
 
         Ok(results)
     }
