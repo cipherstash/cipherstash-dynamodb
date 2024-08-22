@@ -94,6 +94,12 @@ impl PreparedQuery {
     }
 }
 
+impl<S> Default for QueryBuilder<S> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<S> QueryBuilder<S> {
     pub fn new() -> Self {
         Self {

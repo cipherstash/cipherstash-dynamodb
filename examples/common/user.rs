@@ -30,8 +30,8 @@ impl User {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::borrow::Cow;
     use cipherstash_dynamodb::{IndexType, SingleIndex};
+    use std::borrow::Cow;
 
     #[test]
     fn test_cipherstash_typename() {
@@ -58,12 +58,18 @@ mod tests {
         assert_eq!(
             User::protected_indexes(),
             vec![
-                (Cow::Borrowed("email"), IndexType::Single(SingleIndex::Exact)),
+                (
+                    Cow::Borrowed("email"),
+                    IndexType::Single(SingleIndex::Exact)
+                ),
                 (
                     Cow::Borrowed("email#name"),
                     IndexType::Compound2((SingleIndex::Exact, SingleIndex::Prefix))
                 ),
-                (Cow::Borrowed("name"), IndexType::Single(SingleIndex::Prefix)),
+                (
+                    Cow::Borrowed("name"),
+                    IndexType::Single(SingleIndex::Prefix)
+                ),
             ]
         );
     }
