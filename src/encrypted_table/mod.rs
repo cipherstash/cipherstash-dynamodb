@@ -19,7 +19,7 @@ use cipherstash_client::{
         service_credentials::{ServiceCredentials, ServiceToken},
         Credentials,
     },
-    encryption::Encryption,
+    encryption::{Encryption, Plaintext},
     zero_kms::ZeroKMS,
 };
 use log::info;
@@ -135,6 +135,24 @@ impl PreparedRecord {
             protected_attributes,
             sealer,
         }
+    }
+
+    /// Get all the [`Plaintext`] protected attributes from the [`PreparedRecord`]
+    pub fn protected(&self) -> impl Iterator<Item = (&str, &Plaintext)> {
+        self.sealer
+            .unsealed
+            .protected()
+            .iter()
+            .map(|(key, (plaintext, _descriptor))| (key.as_str(), plaintext))
+    }
+
+    /// Get all the unprotected attributes from the [`PreparedRecord`]
+    pub fn unprotected(&self) -> impl Iterator<Item = (&str, &TableAttribute)> {
+        self.sealer
+            .unsealed
+            .unprotected()
+            .iter()
+            .map(|(key, attr)| (key.as_str(), attr))
     }
 
     pub fn prepare_record<R>(record: R) -> Result<Self, SealError>

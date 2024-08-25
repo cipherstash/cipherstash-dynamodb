@@ -37,6 +37,14 @@ impl Unsealed {
         }
     }
 
+    pub fn protected(&self) -> &HashMap<String, (Plaintext, String)> {
+        &self.protected
+    }
+
+    pub fn unprotected(&self) -> &HashMap<String, TableAttribute> {
+        &self.unprotected
+    }
+
     pub fn get_protected(&self, name: &str) -> Result<&Plaintext, SealError> {
         let (plaintext, _) = self
             .protected
@@ -61,10 +69,6 @@ impl Unsealed {
 
     pub fn add_unprotected(&mut self, name: impl Into<String>, attribute: TableAttribute) {
         self.unprotected.insert(name.into(), attribute);
-    }
-
-    pub(crate) fn unprotected(&self) -> HashMap<String, TableAttribute> {
-        self.unprotected.clone()
     }
 
     /// Remove and return a protected value along with its descriptor.

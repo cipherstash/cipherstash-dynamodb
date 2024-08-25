@@ -213,7 +213,7 @@ impl Sealer {
 
             table_entries.push((
                 PrimaryKeyParts { pk, sk },
-                record.unsealed.unprotected(),
+                record.unsealed.unprotected().clone(),
                 terms,
             ));
         }
