@@ -107,6 +107,23 @@ pub struct PreparedRecord {
     sealer: Sealer,
 }
 
+pub struct PreparedDelete {
+    primary_key: PreparedPrimaryKey,
+    protected_indexes: Cow<'static, [(Cow<'static, str>, IndexType)]>,
+}
+
+impl PreparedDelete {
+    pub fn new<S: Searchable + Identifiable>(k: impl Into<S::PrimaryKey>) -> Self {
+        let primary_key = PreparedPrimaryKey::new::<S>(k);
+        let protected_indexes = S::protected_indexes();
+
+        Self {
+            primary_key,
+            protected_indexes,
+        }
+    }
+}
+
 impl PreparedRecord {
     pub(crate) fn new(
         protected_indexes: Cow<'static, [(Cow<'static, str>, IndexType)]>,
@@ -264,14 +281,13 @@ impl<D> EncryptedTable<D> {
         Ok(item.into_value()?)
     }
 
-    pub async fn create_delete_patch<E: Searchable + Identifiable>(
+    pub async fn create_delete_patch(
         &self,
-        k: impl Into<E::PrimaryKey>,
+        delete: PreparedDelete,
     ) -> Result<DynamoRecordPatch, DeleteError> {
-        let PrimaryKeyParts { pk, sk } =
-            self.encrypt_primary_key_parts(PreparedPrimaryKey::new::<E>(k))?;
+        let PrimaryKeyParts { pk, sk } = self.encrypt_primary_key_parts(delete.primary_key)?;
 
-        let delete_records = all_index_keys(&sk, E::protected_indexes())
+        let delete_records = all_index_keys(&sk, delete.protected_indexes)
             .into_iter()
             .map(|x| Ok::<_, DeleteError>(b64_encode(hmac(&x, Some(pk.as_str()), &self.cipher)?)))
             .chain([Ok(sk)])
@@ -407,7 +423,7 @@ impl EncryptedTable<Dynamo> {
         k: impl Into<E::PrimaryKey>,
     ) -> Result<(), DeleteError> {
         let transact_items = self
-            .create_delete_patch::<E>(k)
+            .create_delete_patch(PreparedDelete::new::<E>(k))
             .await?
             .into_transact_write_items(&self.db.table_name)?;
 
