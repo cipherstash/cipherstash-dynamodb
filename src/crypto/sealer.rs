@@ -218,29 +218,32 @@ impl Sealer {
             ));
         }
 
-        let encrypted = cipher
-            .encrypt(protected.iter().map(|(a, b)| (a, b.as_str())))
-            .await?;
+        // Only encrypt if there are actually protected attributes
+        if !protected_attributes.is_empty() {
+            let encrypted = cipher
+                .encrypt(protected.iter().map(|(a, b)| (a, b.as_str())))
+                .await?;
 
-        for (encrypted, (_, attributes, _)) in encrypted
-            .chunks_exact(protected_attributes.len())
-            .zip(table_entries.iter_mut())
-        {
-            for (enc, name) in encrypted.iter().zip(protected_attributes.iter()) {
-                let name: &str = name.deref();
+            for (encrypted, (_, attributes, _)) in encrypted
+                .chunks_exact(protected_attributes.len())
+                .zip(table_entries.iter_mut())
+            {
+                for (enc, name) in encrypted.iter().zip(protected_attributes.iter()) {
+                    let name: &str = name.deref();
 
-                attributes.insert(
-                    String::from(match name {
-                        "pk" => "__pk",
-                        "sk" => "__sk",
-                        _ => name,
-                    }),
-                    TableAttribute::Bytes(enc.to_vec().map_err(|_| {
-                        SealError::InvalidCiphertext(
-                            "Failed to serialize encrypted record as bytes".into(),
-                        )
-                    })?),
-                );
+                    attributes.insert(
+                        String::from(match name {
+                            "pk" => "__pk",
+                            "sk" => "__sk",
+                            _ => name,
+                        }),
+                        TableAttribute::Bytes(enc.to_vec().map_err(|_| {
+                            SealError::InvalidCiphertext(
+                                "Failed to serialize encrypted record as bytes".into(),
+                            )
+                        })?),
+                    );
+                }
             }
         }
 

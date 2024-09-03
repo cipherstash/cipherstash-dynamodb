@@ -6,7 +6,7 @@ use crate::{
 use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
 use cipherstash_client::{
     credentials::{service_credentials::ServiceToken, Credentials},
-    encryption::Encryption,
+    encryption::{Encryption, Plaintext},
 };
 use std::{borrow::Cow, collections::HashMap, ops::Deref};
 
@@ -66,21 +66,28 @@ impl SealedTableEntry {
         let mut decryptable_items = Vec::with_capacity(items.len() * protected_attributes.len());
 
         for item in items.iter() {
-            let ciphertexts = protected_attributes
-                .iter()
-                .map(|name| {
-                    let attribute = item.inner().attributes.get(match name.deref() {
-                        "pk" => "__pk",
-                        "sk" => "__sk",
-                        _ => name,
-                    });
+            if !protected_attributes.is_empty() {
+                let ciphertexts = protected_attributes
+                    .iter()
+                    .map(|name| {
+                        let attribute = item.inner().attributes.get(match name.deref() {
+                            "pk" => "__pk",
+                            "sk" => "__sk",
+                            _ => name,
+                        });
 
-                    attribute
-                        .ok_or_else(|| SealError::MissingAttribute(name.to_string()))?
-                        .as_encrypted_record()
-                        .ok_or_else(|| SealError::InvalidCiphertext(name.to_string()))
-                })
-                .collect::<Result<Vec<_>, _>>()?;
+                        attribute
+                            .ok_or_else(|| SealError::MissingAttribute(name.to_string()))?
+                            .as_encrypted_record()
+                            .ok_or_else(|| SealError::InvalidCiphertext(name.to_string()))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                // Create a list of all ciphertexts so that they can all be decrypted in one go.
+                // The decrypted version of this list will be chunked up and zipped with the plaintext
+                // fields once the decryption succeeds.
+                decryptable_items.extend(ciphertexts);
+            }
 
             let unprotected = plaintext_attributes
                 .iter()
@@ -98,17 +105,18 @@ impl SealedTableEntry {
                 .collect::<Result<Vec<&TableAttribute>, SealError>>()?;
 
             plaintext_items.push(unprotected);
-
-            // Create a list of all ciphertexts so that they can all be decrypted in one go.
-            // The decrypted version of this list will be chunked up and zipped with the plaintext
-            // fields once the decryption succeeds.
-            decryptable_items.extend(ciphertexts);
         }
 
         let decrypted = cipher.decrypt(decryptable_items).await?;
 
-        let unsealed = decrypted
-            .chunks_exact(protected_attributes.len())
+        let decrypted_iter: &mut dyn Iterator<Item = &[Plaintext]> =
+            if protected_attributes.len() > 0 {
+                &mut decrypted.chunks_exact(protected_attributes.len())
+            } else {
+                &mut std::iter::repeat_with::<&[Plaintext], _>(|| &[]).take(plaintext_items.len())
+            };
+
+        let unsealed = decrypted_iter
             .zip(plaintext_items)
             .map(|(decrypted_plaintext, plaintext_items)| {
                 let mut unsealed = Unsealed::new();
