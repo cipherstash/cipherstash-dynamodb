@@ -38,12 +38,6 @@ mod tests {
         assert_eq!(User::type_name(), "user");
     }
 
-    // #[test]
-    // fn test_cipherstash_instance() {
-    //     let user = User::new("person@example.net", "Person Name");
-    //     assert_eq!(user.partition_key(), "person@example.net");
-    // }
-
     #[test]
     fn test_cipherstash_attributes() {
         assert_eq!(

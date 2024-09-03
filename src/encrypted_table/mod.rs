@@ -1,4 +1,3 @@
-pub mod prepared_record;
 pub mod query;
 mod table_entry;
 pub use self::{

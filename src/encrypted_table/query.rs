@@ -17,12 +17,6 @@ use cipherstash_client::encryption::{compound_indexer::CompoundIndex, IndexTerm}
 
 use super::{Dynamo, EncryptedTable, QueryError};
 
-/*
- * S = Searchable
- * T = Decryptable type
- * D = Database
- *
- */
 pub struct QueryBuilder<S, B = ()> {
     parts: Vec<(String, SingleIndex, Plaintext)>,
     backend: B,
