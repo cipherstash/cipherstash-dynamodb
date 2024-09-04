@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct PrimaryKeyParts {
     pub pk: String,
     pub sk: String,
