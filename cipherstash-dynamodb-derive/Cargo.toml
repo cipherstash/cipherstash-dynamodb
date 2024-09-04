@@ -1,6 +1,6 @@
 [package]
 name = "cipherstash-dynamodb-derive"
-license-file = "../LICENSE"
+license-file = "../LICENSE.md"
 homepage = "https://cipherstash.com"
 readme = "../README.md"
 description = "Derive macros for the CipherStash client for DynamoDB"
