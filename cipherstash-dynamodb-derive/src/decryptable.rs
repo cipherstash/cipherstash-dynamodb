@@ -11,6 +11,17 @@ pub(crate) fn derive_decryptable(input: DeriveInput) -> Result<TokenStream, syn:
 
     let protected_attributes = settings.protected_attributes();
     let plaintext_attributes = settings.plaintext_attributes();
+
+    let protected_attributes_cow = settings
+        .protected_attributes()
+        .into_iter()
+        .map(|x| quote! { std::borrow::Cow::Borrowed(#x) });
+
+    let plaintext_attributes_cow = settings
+        .plaintext_attributes()
+        .into_iter()
+        .map(|x| quote! { std::borrow::Cow::Borrowed(#x) });
+
     let skipped_attributes = settings.skipped_attributes();
     let ident = settings.ident();
 
@@ -41,6 +52,14 @@ pub(crate) fn derive_decryptable(input: DeriveInput) -> Result<TokenStream, syn:
     let expanded = quote! {
         #[automatically_derived]
         impl cipherstash_dynamodb::traits::Decryptable for #ident {
+            fn protected_attributes() -> std::borrow::Cow<'static, [std::borrow::Cow<'static, str>]> {
+                std::borrow::Cow::Borrowed(&[#(#protected_attributes_cow,)*])
+            }
+
+            fn plaintext_attributes() -> std::borrow::Cow<'static, [std::borrow::Cow<'static, str>]> {
+                std::borrow::Cow::Borrowed(&[#(#plaintext_attributes_cow,)*])
+            }
+
             fn from_unsealed(unsealed: cipherstash_dynamodb::crypto::Unsealed) -> Result<Self, cipherstash_dynamodb::crypto::SealError> {
                 Ok(Self {
                     #(#from_unsealed_impl,)*

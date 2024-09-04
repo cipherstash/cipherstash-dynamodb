@@ -43,16 +43,6 @@ impl TableEntry {
     pub fn add_attribute(&mut self, k: impl Into<String>, v: TableAttribute) {
         self.attributes.insert(k.into(), v);
     }
-
-    pub(crate) fn set_term(mut self, term: impl Into<Vec<u8>>) -> Self {
-        self.term = Some(term.into());
-        self
-    }
-
-    pub(crate) fn set_sk(mut self, sk: impl Into<String>) -> Self {
-        self.sk = sk.into();
-        self
-    }
 }
 
 /// Trait for converting `TableAttribute` to `Self`

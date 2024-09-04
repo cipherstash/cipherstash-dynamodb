@@ -1,6 +1,6 @@
-use cipherstash_dynamodb::{Decryptable, Encryptable, Searchable};
+use cipherstash_dynamodb::{Decryptable, Encryptable, Identifiable, Searchable};
 
-#[derive(Debug, Encryptable, Decryptable, Searchable)]
+#[derive(Debug, Identifiable, Encryptable, Decryptable, Searchable)]
 pub struct License {
     #[partition_key]
     email: String,
@@ -34,16 +34,5 @@ mod tests {
     #[test]
     fn test_cipherstash_typename() {
         assert_eq!(License::type_name(), "license");
-    }
-
-    #[test]
-    fn test_cipherstash_instance() {
-        let license = License::new("person@example.net", "1234", "2020-01-01");
-        assert_eq!(license.partition_key(), "person@example.net");
-        assert_eq!(
-            License::protected_attributes(),
-            vec!["email", "expires", "number"]
-        );
-        assert!(License::plaintext_attributes().is_empty());
     }
 }

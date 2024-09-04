@@ -1,11 +1,13 @@
-use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, PkSk, Searchable};
+use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Identifiable, Searchable};
 use itertools::Itertools;
 use serial_test::serial;
 use std::future::Future;
 
 mod common;
 
-#[derive(Encryptable, Decryptable, Searchable, Debug, PartialEq, Ord, PartialOrd, Eq)]
+#[derive(
+    Identifiable, Encryptable, Decryptable, Searchable, Debug, PartialEq, Ord, PartialOrd, Eq,
+)]
 #[cipherstash(sort_key_prefix = None)]
 pub struct User {
     #[partition_key]
@@ -142,7 +144,7 @@ async fn test_query_compound() {
 async fn test_get_by_partition_key() {
     run_test(|table| async move {
         let res: Option<User> = table
-            .get(PkSk::new("first-tenant", "dan@coderdan.co"))
+            .get(("first-tenant", "dan@coderdan.co"))
             .await
             .expect("Failed to send");
         assert_eq!(
@@ -158,12 +160,12 @@ async fn test_get_by_partition_key() {
 async fn test_delete() {
     run_test(|table| async move {
         table
-            .delete::<User>(PkSk::new("first-tenant", "dan@coderdan.co"))
+            .delete::<User>(("first-tenant", "dan@coderdan.co"))
             .await
             .expect("Failed to send");
 
         let res = table
-            .get::<User>(PkSk::new("first-tenant", "dan@coderdan.co"))
+            .get::<User>(("first-tenant", "dan@coderdan.co"))
             .await
             .expect("Failed to send");
         assert_eq!(res, None);

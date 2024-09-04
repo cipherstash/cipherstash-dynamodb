@@ -1,6 +1,6 @@
-use cipherstash_dynamodb::{Decryptable, Encryptable, Searchable};
+use cipherstash_dynamodb::{Decryptable, Encryptable, Identifiable, Searchable};
 
-#[derive(Debug, Encryptable, Decryptable, Searchable)]
+#[derive(Debug, Identifiable, Encryptable, Decryptable, Searchable)]
 #[cipherstash(sort_key_prefix = "user")]
 pub struct User {
     #[cipherstash(query = "exact", compound = "email#name")]
@@ -31,6 +31,7 @@ impl User {
 mod tests {
     use super::*;
     use cipherstash_dynamodb::{IndexType, SingleIndex};
+    use std::borrow::Cow;
 
     #[test]
     fn test_cipherstash_typename() {
@@ -38,15 +39,12 @@ mod tests {
     }
 
     #[test]
-    fn test_cipherstash_instance() {
-        let user = User::new("person@example.net", "Person Name");
-        assert_eq!(user.partition_key(), "person@example.net");
-    }
-
-    #[test]
     fn test_cipherstash_attributes() {
-        assert_eq!(User::protected_attributes(), vec!["email", "name"]);
-        assert_eq!(User::plaintext_attributes(), vec!["count"]);
+        assert_eq!(
+            <User as Encryptable>::protected_attributes(),
+            vec!["email", "name"]
+        );
+        assert_eq!(<User as Encryptable>::plaintext_attributes(), vec!["count"]);
     }
 
     #[test]
@@ -54,12 +52,18 @@ mod tests {
         assert_eq!(
             User::protected_indexes(),
             vec![
-                ("email", IndexType::Single(SingleIndex::Exact)),
                 (
-                    "email#name",
+                    Cow::Borrowed("email"),
+                    IndexType::Single(SingleIndex::Exact)
+                ),
+                (
+                    Cow::Borrowed("email#name"),
                     IndexType::Compound2((SingleIndex::Exact, SingleIndex::Prefix))
                 ),
-                ("name", IndexType::Single(SingleIndex::Prefix)),
+                (
+                    Cow::Borrowed("name"),
+                    IndexType::Single(SingleIndex::Prefix)
+                ),
             ]
         );
     }

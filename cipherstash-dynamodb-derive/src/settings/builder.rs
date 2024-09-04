@@ -349,13 +349,6 @@ impl SettingsBuilder {
 
         let sort_key_prefix = sort_key_prefix.into_prefix(&type_name);
 
-        let partition_key_field = partition_key_field.ok_or_else(|| {
-            syn::Error::new(
-                proc_macro2::Span::call_site(),
-                "Missing required attribute: #[partition_key]",
-            )
-        })?;
-
         Ok(Settings {
             ident,
             sort_key_prefix,

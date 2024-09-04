@@ -6,18 +6,32 @@ use crate::{
 use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
 use cipherstash_client::{
     credentials::{service_credentials::ServiceToken, Credentials},
-    encryption::Encryption,
+    encryption::{Encryption, Plaintext},
 };
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap, ops::Deref};
 
 use super::{SealError, Unsealed};
 
 /// Wrapped to indicate that the value is encrypted
-pub struct Sealed(pub(super) TableEntry);
+pub struct SealedTableEntry(pub(super) TableEntry);
 
-impl Sealed {
+pub struct UnsealSpec<'a> {
+    pub protected_attributes: Cow<'a, [Cow<'a, str>]>,
+    pub plaintext_attributes: Cow<'a, [Cow<'a, str>]>,
+}
+
+impl UnsealSpec<'static> {
+    pub fn new_for_decryptable<D: Decryptable>() -> Self {
+        Self {
+            protected_attributes: D::protected_attributes(),
+            plaintext_attributes: D::plaintext_attributes(),
+        }
+    }
+}
+
+impl SealedTableEntry {
     pub fn vec_from<O: TryInto<Self>>(
-        items: Vec<O>,
+        items: impl IntoIterator<Item = O>,
     ) -> Result<Vec<Self>, <O as TryInto<Self>>::Error> {
         items.into_iter().map(Self::from_inner).collect()
     }
@@ -36,42 +50,49 @@ impl Sealed {
     /// decryptions
     ///
     /// This should be used over [`Sealed::unseal`] when multiple values need to be unsealed.
-    pub(crate) async fn unseal_all<T, C>(
-        items: impl AsRef<[Sealed]>,
-        cipher: &Encryption<C>,
-    ) -> Result<Vec<T>, SealError>
-    where
-        C: Credentials<Token = ServiceToken>,
-        T: Decryptable,
-    {
+    pub(crate) async fn unseal_all(
+        items: impl AsRef<[SealedTableEntry]>,
+        spec: UnsealSpec<'_>,
+        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+    ) -> Result<Vec<Unsealed>, SealError> {
         let items = items.as_ref();
-        let plaintext_attributes = T::plaintext_attributes();
-        let decryptable_attributes = T::decryptable_attributes();
+
+        let UnsealSpec {
+            protected_attributes,
+            plaintext_attributes,
+        } = spec;
 
         let mut plaintext_items: Vec<Vec<&TableAttribute>> = Vec::with_capacity(items.len());
-        let mut decryptable_items = Vec::with_capacity(items.len() * decryptable_attributes.len());
+        let mut decryptable_items = Vec::with_capacity(items.len() * protected_attributes.len());
 
         for item in items.iter() {
-            let ciphertexts = decryptable_attributes
-                .iter()
-                .map(|name| {
-                    let attribute = item.inner().attributes.get(match *name {
-                        "pk" => "__pk",
-                        "sk" => "__sk",
-                        _ => name,
-                    });
+            if !protected_attributes.is_empty() {
+                let ciphertexts = protected_attributes
+                    .iter()
+                    .map(|name| {
+                        let attribute = item.inner().attributes.get(match name.deref() {
+                            "pk" => "__pk",
+                            "sk" => "__sk",
+                            _ => name,
+                        });
 
-                    attribute
-                        .ok_or_else(|| SealError::MissingAttribute(name.to_string()))?
-                        .as_encrypted_record()
-                        .ok_or_else(|| SealError::InvalidCiphertext(name.to_string()))
-                })
-                .collect::<Result<Vec<_>, _>>()?;
+                        attribute
+                            .ok_or_else(|| SealError::MissingAttribute(name.to_string()))?
+                            .as_encrypted_record()
+                            .ok_or_else(|| SealError::InvalidCiphertext(name.to_string()))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                // Create a list of all ciphertexts so that they can all be decrypted in one go.
+                // The decrypted version of this list will be chunked up and zipped with the plaintext
+                // fields once the decryption succeeds.
+                decryptable_items.extend(ciphertexts);
+            }
 
             let unprotected = plaintext_attributes
                 .iter()
                 .map(|name| {
-                    let attr = match *name {
+                    let attr = match name.deref() {
                         "sk" => "__sk",
                         _ => name,
                     };
@@ -84,34 +105,35 @@ impl Sealed {
                 .collect::<Result<Vec<&TableAttribute>, SealError>>()?;
 
             plaintext_items.push(unprotected);
-
-            // Create a list of all ciphertexts so that they can all be decrypted in one go.
-            // The decrypted version of this list will be chunked up and zipped with the plaintext
-            // fields once the decryption succeeds.
-            decryptable_items.extend(ciphertexts);
         }
 
         let decrypted = cipher.decrypt(decryptable_items).await?;
 
-        let unsealed = decrypted
-            .chunks_exact(decryptable_attributes.len())
+        let decrypted_iter: &mut dyn Iterator<Item = &[Plaintext]> =
+            if protected_attributes.len() > 0 {
+                &mut decrypted.chunks_exact(protected_attributes.len())
+            } else {
+                &mut std::iter::repeat_with::<&[Plaintext], _>(|| &[]).take(plaintext_items.len())
+            };
+
+        let unsealed = decrypted_iter
             .zip(plaintext_items)
             .map(|(decrypted_plaintext, plaintext_items)| {
                 let mut unsealed = Unsealed::new();
 
-                for (name, plaintext) in decryptable_attributes.iter().zip(decrypted_plaintext) {
-                    unsealed.add_protected(*name, plaintext.clone());
+                for (name, plaintext) in protected_attributes.iter().zip(decrypted_plaintext) {
+                    unsealed.add_protected(name.to_string(), plaintext.clone());
                 }
 
                 for (name, plaintext) in
                     plaintext_attributes.iter().zip(plaintext_items.into_iter())
                 {
-                    unsealed.add_unprotected(*name, plaintext.clone());
+                    unsealed.add_unprotected(name.to_string(), plaintext.clone());
                 }
 
-                unsealed.into_value()
+                unsealed
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Vec<_>>();
 
         Ok(unsealed)
     }
@@ -119,12 +141,12 @@ impl Sealed {
     /// Unseal the current value and return it's plaintext representation
     ///
     /// If you need to unseal multiple values at once use [`Sealed::unseal_all`]
-    pub(crate) async fn unseal<C, T>(self, cipher: &Encryption<C>) -> Result<T, SealError>
-    where
-        C: Credentials<Token = ServiceToken>,
-        T: Decryptable,
-    {
-        let mut vec = Self::unseal_all([self], cipher).await?;
+    pub(crate) async fn unseal(
+        self,
+        spec: UnsealSpec<'_>,
+        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+    ) -> Result<Unsealed, SealError> {
+        let mut vec = Self::unseal_all([self], spec, cipher).await?;
 
         if vec.len() != 1 {
             let actual = vec.len();
@@ -138,7 +160,7 @@ impl Sealed {
     }
 }
 
-impl TryFrom<HashMap<String, AttributeValue>> for Sealed {
+impl TryFrom<HashMap<String, AttributeValue>> for SealedTableEntry {
     type Error = ReadConversionError;
 
     fn try_from(item: HashMap<String, AttributeValue>) -> Result<Self, Self::Error> {
@@ -165,14 +187,14 @@ impl TryFrom<HashMap<String, AttributeValue>> for Sealed {
                 table_entry.add_attribute(&k, v.into());
             });
 
-        Ok(Sealed(table_entry))
+        Ok(SealedTableEntry(table_entry))
     }
 }
 
-impl TryFrom<Sealed> for HashMap<String, AttributeValue> {
+impl TryFrom<SealedTableEntry> for HashMap<String, AttributeValue> {
     type Error = WriteConversionError;
 
-    fn try_from(item: Sealed) -> Result<Self, Self::Error> {
+    fn try_from(item: SealedTableEntry) -> Result<Self, Self::Error> {
         let mut map = HashMap::new();
 
         map.insert("pk".to_string(), AttributeValue::S(item.0.pk));

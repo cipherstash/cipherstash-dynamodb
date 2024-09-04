@@ -1,6 +1,6 @@
-use cipherstash_dynamodb::Encryptable;
+use cipherstash_dynamodb::{Encryptable, Identifiable};
 
-#[derive(Debug, Encryptable)]
+#[derive(Debug, Encryptable, Identifiable)]
 struct Crazy {
     #[cipherstash(query = "exact", compound = "email#name")]
     #[partition_key]

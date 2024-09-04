@@ -1,15 +1,44 @@
-use crate::Encryptable;
-
 pub struct PrimaryKeyParts {
     pub pk: String,
     pub sk: String,
 }
 
 pub trait PrimaryKey: private::Sealed {
-    fn into_parts<E: Encryptable>(self) -> PrimaryKeyParts;
+    type Pk;
+    type Sk;
+
+    fn into_parts(self, type_name: &str, sort_key_prefix: Option<&str>) -> PrimaryKeyParts;
 }
 
-pub struct Pk(String);
+impl PrimaryKey for Pk {
+    type Pk = String;
+    type Sk = ();
+
+    fn into_parts(self, type_name: &str, _sort_key_prefix: Option<&str>) -> PrimaryKeyParts {
+        PrimaryKeyParts {
+            pk: self.0,
+            sk: type_name.into(),
+        }
+    }
+}
+
+impl PrimaryKey for PkSk {
+    type Pk = String;
+    type Sk = String;
+
+    fn into_parts(self, _type_name: &str, sort_key_prefix: Option<&str>) -> PrimaryKeyParts {
+        PrimaryKeyParts {
+            pk: self.0,
+            sk: if let Some(prefix) = sort_key_prefix {
+                format!("{prefix}#{}", self.1)
+            } else {
+                self.1
+            },
+        }
+    }
+}
+
+pub struct Pk(pub String);
 
 impl Pk {
     pub fn new(pk: impl Into<String>) -> Self {
@@ -23,7 +52,7 @@ impl<P: Into<String>> From<P> for Pk {
     }
 }
 
-pub struct PkSk(String, String);
+pub struct PkSk(pub String, pub String);
 
 impl<Pk: Into<String>, Sk: Into<String>> From<(Pk, Sk)> for PkSk {
     fn from(value: (Pk, Sk)) -> Self {
@@ -44,26 +73,4 @@ mod private {
 
     impl Sealed for Pk {}
     impl Sealed for PkSk {}
-}
-
-impl PrimaryKey for Pk {
-    fn into_parts<E: Encryptable>(self) -> PrimaryKeyParts {
-        PrimaryKeyParts {
-            pk: self.0,
-            sk: E::sort_key_prefix().unwrap_or(E::type_name()).to_string(),
-        }
-    }
-}
-
-impl PrimaryKey for PkSk {
-    fn into_parts<E: Encryptable>(self) -> PrimaryKeyParts {
-        let sk = self.1;
-
-        PrimaryKeyParts {
-            pk: self.0,
-            sk: E::sort_key_prefix()
-                .map(|x| format!("{x}#{sk}"))
-                .unwrap_or_else(|| sk.to_string()),
-        }
-    }
 }

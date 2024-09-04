@@ -85,9 +85,9 @@
 //! `Decryptable` derive macros.
 //!
 //! ```rust
-//! use cipherstash_dynamodb::{Searchable, Decryptable, Encryptable};
+//! use cipherstash_dynamodb::{Searchable, Decryptable, Encryptable, Identifiable};
 //!
-//! #[derive(Debug, Searchable, Decryptable, Encryptable)]
+//! #[derive(Debug, Searchable, Decryptable, Encryptable, Identifiable)]
 //! struct User {
 //!     name: String,
 //!     #[partition_key]
@@ -110,9 +110,9 @@
 //! To store a field as a plaintext, you can use the `plaintext` attribute:
 //!
 //! ```rust
-//! use cipherstash_dynamodb::{Searchable, Decryptable, Encryptable};
+//! use cipherstash_dynamodb::{Searchable, Decryptable, Encryptable, Identifiable};
 //!
-//! #[derive(Debug, Searchable, Decryptable, Encryptable)]
+//! #[derive(Debug, Searchable, Decryptable, Encryptable, Identifiable)]
 //! struct User {
 //!     #[partition_key]
 //!     email: String,
@@ -126,9 +126,9 @@
 //! If you don't want a field stored in the the database at all, you can annotate the field with `#[cipherstash(skip)]`.
 //!
 //!```rust
-//! use cipherstash_dynamodb::{Searchable, Encryptable, Decryptable};
+//! use cipherstash_dynamodb::{Searchable, Encryptable, Decryptable, Identifiable};
 //!
-//! #[derive(Debug, Searchable, Encryptable, Decryptable)]
+//! #[derive(Debug, Searchable, Encryptable, Decryptable, Identifiable)]
 //! struct User {
 //!     #[partition_key]
 //!     email: String,
@@ -147,9 +147,9 @@
 //! However, if you want to specify your own, you can use the `sort_key_prefix` attribute:
 //!
 //!```rust
-//! use cipherstash_dynamodb::Encryptable;
+//! use cipherstash_dynamodb::{Encryptable, Identifiable};
 //!
-//! #[derive(Debug, Encryptable)]
+//! #[derive(Debug, Encryptable, Identifiable)]
 //! #[cipherstash(sort_key_prefix = "user")]
 //! struct User {
 //!     #[partition_key]
@@ -167,9 +167,9 @@
 //! You can choose the field using the `#[sort_key]` attribute.
 //!
 //! ```rust
-//! use cipherstash_dynamodb::Encryptable;
+//! use cipherstash_dynamodb::{Encryptable, Identifiable};
 //!
-//! #[derive(Debug, Encryptable)]
+//! #[derive(Debug, Encryptable, Identifiable)]
 //! struct User {
 //!     #[partition_key]
 //!     email: String,
@@ -190,9 +190,9 @@
 //! If your field contains a `pk` or an `sk` field they must be annotated with the `#[partition_key]` and `#[sort_key]` attributes respectively.
 //!
 //! ```rust
-//! use cipherstash_dynamodb::Encryptable;
+//! use cipherstash_dynamodb::{Encryptable, Identifiable};
 //!
-//! #[derive(Debug, Encryptable)]
+//! #[derive(Debug, Encryptable, Identifiable)]
 //! struct User {
 //!     #[partition_key]
 //!     pk: String,
@@ -211,9 +211,9 @@
 //! To index a field, use the `query` attribute:
 //!
 //! ```rust
-//! use cipherstash_dynamodb::Encryptable;
+//! use cipherstash_dynamodb::{Encryptable, Identifiable};
 //!
-//! #[derive(Debug, Encryptable)]
+//! #[derive(Debug, Encryptable, Identifiable)]
 //! struct User {
 //!     #[cipherstash(query = "exact")]
 //!     #[partition_key]
@@ -232,9 +232,9 @@
 //! compilation error.
 //!
 //! ```rust
-//! use cipherstash_dynamodb::Encryptable;
+//! use cipherstash_dynamodb::{Encryptable, Identifiable};
 //!
-//! #[derive(Debug, Encryptable)]
+//! #[derive(Debug, Encryptable, Identifiable)]
 //! struct User {
 //!     #[cipherstash(query = "exact", compound = "email#name")]
 //!     #[partition_key]
@@ -250,9 +250,9 @@
 //!
 //!
 //! ```rust
-//! use cipherstash_dynamodb::Encryptable;
+//! use cipherstash_dynamodb::{Encryptable, Identifiable};
 //!
-//! #[derive(Debug, Encryptable)]
+//! #[derive(Debug, Encryptable, Identifiable)]
 //! struct User {
 //!     #[cipherstash(query = "exact")]
 //!     #[cipherstash(query = "exact", compound = "email#name")]
@@ -307,9 +307,9 @@
 //! To store a record in the table, use the [`EncryptedTable::put`] method:
 //!
 //! ```no_run
-//! # use cipherstash_dynamodb::{Encryptable, Searchable, Decryptable, EncryptedTable};
+//! # use cipherstash_dynamodb::*;
 //! #
-//! # #[derive(Debug, Encryptable, Searchable, Decryptable)]
+//! # #[derive(Debug, Identifiable, Encryptable, Searchable, Decryptable)]
 //! # struct User {
 //! #    #[partition_key]
 //! #    email: String,
@@ -337,9 +337,9 @@
 //! To get a record, use the [`EncryptedTable::get`] method:
 //!
 //! ```no_run
-//! # use cipherstash_dynamodb::{EncryptedTable, Decryptable, Encryptable, Key};
+//! # use cipherstash_dynamodb::*;
 //! #
-//! # #[derive(Debug, Decryptable, Encryptable)]
+//! # #[derive(Debug, Identifiable, Decryptable, Encryptable)]
 //! # struct User {
 //! #    #[partition_key]
 //! #    email: String,
@@ -367,9 +367,9 @@
 //! To delete a record, use the [`EncryptedTable::delete`] method:
 //!
 //! ```no_run
-//! # use cipherstash_dynamodb::{Decryptable, Searchable, Encryptable, EncryptedTable};
+//! # use cipherstash_dynamodb::*;
 //! #
-//! # #[derive(Debug, Decryptable, Searchable, Encryptable)]
+//! # #[derive(Debug, Identifiable, Decryptable, Searchable, Encryptable)]
 //! # struct User {
 //! #    #[partition_key]
 //! #    email: String,
@@ -393,9 +393,9 @@
 //! To query records, use the [`EncryptedTable::query`] method which returns a builder:
 //!
 //! ```no_run
-//! # use cipherstash_dynamodb::{Searchable, Decryptable, Encryptable, EncryptedTable};
+//! # use cipherstash_dynamodb::{Searchable, Decryptable, Encryptable, EncryptedTable, Identifiable};
 //! #
-//! # #[derive(Debug, Decryptable, Searchable, Encryptable)]
+//! # #[derive(Debug, Decryptable, Searchable, Encryptable, Identifiable)]
 //! # struct User {
 //! #    #[partition_key]
 //! #    email: String,
@@ -421,9 +421,9 @@
 //! If you have a compound index defined, CipherStash for DynamoDB will automatically use it when querying.
 //!
 //! ```no_run
-//! # use cipherstash_dynamodb::{Encryptable, Searchable, Decryptable, EncryptedTable, Key};
+//! # use cipherstash_dynamodb::{Encryptable, Searchable, Decryptable, EncryptedTable, Key, Identifiable};
 //! #
-//! # #[derive(Debug, Encryptable, Searchable, Decryptable)]
+//! # #[derive(Debug, Encryptable, Searchable, Decryptable, Identifiable)]
 //! # struct User {
 //! #    #[partition_key]
 //! #    #[cipherstash(query = "exact")]
@@ -460,9 +460,9 @@
 //! For example, you might want to store related records to `User` such as `License`.
 //!
 //! ```rust
-//! use cipherstash_dynamodb::{ Searchable, Encryptable, Decryptable };
+//! use cipherstash_dynamodb::{ Searchable, Encryptable, Decryptable, Identifiable };
 //!
-//! #[derive(Debug, Searchable, Encryptable, Decryptable)]
+//! #[derive(Debug, Searchable, Encryptable, Decryptable, Identifiable)]
 //! struct License {
 //!     #[cipherstash(query = "exact")]
 //!     #[partition_key]
@@ -482,9 +482,9 @@
 //! For example, you might want to query users by name using a prefix (say for using a "type ahead") but only return the name.
 //!
 //! ```rust
-//! # use cipherstash_dynamodb::{Searchable, Encryptable, Decryptable};
+//! # use cipherstash_dynamodb::{Searchable, Encryptable, Decryptable, Identifiable};
 //!
-//! #[derive(Debug, Searchable, Encryptable, Decryptable)]
+//! #[derive(Debug, Searchable, Encryptable, Decryptable, Identifiable)]
 //! pub struct UserView {
 //!     #[cipherstash(skip)]
 //!     #[partition_key]
@@ -498,8 +498,8 @@
 //! To use the view, you can first `put` and then `query` the value.
 //!
 //! ```no_run
-//! # use cipherstash_dynamodb::{Searchable, Encryptable, Decryptable, EncryptedTable};
-//! # #[derive(Debug, Searchable, Encryptable, Decryptable)]
+//! # use cipherstash_dynamodb::*;
+//! # #[derive(Debug, Identifiable, Searchable, Encryptable, Decryptable)]
 //! # pub struct UserView {
 //! #     #[cipherstash(skip)]
 //! #     #[partition_key]
@@ -576,14 +576,15 @@ pub mod encrypted_table;
 pub mod traits;
 pub use encrypted_table::{EncryptedTable, QueryBuilder};
 pub use traits::{
-    Decryptable, Encryptable, IndexType, Pk, PkSk, PrimaryKey, Searchable, SingleIndex,
+    Decryptable, Encryptable, Identifiable, IndexType, Pk, PkSk, PrimaryKey, Searchable,
+    SingleIndex,
 };
 
 pub mod errors;
 pub use errors::Error;
 
 #[doc(hidden)]
-pub use cipherstash_dynamodb_derive::{Decryptable, Encryptable, Searchable};
+pub use cipherstash_dynamodb_derive::{Decryptable, Encryptable, Identifiable, Searchable};
 
 // Re-exports
 pub use cipherstash_client::encryption;

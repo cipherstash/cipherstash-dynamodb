@@ -3,9 +3,11 @@ mod sealed;
 mod sealer;
 mod unsealed;
 
+use std::borrow::Cow;
+
 use crate::{
-    traits::{Encryptable, ReadConversionError, Searchable, WriteConversionError},
-    IndexType,
+    traits::{PrimaryKeyError, PrimaryKeyParts, ReadConversionError, WriteConversionError},
+    Identifiable, IndexType, PrimaryKey,
 };
 use cipherstash_client::{
     credentials::{service_credentials::ServiceToken, Credentials},
@@ -17,7 +19,7 @@ use cipherstash_client::{
 use thiserror::Error;
 
 pub use b64_encode::*;
-pub use sealed::Sealed;
+pub use sealed::{SealedTableEntry, UnsealSpec};
 pub use sealer::Sealer;
 pub use unsealed::Unsealed;
 
@@ -25,6 +27,8 @@ const MAX_TERMS_PER_INDEX: usize = 25;
 
 #[derive(Debug, Error)]
 pub enum SealError {
+    #[error("Error when creating primary key: {0}")]
+    PrimaryKeyError(#[from] PrimaryKeyError),
     #[error("Failed to encrypt partition key")]
     CryptoError(#[from] EncryptionError),
     #[error("Failed to convert attribute: {0} from internal representation")]
@@ -61,8 +65,12 @@ pub fn format_term_key(
     format!("{sort_key}#{index_name}#{index_type}#{counter}")
 }
 
-pub(crate) fn all_index_keys<E: Searchable + Encryptable>(sort_key: &str) -> Vec<String> {
-    E::protected_indexes()
+pub(crate) fn all_index_keys<'a>(
+    sort_key: &str,
+    protected_indexes: impl AsRef<[(Cow<'a, str>, IndexType)]>,
+) -> Vec<String> {
+    protected_indexes
+        .as_ref()
         .iter()
         .flat_map(|(index_name, index_type)| {
             (0..)
@@ -73,7 +81,7 @@ pub(crate) fn all_index_keys<E: Searchable + Encryptable>(sort_key: &str) -> Vec
         .collect()
 }
 
-pub(crate) fn hmac<C>(
+pub fn hmac<C>(
     value: &str,
     salt: Option<&str>,
     cipher: &Encryption<C>,
@@ -96,4 +104,35 @@ where
         .ok_or(EncryptionError::IndexingError(
             "Invalid term type".to_string(),
         ))
+}
+
+// Contains all the necessary information to encrypt the primary key pair
+pub struct PreparedPrimaryKey {
+    pub primary_key_parts: PrimaryKeyParts,
+    pub is_pk_encrypted: bool,
+    pub is_sk_encrypted: bool,
+}
+
+impl PreparedPrimaryKey {
+    pub fn new<R>(k: impl Into<R::PrimaryKey>) -> Self
+    where
+        R: Identifiable,
+    {
+        let primary_key_parts = k
+            .into()
+            .into_parts(&R::type_name(), R::sort_key_prefix().as_deref());
+
+        Self::new_from_parts::<R>(primary_key_parts)
+    }
+
+    pub fn new_from_parts<R>(primary_key_parts: PrimaryKeyParts) -> Self
+    where
+        R: Identifiable,
+    {
+        Self {
+            primary_key_parts,
+            is_pk_encrypted: R::is_pk_encrypted(),
+            is_sk_encrypted: R::is_sk_encrypted(),
+        }
+    }
 }
