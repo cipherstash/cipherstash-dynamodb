@@ -1,6 +1,6 @@
 [package]
 name = "cipherstash-dynamodb"
-license-file = "LICENSE"
+license-file = "LICENSE.md"
 homepage = "https://cipherstash.com"
 repository = "https://github.com/cipherstash/cipherstash-dynamodb"
 readme = "README.md"
