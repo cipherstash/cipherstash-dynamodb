@@ -112,14 +112,25 @@ pub struct PreparedDelete {
 }
 
 impl PreparedDelete {
-    pub fn new<S: Searchable + Identifiable>(k: impl Into<S::PrimaryKey>) -> Self {
-        let primary_key = PreparedPrimaryKey::new::<S>(k);
+    pub fn new<S: Searchable>(k: impl Into<S::PrimaryKey>) -> Self {
+        Self::new_from_parts::<S>(
+            k.into()
+                .into_parts(&S::type_name(), S::sort_key_prefix().as_deref()),
+        )
+    }
+
+    pub fn new_from_parts<S: Searchable>(k: PrimaryKeyParts) -> Self {
+        let primary_key = PreparedPrimaryKey::new_from_parts::<S>(k);
         let protected_indexes = S::protected_indexes();
 
         Self {
             primary_key,
             protected_indexes,
         }
+    }
+
+    pub fn prepared_primary_key(&self) -> PreparedPrimaryKey {
+        self.primary_key.clone()
     }
 }
 
@@ -201,6 +212,17 @@ impl PreparedRecord {
             protected_attributes,
             sealer,
         ))
+    }
+
+    pub fn primary_key_parts(&self) -> PrimaryKeyParts {
+        PrimaryKeyParts {
+            pk: self.sealer.pk.clone(),
+            sk: self.sealer.sk.clone(),
+        }
+    }
+
+    pub fn type_name(&self) -> &str {
+        &self.sealer.type_name
     }
 }
 
