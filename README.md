@@ -5,6 +5,10 @@
 Based on the CipherStash SDK and ZeroKMS key service, CipherStash for DynamoDB provides a simple interface for
 storing and retrieving encrypted data in DynamoDB.
 
+## Playground
+
+To easily try out CipherStash for DynamoDB, visit the [cipherstash-playground](https://github.com/cipherstash/cipherstash-playground) repo.
+
 ## Code status
 
 [![Test suite](https://github.com/cipherstash/cipherstash-dynamodb/actions/workflows/test.yml/badge.svg)](https://github.com/cipherstash/cipherstash-dynamodb/actions/workflows/test.yml) [![Published documentation](https://github.com/cipherstash/cipherstash-dynamodb/actions/workflows/deploy-public-docs.yml/badge.svg)](https://github.com/cipherstash/cipherstash-dynamodb/actions/workflows/deploy-public-docs.yml)
@@ -83,9 +87,9 @@ To use CipherStash for DynamoDB, you must first annotate a struct with the `Encr
 `Decryptable` derive macros.
 
 ```rust
-use cipherstash_dynamodb::{Searchable, Decryptable, Encryptable};
+use cipherstash_dynamodb::{Searchable, Decryptable, Encryptable, Identifiable};
 
-#[derive(Debug, Searchable, Decryptable, Encryptable)]
+#[derive(Debug, Searchable, Decryptable, Encryptable, Identifiable)]
 struct User {
     name: String,
     #[partition_key]
@@ -108,9 +112,9 @@ By default, all fields on an annotated struct are stored encrypted in the table.
 To store a field as a plaintext, you can use the `plaintext` attribute:
 
 ```rust
-use cipherstash_dynamodb::{Searchable, Decryptable, Encryptable};
+use cipherstash_dynamodb::{Searchable, Decryptable, Encryptable, Identifiable};
 
-#[derive(Debug, Searchable, Decryptable, Encryptable)]
+#[derive(Debug, Searchable, Decryptable, Encryptable, Identifiable)]
 struct User {
     #[partition_key]
     email: String,
@@ -124,9 +128,9 @@ struct User {
 If you don't want a field stored in the the database at all, you can annotate the field with `#[cipherstash(skip)]`.
 
 ```rust
-use cipherstash_dynamodb::{Searchable, Encryptable, Decryptable};
+use cipherstash_dynamodb::{Searchable, Encryptable, Decryptable, Identifiable};
 
-#[derive(Debug, Searchable, Encryptable, Decryptable)]
+#[derive(Debug, Searchable, Encryptable, Decryptable, Identifiable)]
 struct User {
     #[partition_key]
     email: String,
@@ -145,9 +149,9 @@ cipherstash-dynamodb requires every record to have a sort key. By default this w
 However, if you want to specify your own, you can use the `sort_key_prefix` attribute:
 
 ```rust
-use cipherstash_dynamodb::Encryptable;
+use cipherstash_dynamodb::{Encryptable, Identifiable};
 
-#[derive(Debug, Encryptable)]
+#[derive(Debug, Encryptable, Identifiable)]
 #[cipherstash(sort_key_prefix = "user")]
 struct User {
     #[partition_key]
@@ -165,9 +169,9 @@ CipherStash for DynamoDB also supports specifying the sort key dynamically based
 You can choose the field using the `#[sort_key]` attribute.
 
 ```rust
-use cipherstash_dynamodb::Encryptable;
+use cipherstash_dynamodb::{Encryptable, Identifiable};
 
-#[derive(Debug, Encryptable)]
+#[derive(Debug, Encryptable, Identifiable)]
 struct User {
     #[partition_key]
     email: String,
@@ -188,9 +192,9 @@ and sort keys. To support this behaviour these are treated as special keywords i
 If your field contains a `pk` or an `sk` field they must be annotated with the `#[partition_key]` and `#[sort_key]` attributes respectively.
 
 ```rust
-use cipherstash_dynamodb::Encryptable;
+use cipherstash_dynamodb::{Encryptable, Identifiable};
 
-#[derive(Debug, Encryptable)]
+#[derive(Debug, Encryptable, Identifiable)]
 struct User {
     #[partition_key]
     pk: String,
@@ -209,9 +213,9 @@ Exact, prefix and compound match types are currently supported.
 To index a field, use the `query` attribute:
 
 ```rust
-use cipherstash_dynamodb::Encryptable;
+use cipherstash_dynamodb::{Encryptable, Identifiable};
 
-#[derive(Debug, Encryptable)]
+#[derive(Debug, Encryptable, Identifiable)]
 struct User {
     #[cipherstash(query = "exact")]
     #[partition_key]
@@ -230,9 +234,9 @@ Fields mentioned in the compound index name that aren't correctly annotated will
 compilation error.
 
 ```rust
-use cipherstash_dynamodb::Encryptable;
+use cipherstash_dynamodb::{Encryptable, Identifiable};
 
-#[derive(Debug, Encryptable)]
+#[derive(Debug, Encryptable, Identifiable)]
 struct User {
     #[cipherstash(query = "exact", compound = "email#name")]
     #[partition_key]
@@ -248,9 +252,9 @@ different ways.
 
 
 ```rust
-use cipherstash_dynamodb::Encryptable;
+use cipherstash_dynamodb::{Encryptable, Identifiable};
 
-#[derive(Debug, Encryptable)]
+#[derive(Debug, Encryptable, Identifiable)]
 struct User {
     #[cipherstash(query = "exact")]
     #[cipherstash(query = "exact", compound = "email#name")]
@@ -361,9 +365,9 @@ In practice, this means you can store multiple types in the same table.
 For example, you might want to store related records to `User` such as `License`.
 
 ```rust
-use cipherstash_dynamodb::{ Searchable, Encryptable, Decryptable };
+use cipherstash_dynamodb::{ Searchable, Encryptable, Decryptable, Identifiable };
 
-#[derive(Debug, Searchable, Encryptable, Decryptable)]
+#[derive(Debug, Searchable, Encryptable, Decryptable, Identifiable)]
 struct License {
     #[cipherstash(query = "exact")]
     #[partition_key]
@@ -384,7 +388,7 @@ For example, you might want to query users by name using a prefix (say for using
 
 ```rust
 
-#[derive(Debug, Searchable, Encryptable, Decryptable)]
+#[derive(Debug, Searchable, Encryptable, Decryptable, Identifiable)]
 pub struct UserView {
     #[cipherstash(skip)]
     #[partition_key]
@@ -443,7 +447,7 @@ When self-hosting ZeroKMS, we recommend running it in different account to your 
 
 ## Issues and TODO
 
-- [ ] Sort keys are not currently hashed (and should be)
+- [ ] Sort keys are not currently hashed (but this may change in the future)
 
 <!-- cargo-rdme end -->
 

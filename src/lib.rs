@@ -7,6 +7,10 @@
 //! Based on the CipherStash SDK and ZeroKMS key service, CipherStash for DynamoDB provides a simple interface for
 //! storing and retrieving encrypted data in DynamoDB.
 //!
+//! ## Playground
+//!
+//! To easily try out CipherStash for DynamoDB, visit the [cipherstash-playground](https://github.com/cipherstash/cipherstash-playground) repo.
+//!
 //! ## Code status
 //!
 //! [![Test suite](https://github.com/cipherstash/cipherstash-dynamodb/actions/workflows/test.yml/badge.svg)](https://github.com/cipherstash/cipherstash-dynamodb/actions/workflows/test.yml) [![Published documentation](https://github.com/cipherstash/cipherstash-dynamodb/actions/workflows/deploy-public-docs.yml/badge.svg)](https://github.com/cipherstash/cipherstash-dynamodb/actions/workflows/deploy-public-docs.yml)
