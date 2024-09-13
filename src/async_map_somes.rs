@@ -47,14 +47,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_maintain_order() {
-        let input = vec![
-            None,
-            Some(1_u8),
-            None,
-            Some(2_u8),
-            None,
-            Some(3_u8)
-        ];
+        let input = vec![None, Some(1_u8), None, Some(2_u8), None, Some(3_u8)];
 
         let output = async_map_somes(input.clone(), |x| async { Ok::<_, ()>(x) })
             .await
