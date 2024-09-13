@@ -1,4 +1,5 @@
 use crate::{
+    async_map_somes::async_map_somes,
     encrypted_table::{TableAttribute, TableEntry},
     traits::{ReadConversionError, WriteConversionError},
     Decryptable,
@@ -62,7 +63,8 @@ impl SealedTableEntry {
             plaintext_attributes,
         } = spec;
 
-        let mut plaintext_items: Vec<Vec<&TableAttribute>> = Vec::with_capacity(items.len());
+        let mut plaintext_items: Vec<Vec<Option<&TableAttribute>>> =
+            Vec::with_capacity(items.len());
         let mut decryptable_items = Vec::with_capacity(items.len() * protected_attributes.len());
 
         for item in items.iter() {
@@ -77,9 +79,11 @@ impl SealedTableEntry {
                         });
 
                         attribute
-                            .ok_or_else(|| SealError::MissingAttribute(name.to_string()))?
-                            .as_encrypted_record()
-                            .ok_or_else(|| SealError::InvalidCiphertext(name.to_string()))
+                            .map(|x| {
+                                x.as_encrypted_record()
+                                    .ok_or_else(|| SealError::InvalidCiphertext(name.to_string()))
+                            })
+                            .transpose()
                     })
                     .collect::<Result<Vec<_>, _>>()?;
 
@@ -97,23 +101,21 @@ impl SealedTableEntry {
                         _ => name,
                     };
 
-                    item.inner()
-                        .attributes
-                        .get(attr)
-                        .ok_or(SealError::MissingAttribute(attr.to_string()))
+                    item.inner().attributes.get(attr)
                 })
-                .collect::<Result<Vec<&TableAttribute>, SealError>>()?;
+                .collect::<Vec<Option<&TableAttribute>>>();
 
             plaintext_items.push(unprotected);
         }
 
-        let decrypted = cipher.decrypt(decryptable_items).await?;
+        let decrypted = async_map_somes(decryptable_items, |items| cipher.decrypt(items)).await?;
 
-        let decrypted_iter: &mut dyn Iterator<Item = &[Plaintext]> =
+        let decrypted_iter: &mut dyn Iterator<Item = &[Option<Plaintext>]> =
             if protected_attributes.len() > 0 {
                 &mut decrypted.chunks_exact(protected_attributes.len())
             } else {
-                &mut std::iter::repeat_with::<&[Plaintext], _>(|| &[]).take(plaintext_items.len())
+                &mut std::iter::repeat_with::<&[Option<Plaintext>], _>(|| &[])
+                    .take(plaintext_items.len())
             };
 
         let unsealed = decrypted_iter
@@ -122,13 +124,17 @@ impl SealedTableEntry {
                 let mut unsealed = Unsealed::new();
 
                 for (name, plaintext) in protected_attributes.iter().zip(decrypted_plaintext) {
-                    unsealed.add_protected(name.to_string(), plaintext.clone());
+                    if let Some(plaintext) = plaintext {
+                        unsealed.add_protected(name.to_string(), plaintext.clone());
+                    }
                 }
 
                 for (name, plaintext) in
                     plaintext_attributes.iter().zip(plaintext_items.into_iter())
                 {
-                    unsealed.add_unprotected(name.to_string(), plaintext.clone());
+                    if let Some(plaintext) = plaintext {
+                        unsealed.add_unprotected(name.to_string(), plaintext.clone());
+                    }
                 }
 
                 unsealed
