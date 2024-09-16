@@ -7,7 +7,7 @@ use cipherstash_client::{
     },
 };
 use itertools::Itertools;
-use std::{collections::HashMap, marker::PhantomData};
+use std::{borrow::Cow, collections::HashMap, marker::PhantomData};
 
 use crate::{
     traits::{Decryptable, Searchable},
@@ -131,11 +131,56 @@ where
     S: Searchable,
 {
     pub fn build(self) -> Result<PreparedQuery, QueryError> {
-        let items_len = self.parts.len();
+        PreparedQueryBuilder::new::<S>().build(self.parts)
+    }
+}
+
+impl<S> QueryBuilder<S, &EncryptedTable<Dynamo>>
+where
+    S: Searchable + Identifiable,
+{
+    pub async fn load<T: Decryptable>(self) -> Result<Vec<T>, QueryError> {
+        let table = self.backend;
+        let query = self.build()?;
+
+        let items = query.send(table).await?;
+        let results = table.decrypt_all(items).await?;
+
+        Ok(results)
+    }
+}
+
+impl<S> QueryBuilder<S, &EncryptedTable<Dynamo>>
+where
+    S: Searchable + Decryptable + Identifiable,
+{
+    pub async fn send(self) -> Result<Vec<S>, QueryError> {
+        self.load::<S>().await
+    }
+}
+
+pub struct PreparedQueryBuilder {
+    pub type_name: Cow<'static, str>,
+    pub index_by_name: fn(&str, IndexType) -> Option<Box<dyn ComposableIndex>>,
+}
+
+impl PreparedQueryBuilder {
+    pub fn new<S: Searchable>() -> Self {
+        Self {
+            type_name: S::type_name(),
+            index_by_name: S::index_by_name,
+        }
+    }
+
+    pub fn build(
+        &self,
+        parts: Vec<(String, SingleIndex, Plaintext)>,
+    ) -> Result<PreparedQuery, QueryError> {
+        let items_len = parts.len();
 
         // this is the simplest way to brute force the index names but relies on some gross
         // stringly typing which doesn't feel good
-        for perm in self.parts.iter().permutations(items_len) {
+        for perm in parts.iter().permutations(items_len) {
             let (indexes, plaintexts): (Vec<(&String, &SingleIndex)>, Vec<&Plaintext>) =
                 perm.into_iter().map(|x| ((&x.0, &x.1), &x.2)).unzip();
 
@@ -170,7 +215,7 @@ where
                 }
             };
 
-            if let Some(composed_index) = S::index_by_name(index_name.as_str(), index_type) {
+            if let Some(composed_index) = (self.index_by_name)(index_name.as_str(), index_type) {
                 let mut plaintext = ComposablePlaintext::new(plaintexts[0].clone());
 
                 for p in plaintexts[1..].iter() {
@@ -181,41 +226,17 @@ where
 
                 return Ok(PreparedQuery {
                     index_name,
-                    type_name: S::type_name().to_string(),
+                    type_name: self.type_name.to_string(),
                     plaintext,
                     composed_index,
                 });
             }
         }
 
-        let fields = self.parts.iter().map(|x| &x.0).join(",");
+        let fields = parts.iter().map(|x| &x.0).join(",");
 
         Err(QueryError::InvalidQuery(format!(
             "Could not build query for fields: {fields}"
         )))
-    }
-}
-
-impl<S> QueryBuilder<S, &EncryptedTable<Dynamo>>
-where
-    S: Searchable + Identifiable,
-{
-    pub async fn load<T: Decryptable>(self) -> Result<Vec<T>, QueryError> {
-        let table = self.backend;
-        let query = self.build()?;
-
-        let items = query.send(table).await?;
-        let results = table.decrypt_all(items).await?;
-
-        Ok(results)
-    }
-}
-
-impl<S> QueryBuilder<S, &EncryptedTable<Dynamo>>
-where
-    S: Searchable + Decryptable + Identifiable,
-{
-    pub async fn send(self) -> Result<Vec<S>, QueryError> {
-        self.load::<S>().await
     }
 }

@@ -107,6 +107,7 @@ where
 }
 
 // Contains all the necessary information to encrypt the primary key pair
+#[derive(Clone)]
 pub struct PreparedPrimaryKey {
     pub primary_key_parts: PrimaryKeyParts,
     pub is_pk_encrypted: bool,
