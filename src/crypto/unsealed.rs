@@ -45,20 +45,17 @@ impl Unsealed {
         &self.unprotected
     }
 
-    pub fn get_protected(&self, name: &str) -> Result<&Plaintext, SealError> {
-        let (plaintext, _) = self
-            .protected
-            .get(name)
-            .ok_or_else(|| SealError::MissingAttribute(name.to_string()))?;
+    pub fn get_protected(&self, name: &str) -> Option<&Plaintext> {
+        let (plaintext, _) = self.protected.get(name)?;
 
-        Ok(plaintext)
+        Some(plaintext)
     }
 
-    pub fn get_plaintext(&self, name: &str) -> Result<TableAttribute, SealError> {
+    pub fn get_plaintext(&self, name: &str) -> TableAttribute {
         self.unprotected
             .get(name)
             .cloned()
-            .ok_or_else(|| SealError::MissingAttribute(name.to_string()))
+            .unwrap_or(TableAttribute::Null)
     }
 
     pub fn add_protected(&mut self, name: impl Into<String>, plaintext: Plaintext) {
