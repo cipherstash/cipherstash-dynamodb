@@ -19,7 +19,7 @@ use std::{borrow::Cow, collections::HashMap, ops::Deref};
 /// The combination of plaintext, index, name and index type for a particular field
 pub type UnsealedIndex = (
     ComposablePlaintext,
-    Box<dyn ComposableIndex>,
+    Box<dyn ComposableIndex + Send>,
     Cow<'static, str>,
     IndexType,
 );
