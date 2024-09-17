@@ -366,6 +366,9 @@ impl<D> EncryptedTable<D> {
         let sealed = sealer.seal(protected_attributes, &self.cipher, 12).await?;
 
         let mut put_records = Vec::with_capacity(sealed.len());
+
+        // When doing an upsert you need to delete any index keys that are not used for the current
+        // record but may have been used for previous records.
         let mut delete_records = vec![];
 
         let PrimaryKeyParts { pk, sk } = sealed.primary_key();
@@ -383,6 +386,7 @@ impl<D> EncryptedTable<D> {
         for index_sk in all_index_keys(&sk, protected_indexes) {
             let index_sk = b64_encode(hmac(&index_sk, Some(pk.as_str()), &self.cipher)?);
 
+            // If the current put has an index with the specified key then don't delete it.
             if seen_sk.contains(&index_sk) {
                 continue;
             }
@@ -399,6 +403,8 @@ impl<D> EncryptedTable<D> {
         })
     }
 
+    /// Take a prepared primary key and encrypt it to get the [`PrimaryKeyParts`] which can be used
+    /// for retrieval.
     pub fn encrypt_primary_key_parts(
         &self,
         prepared_primary_key: PreparedPrimaryKey,

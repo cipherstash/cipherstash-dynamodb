@@ -23,6 +23,9 @@ pub use sealed::{SealedTableEntry, UnsealSpec};
 pub use sealer::Sealer;
 pub use unsealed::Unsealed;
 
+/// In order to stop indexes from exploding with indexes on large strings, cap the number of terms
+/// generated per index. Since there is a fixed number of terms per index it is also possible to
+/// delete all index terms for a particular record.
 const MAX_TERMS_PER_INDEX: usize = 25;
 
 #[derive(Debug, Error)]
@@ -65,6 +68,9 @@ pub fn format_term_key(
     format!("{sort_key}#{index_name}#{index_type}#{counter}")
 }
 
+/// Get all the term index keys for a particular sort key and index definitions
+///
+/// This is used to delete any index items that shouldn't exist during either an update or
 pub(crate) fn all_index_keys<'a>(
     sort_key: &str,
     protected_indexes: impl AsRef<[(Cow<'a, str>, IndexType)]>,
@@ -81,14 +87,14 @@ pub(crate) fn all_index_keys<'a>(
         .collect()
 }
 
-pub fn hmac<C>(
+/// Use a CipherStash [`ExactIndex`] to take the HMAC of a string with a provided salt
+///
+/// This value is used for term index keys and "encrypted" partition / sort keys
+pub fn hmac(
     value: &str,
     salt: Option<&str>,
-    cipher: &Encryption<C>,
-) -> Result<Vec<u8>, EncryptionError>
-where
-    C: Credentials<Token = ServiceToken>,
-{
+    cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+) -> Result<Vec<u8>, EncryptionError> {
     let plaintext = Plaintext::Utf8Str(Some(value.to_string()));
     let index = CompoundIndex::new(ExactIndex::new(vec![]));
 
