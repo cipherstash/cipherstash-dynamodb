@@ -451,6 +451,26 @@ When self-hosting ZeroKMS, we recommend running it in different account to your 
 
 <!-- cargo-rdme end -->
 
+## Running the tests
+
+In order to run the tests you need to have the following variables set in your environment:
+
+```sh
+export CS_CLIENT_ID=<your client id>
+export CS_CLIENT_KEY=<your client key>
+
+// The following are required for using the local dynamo emulator
+export AWS_ACCESS_KEY_ID=dynamo
+export AWS_SECRET_ACCESS_KEY=dynamo
+export AWS_REGION=ap-southeast-2
+```
+
+With these variables set, you're free to run the tests with the following command:
+
+```sh
+cargo test
+```
+
 ## Contributing
 
 We welcome contributions to CipherStash for DynamoDB.
