@@ -26,7 +26,7 @@ pub struct QueryBuilder<S, B = ()> {
 pub struct PreparedQuery {
     index_name: String,
     type_name: String,
-    composed_index: Box<dyn ComposableIndex>,
+    composed_index: Box<dyn ComposableIndex + Send>,
     plaintext: ComposablePlaintext,
 }
 
@@ -161,7 +161,7 @@ where
 
 pub struct PreparedQueryBuilder {
     pub type_name: Cow<'static, str>,
-    pub index_by_name: fn(&str, IndexType) -> Option<Box<dyn ComposableIndex>>,
+    pub index_by_name: fn(&str, IndexType) -> Option<Box<dyn ComposableIndex + Send>>,
 }
 
 impl PreparedQueryBuilder {

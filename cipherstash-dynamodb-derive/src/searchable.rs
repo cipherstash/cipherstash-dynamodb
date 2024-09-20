@@ -57,7 +57,7 @@ pub(crate) fn derive_searchable(input: DeriveInput) -> Result<TokenStream, syn::
                 std::borrow::Cow::Borrowed(&[#(#protected_indexes_impl,)*])
             }
 
-            fn index_by_name(index_name: &str, index_type: cipherstash_dynamodb::IndexType) -> Option<Box<dyn cipherstash_dynamodb::traits::ComposableIndex>> {
+            fn index_by_name(index_name: &str, index_type: cipherstash_dynamodb::IndexType) -> Option<Box<dyn cipherstash_dynamodb::traits::ComposableIndex + Send>> {
                 match ( index_name, index_type ) {
                     #(#indexes_impl,)*
                     _ => None,

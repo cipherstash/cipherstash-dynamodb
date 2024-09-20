@@ -126,7 +126,7 @@ pub trait Searchable: Encryptable {
     fn index_by_name(
         _index_name: &str,
         _index_type: IndexType,
-    ) -> Option<Box<dyn ComposableIndex>> {
+    ) -> Option<Box<dyn ComposableIndex + Send>> {
         None
     }
 }
