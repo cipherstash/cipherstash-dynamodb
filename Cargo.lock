@@ -673,9 +673,9 @@ dependencies = [
 
 [[package]]
 name = "cipherstash-client"
-version = "0.10.0"
+version = "0.12.0"
 source = "sparse+https://cargo.cloudsmith.io/cipherstash/cipherstash/"
-checksum = "70b1e97490a4c0955ac7c8f9ba3484408c22c62c619179bab95dc86005d25a1a"
+checksum = "648b9f57179b0d6a949a097aaba5603188211dc2f8f1cd980f5cbe6cb0414753"
 dependencies = [
  "aes-gcm-siv",
  "anyhow",
@@ -684,7 +684,6 @@ dependencies = [
  "base64 0.22.1",
  "cfg-if",
  "chrono",
- "cipherstash-config",
  "cipherstash-core",
  "cipherstash-stats",
  "dirs",
@@ -720,9 +719,9 @@ dependencies = [
 
 [[package]]
 name = "cipherstash-config"
-version = "0.1.0"
+version = "0.2.0"
 source = "sparse+https://cargo.cloudsmith.io/cipherstash/cipherstash/"
-checksum = "7d20ddb4dc9319bb932fd32775cd6895d5d49bf5dbd53a5051d8745fd542f2ce"
+checksum = "d0fc6810f2b0b2f41de31691851ffd553b6b0f96097044f41b690b579884fb2f"
 dependencies = [
  "serde",
  "thiserror",
@@ -3126,9 +3125,9 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "vitur-protocol"
-version = "0.2.0"
+version = "0.2.1"
 source = "sparse+https://cargo.cloudsmith.io/cipherstash/cipherstash/"
-checksum = "174592d9c0a0f727a1d1aaa8c22eee5ad58eb27b5fa0eb48eca8e42cff1d7240"
+checksum = "8cc735d28f9cc5dc09a3ff60ee5d7969cf170c2e9424981808a8b9cf2ea2551e"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
