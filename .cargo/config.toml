@@ -1,6 +1,6 @@
-[registries.cipherstash]
-index = "sparse+https://cargo.cloudsmith.io/cipherstash/cipherstash/"
-credential-provider = "cargo:token"
+#[registries.cipherstash]
+#index = "sparse+https://cargo.cloudsmith.io/cipherstash/cipherstash/"
+#credential-provider = "cargo:token"
 
 # To use this registry export the variable CARGO_REGISTRIES_CIPHERSTASH_TOKEN with "Token <your token>".
 # Or set the appropriate option in your ~/.cargo/config.toml file.
