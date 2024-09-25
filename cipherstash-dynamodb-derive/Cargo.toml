@@ -4,7 +4,7 @@ license-file = "../LICENSE.md"
 homepage = "https://cipherstash.com"
 readme = "../README.md"
 description = "Derive macros for the CipherStash client for DynamoDB"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 
 [lib]
