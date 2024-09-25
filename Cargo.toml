@@ -6,23 +6,11 @@ repository = "https://github.com/cipherstash/cipherstash-dynamodb"
 documentation = "https://docs.rs/cipherstash-dynamodb"
 readme = "README.md"
 description = "CipherStash SDK for searchable, in-use encryption for DynamoDB"
-version = "0.7.1"
+version = "0.7.2"
 edition = "2021"
 authors = ["CipherStash <info@cipherstash.com>"]
 keywords = ["cryptography", "security", "databases", "encryption", "dynamodb"]
 categories = ["cryptography", "database"]
-
-[lib]
-# Starting in Rust 1.62 you can use `cargo add` to add dependencies 
-# to your project.
-#
-# If you're using an older Rust version,
-# download cargo-edit(https://github.com/killercup/cargo-edit#installation) 
-# to install the `add` subcommand.
-#
-# Running `cargo add DEPENDENCY_NAME` will
-# add the latest version of a dependency to the list,
-# and it will keep the alphabetic ordering for you.
 
 [dependencies]
 cipherstash-client = { version = "0.12" }
