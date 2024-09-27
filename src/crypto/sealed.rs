@@ -109,12 +109,13 @@ impl SealedTableEntry {
         }
 
         let decrypted = async_map_somes(decryptable_items, |items| cipher.decrypt(items)).await?;
-        let mut chunks_exact = decrypted.chunks_exact(protected_attributes.len());
         let mut default_iter =
             std::iter::repeat_with::<&[Option<Plaintext>], _>(|| &[]).take(plaintext_items.len());
 
+        let mut chunks_exact;
         let decrypted_iter: &mut dyn Iterator<Item = &[Option<Plaintext>]> =
             if protected_attributes.len() > 0 {
+                chunks_exact = decrypted.chunks_exact(protected_attributes.len());
                 &mut chunks_exact
             } else {
                 &mut default_iter
