@@ -227,11 +227,10 @@ async fn test_delete() {
 #[tokio::test]
 #[serial]
 async fn test_insert_retrieve_public() {
-
     let config = aws_config::from_env()
-    .endpoint_url("http://localhost:8000")
-    .load()
-    .await;
+        .endpoint_url("http://localhost:8000")
+        .load()
+        .await;
 
     let client = aws_sdk_dynamodb::Client::new(&config);
 
@@ -249,5 +248,7 @@ async fn test_insert_retrieve_public() {
         .expect("Failed to insert Dan");
 
     table
-        .get::<PublicUser>("dan@coderdan.co").await.expect("Failed to get Dan");
+        .get::<PublicUser>("dan@coderdan.co")
+        .await
+        .expect("Failed to get Dan");
 }
