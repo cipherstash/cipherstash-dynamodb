@@ -37,6 +37,36 @@ impl User {
     }
 }
 
+#[derive(
+    Identifiable, Encryptable, Decryptable, Searchable, Debug, PartialEq, Ord, PartialOrd, Eq,
+)]
+#[cipherstash(sort_key_prefix = "user")]
+pub struct PublicUser {
+    #[partition_key]
+    #[cipherstash(skip)]
+    pub email: String,
+
+    #[cipherstash(skip)]
+    pub name: String,
+
+    #[cipherstash(skip)]
+    pub tag: String,
+
+    #[cipherstash(skip)]
+    pub temp: bool,
+}
+
+impl PublicUser {
+    pub fn new(email: impl Into<String>, name: impl Into<String>, tag: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            email: email.into(),
+            tag: tag.into(),
+            temp: false,
+        }
+    }
+}
+
 async fn run_test<F: Future<Output = ()>>(mut f: impl FnMut(EncryptedTable) -> F) {
     let config = aws_config::from_env()
         .endpoint_url("http://localhost:8000")
@@ -192,4 +222,32 @@ async fn test_delete() {
         assert_eq!(res, vec![])
     })
     .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn test_insert_retrieve_public() {
+
+    let config = aws_config::from_env()
+    .endpoint_url("http://localhost:8000")
+    .load()
+    .await;
+
+    let client = aws_sdk_dynamodb::Client::new(&config);
+
+    let table_name = "test-public-users-pk";
+
+    common::create_table(&client, table_name).await;
+
+    let table = EncryptedTable::init(client, table_name)
+        .await
+        .expect("Failed to init table");
+
+    table
+        .put(PublicUser::new("dan@coderdan.co", "Dan Draper", "blue"))
+        .await
+        .expect("Failed to insert Dan");
+
+    table
+        .get::<PublicUser>("dan@coderdan.co").await.expect("Failed to get Dan");
 }
