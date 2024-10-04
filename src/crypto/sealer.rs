@@ -102,39 +102,6 @@ impl Sealed {
 }
 
 impl Sealer {
-    // pub fn new<T>(inner: T) -> Self {
-    //     Self {
-    //         inner,
-    //         unsealed: Unsealed::new(),
-    //     }
-    // }
-
-    // pub fn new_with_descriptor<T>(inner: T, descriptor: impl Into<String>) -> Self {
-    //     Self {
-    //         inner,
-    //         unsealed: Unsealed::new_with_descriptor(descriptor),
-    //     }
-    // }
-
-    // pub fn add_protected<F>(mut self, name: impl Into<String>, f: F) -> Result<Self, SealError>
-    // where
-    //     F: FnOnce(&T) -> Plaintext,
-    // {
-    //     let name: String = name.into();
-
-    //     self.unsealed.add_protected(name, f(&self.inner));
-    //     Ok(self)
-    // }
-
-    // pub fn add_plaintext<F>(mut self, name: impl Into<String>, f: F) -> Result<Self, SealError>
-    // where
-    //     F: FnOnce(&T) -> TableAttribute,
-    // {
-    //     let name: String = name.into();
-    //     self.unsealed.add_unprotected(name, f(&self.inner));
-    //     Ok(self)
-    // }
-
     pub(crate) async fn seal_all<'a>(
         records: impl IntoIterator<Item = Sealer>,
         protected_attributes: impl AsRef<[Cow<'a, str>]>,
@@ -163,13 +130,6 @@ impl Sealer {
 
             let type_name = &record.type_name;
 
-            // let PrimaryKeyParts { pk, sk } = encrypt_primary_key::<S>(
-            //     record.inner.get_primary_key(),
-            //     &S::type_name(),
-            //     S::sort_key_prefix().as_deref(),
-            //     cipher,
-            // )?;
-
             for attr in protected_attributes.iter() {
                 protected.push(record.unsealed.remove_protected_with_descriptor(attr)?);
             }
@@ -177,16 +137,6 @@ impl Sealer {
             let terms: Vec<(Cow<'_, str>, IndexType, Vec<u8>)> = record
                 .unsealed_indexes
                 .into_iter()
-                // .iter()
-                // .map(|(index_name, index_type)| {
-                //     record
-                //         .inner
-                //         .attribute_for_index(index_name, *index_type)
-                //         .and_then(|attr| {
-                //             S::index_by_name(index_name, *index_type)
-                //                 .map(|index| (attr, index, index_name, index_type))
-                //         })
-                //         .ok_or(SealError::MissingAttribute(index_name.to_string()))
                 .map(|(attr, index, index_name, index_type)| {
                     let term = cipher.compound_index(
                         &CompoundIndex::new(index),
