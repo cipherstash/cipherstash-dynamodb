@@ -28,6 +28,8 @@ use std::{
     ops::Deref,
 };
 
+const DEFAULT_TERM_SIZE: usize = 12;
+
 pub struct Headless;
 
 pub struct Dynamo {
@@ -375,7 +377,7 @@ impl<D> EncryptedTable<D> {
             sealer,
         } = record;
 
-        let sealed = sealer.seal(protected_attributes, &self.cipher, 12).await?;
+        let sealed = sealer.seal(protected_attributes, &self.cipher, DEFAULT_TERM_SIZE).await?;
 
         let mut put_records = Vec::with_capacity(sealed.len());
 
