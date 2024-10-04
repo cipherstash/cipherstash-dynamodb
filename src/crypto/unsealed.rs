@@ -68,6 +68,21 @@ impl Unsealed {
         self.unprotected.insert(name.into(), attribute);
     }
 
+    // TODO: Add docs
+    // TODO: Repeat for unprotected
+    pub fn nested_protected<'p>(&'p self, prefix: &'p str) -> impl Iterator<Item = (String, Plaintext)> + 'p {
+        // TODO: Make adding the . idempotent
+        let prefix = format!("{}.", prefix);
+        self.protected
+            .iter()
+            .filter_map(move |(k, v)| {
+                // TODO: Remove the prefix from the key
+                // TODO: This function should consume
+                k.strip_prefix(&prefix).map(|k| (k.to_string(), v.0.clone()))
+            })
+            //.collect()
+    }
+
     /// Remove and return a protected value along with its descriptor.
     pub(crate) fn remove_protected_with_descriptor(
         &mut self,
@@ -83,5 +98,31 @@ impl Unsealed {
 
     pub fn into_value<T: Decryptable>(self) -> Result<T, SealError> {
         T::from_unsealed(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::*;
+
+    #[test]
+    fn test_nested_protected() {
+        let mut unsealed = Unsealed::new_with_descriptor("test");
+        unsealed.add_protected("test.a", Plaintext::from("a"));
+        unsealed.add_protected("test.b", Plaintext::from("b"));
+        unsealed.add_protected("test.c", Plaintext::from("c"));
+        unsealed.add_protected("test.d", Plaintext::from("d"));
+
+        let nested = unsealed
+            .nested_protected("test")
+            .collect::<BTreeMap<_, _>>();
+
+        assert_eq!(nested.len(), 4);
+        assert_eq!(nested["a"], Plaintext::from("a"));
+        assert_eq!(nested["b"], Plaintext::from("b"));
+        assert_eq!(nested["c"], Plaintext::from("c"));
+        assert_eq!(nested["d"], Plaintext::from("d"));   
     }
 }
