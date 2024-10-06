@@ -1,8 +1,13 @@
+mod dynamo;
 pub mod query;
+mod table_attribute;
+mod table_attributes;
 mod table_entry;
 pub use self::{
     query::QueryBuilder,
-    table_entry::{TableAttribute, TableEntry, TryFromTableAttr},
+    table_attribute::{TableAttribute, TryFromTableAttr},
+    table_attributes::TableAttributes,
+    table_entry::TableEntry,
 };
 use crate::{
     crypto::*,
@@ -27,6 +32,7 @@ use std::{
     collections::{HashMap, HashSet},
     ops::Deref,
 };
+pub use dynamo::DynamoItem;
 
 const DEFAULT_TERM_SIZE: usize = 12;
 
@@ -102,6 +108,8 @@ pub struct DynamoRecordPatch {
     pub delete_records: Vec<PrimaryKeyParts>,
 }
 
+// FIXME: Remove this (only used for debugging)
+#[derive(Debug)]
 pub struct PreparedRecord {
     protected_indexes: Cow<'static, [(Cow<'static, str>, IndexType)]>,
     protected_attributes: Cow<'static, [Cow<'static, str>]>,
@@ -153,28 +161,6 @@ impl PreparedRecord {
         }
     }
 
-    /// Get all the [`Plaintext`] protected attributes from the [`PreparedRecord`]
-    pub fn protected(&self) -> impl Iterator<Item = (&str, &Plaintext)> {
-        self.sealer
-            .unsealed
-            .protected()
-            .iter()
-            .map(|(key, (plaintext, _descriptor))| (key.as_str(), plaintext))
-    }
-
-    /// Get all the unprotected attributes from the [`PreparedRecord`]
-    pub fn unprotected(&self) -> impl Iterator<Item = (&str, &TableAttribute)> {
-        self.sealer
-            .unsealed
-            .unprotected()
-            .iter()
-            .map(|(key, attr)| (key.as_str(), attr))
-    }
-
-    pub fn unsealed_indexes(&self) -> &[UnsealedIndex] {
-        &self.sealer.unsealed_indexes
-    }
-
     pub fn prepare_record<R>(record: R) -> Result<Self, SealError>
     where
         R: Searchable + Identifiable,
@@ -188,6 +174,7 @@ impl PreparedRecord {
         let protected_indexes = R::protected_indexes();
         let protected_attributes = R::protected_attributes();
 
+        // Get the CompositePlaintext, ComposableIndex, name and type for each index
         let unsealed_indexes = protected_indexes
             .iter()
             .map(|(index_name, index_type)| {
@@ -198,6 +185,11 @@ impl PreparedRecord {
                             .map(|index| (attr, index, index_name.clone(), *index_type))
                     })
                     .ok_or(SealError::MissingAttribute(index_name.to_string()))
+                    // TODO: Remove
+                    .map(|e| {
+                        println!("HHHHHHH {:?}", e);
+                        e
+                    })
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -331,6 +323,8 @@ impl<D> EncryptedTable<D> {
         let item = self
             .unseal(item, UnsealSpec::new_for_decryptable::<T>())
             .await?;
+
+        println!("LAST: ---> Unsealed item: {:?}", item);
         Ok(item.into_value()?)
     }
 
@@ -377,7 +371,9 @@ impl<D> EncryptedTable<D> {
             sealer,
         } = record;
 
-        let sealed = sealer.seal(protected_attributes, &self.cipher, DEFAULT_TERM_SIZE).await?;
+        let sealed = sealer
+            .seal(protected_attributes, &self.cipher, DEFAULT_TERM_SIZE)
+            .await?;
 
         let mut put_records = Vec::with_capacity(sealed.len());
 

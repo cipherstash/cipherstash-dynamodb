@@ -1,3 +1,4 @@
+mod attrs;
 mod b64_encode;
 mod sealed;
 mod sealer;
@@ -16,6 +17,7 @@ use cipherstash_client::{
         Encryption, EncryptionError, Plaintext, TypeParseError,
     },
 };
+use miette::Diagnostic;
 use thiserror::Error;
 
 pub use b64_encode::*;
@@ -28,7 +30,7 @@ pub use unsealed::Unsealed;
 /// delete all index terms for a particular record.
 const MAX_TERMS_PER_INDEX: usize = 25;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Diagnostic)]
 pub enum SealError {
     #[error("Error when creating primary key: {0}")]
     PrimaryKeyError(#[from] PrimaryKeyError),

@@ -31,7 +31,7 @@ pub(crate) fn derive_decryptable(input: DeriveInput) -> Result<TokenStream, syn:
             let attr_ident = format_ident!("{attr}");
 
             quote! {
-                #attr_ident: ::cipherstash_dynamodb::traits::TryFromPlaintext::try_from_optional_plaintext(unsealed.get_protected(#attr).cloned())?
+                #attr_ident: ::cipherstash_dynamodb::traits::TryFromPlaintext::try_from_optional_plaintext(unsealed.take_protected(#attr))?
             }
         })
         .chain(plaintext_attributes.iter().map(|attr| {
@@ -60,7 +60,7 @@ pub(crate) fn derive_decryptable(input: DeriveInput) -> Result<TokenStream, syn:
                 std::borrow::Cow::Borrowed(&[#(#plaintext_attributes_cow,)*])
             }
 
-            fn from_unsealed(unsealed: cipherstash_dynamodb::crypto::Unsealed) -> Result<Self, cipherstash_dynamodb::crypto::SealError> {
+            fn from_unsealed(mut unsealed: cipherstash_dynamodb::crypto::Unsealed) -> Result<Self, cipherstash_dynamodb::crypto::SealError> {
                 Ok(Self {
                     #(#from_unsealed_impl,)*
                 })
