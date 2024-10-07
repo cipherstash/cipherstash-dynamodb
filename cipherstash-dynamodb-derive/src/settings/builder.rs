@@ -1,7 +1,7 @@
 use super::{index_type::IndexType, AttributeMode, Settings};
 use proc_macro2::{Ident, Span};
 use std::collections::HashMap;
-use syn::{Data, DeriveInput, Fields, LitStr, ExprPath};
+use syn::{Data, DeriveInput, ExprPath, Fields, LitStr};
 
 enum SortKeyPrefix {
     Default,
@@ -19,7 +19,7 @@ impl SortKeyPrefix {
     }
 }
 
-const RESERVED_FIELD_NAMES: &'static [&'static str] = &["term"];
+const RESERVED_FIELD_NAMES: &[&str] = &["term"];
 
 pub(crate) struct SettingsBuilder {
     ident: Ident,
@@ -162,28 +162,25 @@ impl SettingsBuilder {
                         let has_partition_key_attr = field
                             .attrs
                             .iter()
-                            .find(|x| x.path().is_ident("partition_key"))
-                            .is_some();
+                            .any(|x| x.path().is_ident("partition_key"));
 
                         if !has_partition_key_attr {
                             return Err(syn::Error::new_spanned(
                                 field,
-                                format!("field named 'pk' must be annotated with #[partition_key]"),
+                                "field named 'pk' must be annotated with #[partition_key]"
+                                    .to_string(),
                             ));
                         }
                     }
 
                     if field_name == "sk" {
-                        let has_partition_key_attr = field
-                            .attrs
-                            .iter()
-                            .find(|x| x.path().is_ident("sort_key"))
-                            .is_some();
+                        let has_partition_key_attr =
+                            field.attrs.iter().any(|x| x.path().is_ident("sort_key"));
 
                         if !has_partition_key_attr {
                             return Err(syn::Error::new_spanned(
                                 field,
-                                format!("field named 'sk' must be annotated with #[sort_key]"),
+                                "field named 'sk' must be annotated with #[sort_key]".to_string(),
                             ));
                         }
                     }
