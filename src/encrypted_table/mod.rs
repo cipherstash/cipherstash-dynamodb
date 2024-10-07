@@ -318,8 +318,6 @@ impl<D> EncryptedTable<D> {
         T: Decryptable + Identifiable,
     {
         let uspec = UnsealSpec::new_for_decryptable::<T>();
-        println!("USPEC: {:?}", uspec);
-
         let item = self.unseal(item, uspec).await?;
 
         Ok(item.into_value()?)
@@ -454,8 +452,6 @@ impl EncryptedTable<Dynamo> {
         let PrimaryKeyParts { pk, sk } =
             self.encrypt_primary_key_parts(PreparedPrimaryKey::new::<T>(k))?;
 
-        println!("GET: PK: {}, SK: {}", pk, sk);
-
         let result = self
             .db
             .get_item()
@@ -465,8 +461,6 @@ impl EncryptedTable<Dynamo> {
             .send()
             .await
             .map_err(|e| GetError::Aws(format!("{e:?}")))?;
-
-        println!("RESULT: {:?}", result);
 
         if let Some(item) = result.item {
             Ok(Some(self.decrypt(item).await?))

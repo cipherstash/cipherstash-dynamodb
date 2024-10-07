@@ -4,8 +4,6 @@ use super::flattened_protected_attributes::{
 use cipherstash_client::encryption::Plaintext;
 use std::collections::HashMap;
 
-// FIXME: Remove this (only used for debugging)
-#[derive(Debug)]
 pub(crate) struct NormalizedProtectedAttributes {
     values: HashMap<NormalizedKey, NormalizedValue>,
     prefix: Option<String>,

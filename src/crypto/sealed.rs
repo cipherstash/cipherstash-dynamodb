@@ -18,8 +18,6 @@ use super::{attrs::NormalizedProtectedAttributes, SealError, Unsealed};
 /// Wrapped to indicate that the value is encrypted
 pub struct SealedTableEntry(pub(super) TableEntry);
 
-// FIXME: Remove this (only used for debugging)
-#[derive(Debug)]
 pub struct UnsealSpec<'a> {
     pub(crate) protected_attributes: Cow<'a, [Cow<'a, str>]>,
 

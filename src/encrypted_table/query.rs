@@ -75,15 +75,11 @@ impl PreparedQuery {
             .key_condition_expression("term = :term")
             .expression_attribute_values(":term", term);
 
-        let result = query.send().await?;
-
-        dbg!(&result);
-
-        let items = result
+        query
+            .send()
+            .await?
             .items
-            .ok_or_else(|| QueryError::Other("Expected items entry on aws response".into()))?;
-
-        Ok(items)
+            .ok_or_else(|| QueryError::Other("Expected items entry on aws response".into()))
     }
 }
 
