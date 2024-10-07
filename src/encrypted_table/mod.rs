@@ -109,8 +109,6 @@ pub struct DynamoRecordPatch {
     pub delete_records: Vec<PrimaryKeyParts>,
 }
 
-// FIXME: Remove this (only used for debugging)
-#[derive(Debug)]
 pub struct PreparedRecord {
     protected_indexes: Cow<'static, [(Cow<'static, str>, IndexType)]>,
     protected_attributes: Cow<'static, [Cow<'static, str>]>,
@@ -383,10 +381,7 @@ impl<D> EncryptedTable<D> {
 
         let PrimaryKeyParts { pk, sk } = sealed.primary_key();
 
-        println!("PUT: PK: {}, SK: {}", pk, sk);
-
         let (root, index_entries) = sealed.into_table_entries(index_predicate);
-        println!("ROOT: {:?}", root);
 
         seen_sk.insert(root.inner().sk.clone());
         put_records.push(root.try_into()?);

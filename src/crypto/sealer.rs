@@ -25,8 +25,6 @@ pub type UnsealedIndex = (
     IndexType,
 );
 
-// FIXME: Remove this (only used for debugging)
-#[derive(Debug)]
 /// Builder pattern for sealing a record of type, `T`.
 pub struct Sealer {
     pub(crate) pk: String,
@@ -250,8 +248,6 @@ struct Term {
     value: Vec<u8>,
 }
 
-// FIXME: Remove this (only used for debugging)
-#[derive(Debug)]
 // FIXME: This struct is almost _identical_ to the one in encrypted_table/table_entry.rs
 pub struct Sealed {
     pk: String,

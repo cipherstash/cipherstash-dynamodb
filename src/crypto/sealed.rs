@@ -14,8 +14,6 @@ use std::{borrow::Cow, collections::HashMap};
 
 use super::{attrs::NormalizedProtectedAttributes, SealError, Unsealed};
 
-// FIXME: Remove this (only used for debugging)
-#[derive(Debug)]
 // FIXME: Move this to a separate file
 /// Wrapped to indicate that the value is encrypted
 pub struct SealedTableEntry(pub(super) TableEntry);
@@ -117,7 +115,6 @@ impl SealedTableEntry {
                 .decrypt_all(cipher)
                 .await?
                 .into_iter()
-                // FIXME: chunk_size is not the same as protected_attributes.len() when dealing with maps
                 // TODO: Can we make decrypt_all return a Vec of FlattenedProtectedAttributes? (like the mirror of encrypt_all)
                 .chunks(chunk_size)
                 .into_iter()

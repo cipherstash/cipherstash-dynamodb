@@ -4,8 +4,7 @@ use std::{
     collections::{hash_map::IntoIter, HashMap},
 };
 
-// FIXME: Remove this (only used for debugging)
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 /// Represents a collection of attributes for a table entry.
 /// Attributes are stored as a map of `String` to `TableAttribute`.
 pub struct TableAttributes(HashMap<AttributeName, TableAttribute>);

@@ -12,7 +12,7 @@ pub trait TryFromTableAttr: Sized {
     fn try_from_table_attr(value: TableAttribute) -> Result<Self, ReadConversionError>;
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum TableAttribute {
     String(String),
     Number(String),

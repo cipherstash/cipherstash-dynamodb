@@ -9,8 +9,6 @@ use crate::{
 use cipherstash_client::encryption::Plaintext;
 use std::collections::HashMap;
 
-// FIXME: Remove this (only used for debugging)
-#[derive(Debug)]
 /// Wrapper to indicate that a value is NOT encrypted
 pub struct Unsealed {
     /// Protected plaintexts with their descriptors

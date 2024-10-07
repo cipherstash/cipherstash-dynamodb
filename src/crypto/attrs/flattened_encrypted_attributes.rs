@@ -12,10 +12,7 @@ use itertools::Itertools;
 
 use super::FlattenedProtectedAttributes;
 
-// TODO: Move this elsewhere
 /// Represents a set of encrypted records that have not yet been normalized into an output type.
-// TODO: Remove the Debug derive
-#[derive(Debug)]
 pub(crate) struct FlattenedEncryptedAttributes {
     attrs: Vec<EncryptedRecord>,
 }
@@ -31,7 +28,6 @@ impl FlattenedEncryptedAttributes {
         self.attrs.is_empty()
     }
 
-    // TODO: REmove this
     pub(crate) fn len(&self) -> usize {
         self.attrs.len()
     }

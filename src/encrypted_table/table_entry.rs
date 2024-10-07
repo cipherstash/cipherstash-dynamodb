@@ -1,9 +1,5 @@
 use super::{table_attribute::TableAttribute, table_attributes::TableAttributes, AttributeName};
 
-// FIXME: Clean this up
-// FIXME: Can we remove the Clone and Debug?
-//#[skip_serializing_none]
-#[derive(Debug, Clone)]
 pub struct TableEntry {
     pub(crate) pk: String,
     pub(crate) sk: String,
