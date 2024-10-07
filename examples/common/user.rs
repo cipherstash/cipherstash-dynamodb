@@ -3,13 +3,13 @@ use cipherstash_dynamodb::{Decryptable, Encryptable, Identifiable, Searchable};
 #[derive(Debug, Identifiable, Encryptable, Decryptable, Searchable)]
 #[cipherstash(sort_key_prefix = "user")]
 pub struct User {
-    //#[cipherstash(query = "exact", compound = "email#name")]
-    //#[cipherstash(query = "exact")]
+    #[cipherstash(query = "exact", compound = "email#name")]
+    #[cipherstash(query = "exact")]
     #[partition_key]
     pub email: String,
 
-    //#[cipherstash(query = "prefix", compound = "email#name")]
-    //#[cipherstash(query = "prefix")]
+    #[cipherstash(query = "prefix", compound = "email#name")]
+    #[cipherstash(query = "prefix")]
     pub name: String,
 
     #[cipherstash(plaintext)]

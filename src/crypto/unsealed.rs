@@ -73,6 +73,17 @@ impl Unsealed {
         (self.protected.flatten(), self.unprotected)
     }
 
+    /// Create a new Unsealed from the protected and unprotected attributes.
+    pub(crate) fn new_from_parts(
+        protected: NormalizedProtectedAttributes,
+        unprotected: TableAttributes,
+    ) -> Self {
+        let mut unsealed = Self::new();
+        unsealed.protected = protected;
+        unsealed.unprotected = unprotected;
+        unsealed
+    }
+
     pub fn into_value<T: Decryptable>(self) -> Result<T, SealError> {
         T::from_unsealed(self)
     }

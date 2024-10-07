@@ -1,9 +1,9 @@
 use super::{
-    attrs::{FlattenedEncryptedAttributes, FlattenedProtectedAttributes}, b64_encode, format_term_key, hmac, SealError,
+    attrs::FlattenedProtectedAttributes, b64_encode, format_term_key, hmac, SealError,
     SealedTableEntry, Unsealed, MAX_TERMS_PER_INDEX,
 };
 use crate::{
-    encrypted_table::{Dynamo, TableAttribute, TableAttributes, TableEntry},
+    encrypted_table::{TableAttribute, TableAttributes, TableEntry},
     traits::PrimaryKeyParts,
     IndexType,
 };
@@ -15,8 +15,7 @@ use cipherstash_client::{
     },
 };
 use itertools::Itertools;
-use core::num;
-use std::{borrow::Cow, collections::HashMap, ops::Deref};
+use std::{borrow::Cow, collections::HashMap};
 
 /// The combination of plaintext, index, name and index type for a particular field
 pub type UnsealedIndex = (
@@ -50,6 +49,7 @@ struct RecordsWithTerms<'a> {
 
 impl<'a> RecordsWithTerms<'a> {
     fn new(records: Vec<RecordWithTerms<'a>>, num_protected_attributes: usize) -> Self {
+        println!("Creating RecordsWithTerms with {} protected attrs", num_protected_attributes);
         Self {
             num_protected_attributes,
             records,
@@ -59,11 +59,12 @@ impl<'a> RecordsWithTerms<'a> {
     async fn encrypt(self,
         cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
     ) -> Result<Vec<Sealed>, SealError> {
-        let mut pksks = Vec::with_capacity(self.records.len());
-        let mut record_terms = Vec::with_capacity(self.records.len());
-        let mut unprotecteds = Vec::with_capacity(self.records.len());
+        let num_records = self.records.len();
+        let mut pksks = Vec::with_capacity(num_records);
+        let mut record_terms = Vec::with_capacity(num_records);
+        let mut unprotecteds = Vec::with_capacity(num_records);
         let mut protected =
-            FlattenedProtectedAttributes::new_with_capacity(self.records.len() * self.num_protected_attributes);
+            FlattenedProtectedAttributes::new_with_capacity(num_records * self.num_protected_attributes);
 
         for sealer_with_terms in self.records {
             let (pksk, terms, flattened_protected, unprotected) = sealer_with_terms.into_parts();
@@ -74,29 +75,47 @@ impl<'a> RecordsWithTerms<'a> {
             protected.extend(flattened_protected.into_iter());
         }
 
-        let encrypted = protected.encrypt_all(cipher, self.num_protected_attributes).await?;
-
-        encrypted
-            .into_iter()
-            .zip_eq(unprotecteds.into_iter())
-            .zip_eq(record_terms.into_iter())
-            .zip_eq(pksks.into_iter())
-            .map(|record| {
-                let (enc_attrs, unprotecteds, terms, pksk) = flatten_tuple(record);
-                enc_attrs
-                    .denormalize()
-                    .map(|protected_attrs| {
-                        Sealed {
-                            pk: pksk.pk,
-                            sk: pksk.sk,
-                            attributes: unprotecteds.merge(protected_attrs),
-                            terms,
-                        }
+        // TODO: Split this out into separate functions and/or implement From for the tuple into Sealed
+        if protected.is_empty() {
+            unprotecteds
+                .into_iter()
+                .zip_eq(record_terms.into_iter())
+                .zip_eq(pksks.into_iter())
+                .map(|record| {
+                    let (attributes, terms, pksk) = flatten_tuple_3(record);
+                    Ok(Sealed {
+                        pk: pksk.pk,
+                        sk: pksk.sk,
+                        attributes,
+                        terms,
                     })
-            })
-            .collect()
-    }
+                })
+                .collect()
 
+        } else {
+            let encrypted = protected.encrypt_all(cipher, self.num_protected_attributes).await?;
+
+            encrypted
+                .into_iter()
+                .zip_eq(unprotecteds.into_iter())
+                .zip_eq(record_terms.into_iter())
+                .zip_eq(pksks.into_iter())
+                .map(|record| {
+                    let (enc_attrs, unprotecteds, terms, pksk) = flatten_tuple_4(record);
+                    enc_attrs
+                        .denormalize()
+                        .map(|protected_attrs| {
+                            Sealed {
+                                pk: pksk.pk,
+                                sk: pksk.sk,
+                                attributes: unprotecteds.merge(protected_attrs),
+                                terms,
+                            }
+                        })
+                })
+                .collect()
+        }
+    }
 }
 
 struct RecordWithTerms<'a> {
@@ -131,6 +150,9 @@ impl Sealer {
     ) -> Result<RecordsWithTerms<'a>, SealError> {
         let protected_attributes = protected_attributes.as_ref();
         let num_protected_attributes = protected_attributes.len();
+
+        dbg!(&protected_attributes);
+        dbg!(num_protected_attributes);
 
         records
             .into_iter()
@@ -360,7 +382,7 @@ struct Term {
 
 // FIXME: Remove this (only used for debugging)
 #[derive(Debug)]
-// FIXME: Shouldn't this type be in the sealed module?
+// FIXME: This struct is almost _identical_ to the one in encrypted_table/table_entry.rs
 pub struct Sealed {
     pk: String,
     sk: String,
@@ -422,7 +444,13 @@ impl Sealed {
     }
 }
 
+// TODO: Move these somewhere else
 #[inline]
-fn flatten_tuple<A, B, C, D>((((a, b), c), d): (((A, B), C), D)) -> (A, B, C, D) {
+fn flatten_tuple_4<A, B, C, D>((((a, b), c), d): (((A, B), C), D)) -> (A, B, C, D) {
     (a, b, c, d)
+}
+
+#[inline]
+fn flatten_tuple_3<A, B, C>(((a, b), c): ((A, B), C)) -> (A, B, C) {
+    (a, b, c)
 }

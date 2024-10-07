@@ -1,8 +1,5 @@
 use crate::{
-    async_map_somes::async_map_somes,
-    encrypted_table::TableEntry,
-    traits::{ReadConversionError, TableAttribute, WriteConversionError},
-    Decryptable,
+    async_map_somes::async_map_somes, crypto::attrs::FlattenedEncryptedAttributes, encrypted_table::TableEntry, traits::{ReadConversionError, TableAttribute, WriteConversionError}, Decryptable
 };
 use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
 use cipherstash_client::{
@@ -12,7 +9,7 @@ use cipherstash_client::{
 use itertools::Itertools;
 use std::{borrow::Cow, collections::HashMap, ops::Deref};
 
-use super::{SealError, Unsealed};
+use super::{attrs::NormalizedProtectedAttributes, sealer::Sealed, SealError, Unsealed};
 
 // FIXME: Remove this (only used for debugging)
 #[derive(Debug)]
@@ -71,10 +68,6 @@ impl SealedTableEntry {
             plaintext_attributes,
         } = spec;
 
-        println!(
-            "DECRYPT: Unsealing all items, protected_attributes: {:?}",
-            protected_attributes
-        );
 
         // FIXME: The following issues remain:
         // 1. The pk and sk are not being added to the unsealed
@@ -87,52 +80,56 @@ impl SealedTableEntry {
         // 7. Determine if pk and sk should be underscored (check the bahaviour in main or tests)
 
         //let mut plaintext_items: Vec<Vec<Option<&TableAttribute>>> =
-        let mut plaintext_items = Vec::with_capacity(items.len());
-        let mut decryptable_items = Vec::with_capacity(items.len() * protected_attributes.len());
-        let mut decryptable_names: Vec<String> =
-            Vec::with_capacity(items.len() * protected_attributes.len());
+        let mut unprotected_items = Vec::with_capacity(items.len());
+        let mut protected_items = FlattenedEncryptedAttributes::with_capacity(items.len() * protected_attributes.len());
+
+        println!("---- protected count: {}", protected_attributes.len());
 
         for item in items.into_iter() {
-            println!("DECRYPT: Unsealing item: {:?}", item);
             let (protected, unprotected) = item
                 .into_inner()
                 .attributes
                 .partition(protected_attributes.as_ref());
 
-            println!("DECRYPT: Unsealing item: {:?}", protected);
+            protected_items.try_extend(protected);
+            unprotected_items.push(unprotected);
+        }
 
-            if !protected_attributes.is_empty() {
-                let (names, ciphertexts) = protected
-                    .denormalize()
-                    .into_iter()
-                    .map(|(name, attribute)| {
-                        // TODO: Its still unclear why these are even here - if we still need it, move it to the normalise function
-                        //dbg!(&item.inner().attributes);
-                        /*let attribute = attributes.get(match name.deref() {
-                            "pk" => "__pk",
-                            "sk" => "__sk",
-                            _ => name,
-                        });*/
+        dbg!(&unprotected_items);
 
-                        // FIXME: We need to track the denormalized attr name so we can use that to key into the Unsealed later
-                        println!(
-                            "DECRYPT: Decrypting protected attribute: {} = {:?}",
-                            name, attribute
-                        );
-                        attribute
-                            .as_encrypted_record()
-                            .ok_or_else(|| SealError::InvalidCiphertext(name.to_string()))
-                            .map(|attr| (name.to_string(), attr))
-                    })
-                    .collect::<Result<(Vec<_>, Vec<_>), _>>()?;
+        println!("---- protected items empty?: {:?}", protected_items.is_empty());
 
-                // Create a list of all ciphertexts so that they can all be decrypted in one go.
-                // The decrypted version of this list will be chunked up and zipped with the plaintext
-                // fields once the decryption succeeds.
-                decryptable_items.extend(ciphertexts);
-                decryptable_names.extend(names);
-            }
+        if protected_items.is_empty() {
+            unprotected_items
+                .into_iter()
+                .map(|unprotected| {
+                    Ok(Unsealed::new_from_parts(NormalizedProtectedAttributes::new(), unprotected))
+                })
+                .collect()
+        } else {
+            let r1 = protected_items
+                .decrypt_all(cipher)
+                .await?
+                .into_iter()
+                .chunks(protected_attributes.len())
+                .into_iter()
+                .map(|fpa| fpa.into_iter().collect::<NormalizedProtectedAttributes>())
+                .collect_vec();
 
+            dbg!(&r1);
+
+            let r = r1
+                .into_iter()
+                .zip_eq(unprotected_items.into_iter())
+                .map(|(fpa, unprotected)| {
+                    Unsealed::new_from_parts(fpa, unprotected)
+                })
+                .collect();
+
+            Ok(r)
+        }
+
+        /*  
             let unprotected = unprotected
                 .into_iter()
                 .map(|(name, attribute)| {
@@ -146,18 +143,14 @@ impl SealedTableEntry {
                 })
                 .collect::<Vec<TableAttribute>>();
 
-            plaintext_items.push(unprotected);
+            unprotected_items.push(unprotected);
         }
 
-        println!("----->> BBB {:?}", decryptable_items);
-
         //let decrypted = async_map_somes(decryptable_items, |items| cipher.decrypt(items)).await?;
-        let decrypted = cipher.decrypt(decryptable_items).await?;
+        let decrypted = cipher.decrypt(protected_items).await?;
         //let mut default_iter =
         //    std::iter::repeat_with::<Plaintext, _>(|| &[]).take(plaintext_items.len());
         //std::iter::repeat_with::<&[Option<Plaintext>], _>(|| &[]).take(plaintext_items.len());
-
-        println!("----->> CCCC");
 
         /*let mut chunks_exact;
         //let decrypted_iter: &mut dyn Iterator<Item = &[Option<Plaintext>]> =
@@ -169,14 +162,12 @@ impl SealedTableEntry {
                 &mut default_iter
             };*/
 
-        println!("----->> DDDD");
-
         // TODO: Handle if protected_attributes is empty
         let unsealed = decrypted
             .into_iter()
             .chunks(protected_attributes.len())
             .into_iter()
-            .zip(plaintext_items.into_iter())
+            .zip(unprotected_items.into_iter())
             .map(|(decrypted, plaintext_items)| {
                 let mut unsealed = Unsealed::new();
 
@@ -198,7 +189,7 @@ impl SealedTableEntry {
             .collect::<Vec<_>>();
 
         dbg!(&unsealed);
-        Ok(unsealed)
+        Ok(unsealed)*/
     }
 
     /// Unseal the current value and return it's plaintext representation

@@ -36,9 +36,9 @@ pub enum SealError {
     PrimaryKeyError(#[from] PrimaryKeyError),
     #[error("Failed to encrypt partition key")]
     CryptoError(#[from] EncryptionError),
-    #[error("Failed to convert attribute: {0} from internal representation")]
+    #[error(transparent)]
     ReadConversionError(#[from] ReadConversionError),
-    #[error("Failed to convert attribute: {0} to internal representation")]
+    #[error(transparent)]
     WriteConversionError(#[from] WriteConversionError),
     // TODO: Does TypeParseError correctly redact the plaintext value?
     #[error("Failed to parse type for encryption: {0}")]

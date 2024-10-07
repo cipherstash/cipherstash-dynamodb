@@ -152,7 +152,7 @@ pub trait Decryptable: Sized {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cipherstash_client::encryption::TypeParseError;
+    use miette::IntoDiagnostic;
     use std::collections::BTreeMap;
 
     fn make_btree_map() -> BTreeMap<String, String> {
@@ -165,8 +165,7 @@ mod tests {
 
     #[derive(Debug, Clone, PartialEq)]
     struct Test {
-        pub pk: String,
-        pub sk: String,
+        pub id: String,
         pub name: String,
         pub age: i16,
         pub tag: String,
@@ -174,9 +173,10 @@ mod tests {
     }
 
     impl Identifiable for Test {
-        type PrimaryKey = PkSk;
+        type PrimaryKey = Pk;
+
         fn get_primary_key(&self) -> Self::PrimaryKey {
-            PkSk(self.pk.to_string(), self.sk.to_string())
+            Pk(self.id.to_string())
         }
         #[inline]
         fn type_name() -> Cow<'static, str> {
@@ -238,16 +238,16 @@ mod tests {
             .collect()
     }
 
+    // TODO: Test this with struct fields called pk and sk
     impl Decryptable for Test {
         fn from_unsealed(mut unsealed: Unsealed) -> Result<Self, SealError> {
             Ok(Self {
                 // FIXME: How do we handle pk and sk? - especialy if they are encryptedl
-                pk: String::from("pk"),
-                sk: TryFromTableAttr::try_from_table_attr(unsealed.get_plaintext("sk"))?,
+                id: TryFromTableAttr::try_from_table_attr(unsealed.get_plaintext("tag"))?,
                 name: TryFromPlaintext::try_from_optional_plaintext(
                     unsealed.take_protected("name"),
-                )?,
-                age: TryFromPlaintext::try_from_optional_plaintext(unsealed.take_protected("age"))?,
+                ).expect("name conversion failed"),
+                age: TryFromPlaintext::try_from_optional_plaintext(unsealed.take_protected("age")).expect("age conversion failed"),
                 tag: TryFromTableAttr::try_from_table_attr(unsealed.get_plaintext("tag"))?,
                 attrs: get_attrs(&mut unsealed)?,
             })
@@ -269,10 +269,9 @@ mod tests {
     }
 
     #[test]
-    fn test_encryptable() {
+    fn test_encryptable() -> Result<(), Box<dyn std::error::Error>> {
         let test = Test {
-            pk: "pk".to_string(),
-            sk: "sk".to_string(),
+            id: "id-100".to_string(),
             name: "name".to_string(),
             tag: "tag".to_string(),
             age: 42,
@@ -280,6 +279,9 @@ mod tests {
         };
 
         let unsealed = test.clone().into_unsealed();
-        assert_eq!(test, Test::from_unsealed(unsealed).unwrap());
+        dbg!(&unsealed);
+        assert_eq!(test, Test::from_unsealed(unsealed).into_diagnostic()?);
+
+        Ok(())
     }
 }

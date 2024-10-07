@@ -8,6 +8,7 @@ use cipherstash_client::{
 };
 use itertools::Itertools;
 
+// TODO: This thing is confusingly named - it holds unencrypted attributes that are intended for encryption
 /// Describes a set of flattened protected attributes intended for encryption.
 #[derive(PartialEq, Debug)]
 pub(crate) struct FlattenedProtectedAttributes(pub(super) Vec<FlattenedProtectedAttribute>);
@@ -17,7 +18,12 @@ impl FlattenedProtectedAttributes {
         Self(Vec::with_capacity(capacity))
     }
 
-    pub(super) fn normalize(self) -> NormalizedProtectedAttributes {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    // TODO: Is this needed now that we have FromIterator?
+    pub(crate) fn normalize(self) -> NormalizedProtectedAttributes {
         self.0
             .into_iter()
             .fold(NormalizedProtectedAttributes::new(), |mut acc, fpa| {
@@ -43,13 +49,19 @@ impl FlattenedProtectedAttributes {
         cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
         chunk_size: usize,
     ) -> Result<Vec<FlattenedEncryptedAttributes>, SealError> {
-        cipher
+        println!("Encrypting all attributes, chunk size: {}", chunk_size);
+
+        let x = cipher
             .encrypt(self.0.into_iter())
-            .await?
+            .await?;
+
+        dbg!(&x);
+
+        x
             .into_iter()
             .chunks(chunk_size)
             .into_iter()
-            .map(|chunk| Ok(chunk.collect()))
+            .map(|chunk| Ok(chunk.collect::<FlattenedEncryptedAttributes>()))
             .collect()
     }
 }
@@ -57,6 +69,13 @@ impl FlattenedProtectedAttributes {
 impl Extend<FlattenedProtectedAttribute> for FlattenedProtectedAttributes {
     fn extend<T: IntoIterator<Item = FlattenedProtectedAttribute>>(&mut self, iter: T) {
         self.0.extend(iter);
+    }
+}
+
+/// Allows us to collect a list of (Plaintext, String) tuples into a [FlattenedProtectedAttributes] object.
+impl FromIterator<(Plaintext, String)> for FlattenedProtectedAttributes {
+    fn from_iter<T: IntoIterator<Item = (Plaintext, String)>>(iter: T) -> Self {
+        Self(iter.into_iter().map(|(plaintext, key)| FlattenedProtectedAttribute::new(plaintext, key)).collect())
     }
 }
 
@@ -78,8 +97,13 @@ impl FlattenedProtectedAttribute {
         }
     }
 
-    fn has_subkey(&self) -> bool {
+    pub(crate) fn has_subkey(&self) -> bool {
         self.key.has_subkey()
+    }
+
+    /// Consume and return the [Plaintext], key and subkey (if one is set) of the attribute.
+    pub(crate) fn into_parts(self) -> (Plaintext, String, Option<String>) {
+        (self.plaintext, self.key.key, self.key.subkey)
     }
 
     fn descriptor(&self) -> String {
@@ -117,6 +141,7 @@ impl FlattenedKey {
         }
     }
 
+    // TODO: Rename this to try_parse
     /// Parse a descriptor into a [FlattenedKey].
     pub(super) fn parse(descriptor: &str) -> Self {
         fn split_subkey(prefix: Option<String>, key: &str) -> FlattenedKey {
@@ -155,15 +180,16 @@ impl FlattenedKey {
     }
 }
 
+// TODO: Change to TryFrom
 impl From<String> for FlattenedKey {
     fn from(key: String) -> Self {
-        Self::new(None, key)
+        Self::parse(key.as_str())
     }
 }
 
 impl From<&str> for FlattenedKey {
     fn from(key: &str) -> Self {
-        Self::new(None, key)
+        Self::parse(key)
     }
 }
 

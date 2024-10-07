@@ -88,18 +88,21 @@ impl Encryptable for Test {
     }
 }
 
-fn get_attrs<T>(unsealed: &Unsealed) -> Result<T, TypeParseError>
+fn get_attrs<T>(unsealed: &mut Unsealed) -> Result<T, TypeParseError>
 where
     T: FromIterator<(String, String)>,
 {
     unsealed
-        .nested_protected("attrs")
+        .take_protected_map("attrs")
+        // FIXME: This method should have a better error
+        .ok_or(TypeParseError("attrs".to_string()))?
+        .into_iter()
         .map(|(k, v)| TryFromPlaintext::try_from_plaintext(v).map(|v| (k, v)))
         .collect()
 }
 
 impl Decryptable for Test {
-    fn from_unsealed(unsealed: Unsealed) -> Result<Self, SealError> {
+    fn from_unsealed(mut unsealed: Unsealed) -> Result<Self, SealError> {
         println!("IN FROM UNSEALED");
         Ok(Self {
             /*pk: TryFromTableAttr::try_from_table_attr(
@@ -111,15 +114,15 @@ impl Decryptable for Test {
             pk: String::from("pk-hack"),
             sk: String::from("sk-hack"),
             name: dbg!(TryFromPlaintext::try_from_optional_plaintext(
-                dbg!(unsealed.get_protected("name")).cloned(),
+                dbg!(unsealed.take_protected("name")),
             ))?,
             age: dbg!(TryFromPlaintext::try_from_optional_plaintext(
-                unsealed.get_protected("age").cloned(),
+                unsealed.take_protected("age"),
             ))?,
             tag: dbg!(TryFromTableAttr::try_from_table_attr(
                 unsealed.get_plaintext("tag"),
             ))?,
-            attrs: dbg!(get_attrs(&unsealed))?,
+            attrs: dbg!(get_attrs(&mut unsealed))?,
         })
     }
 

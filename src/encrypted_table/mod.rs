@@ -324,7 +324,6 @@ impl<D> EncryptedTable<D> {
             .unseal(item, UnsealSpec::new_for_decryptable::<T>())
             .await?;
 
-        println!("LAST: ---> Unsealed item: {:?}", item);
         Ok(item.into_value()?)
     }
 
@@ -361,9 +360,12 @@ impl<D> EncryptedTable<D> {
     pub async fn create_put_patch(
         &self,
         record: PreparedRecord,
+        // TODO: Make sure the index_predicate is used correctly
         index_predicate: impl FnMut(&str, &TableAttribute) -> bool,
     ) -> Result<DynamoRecordPatch, PutError> {
         let mut seen_sk = HashSet::new();
+
+        dbg!(&record);
 
         let PreparedRecord {
             protected_attributes,

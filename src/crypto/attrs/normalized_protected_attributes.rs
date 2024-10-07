@@ -1,7 +1,6 @@
-use std::collections::HashMap;
-
+use std::collections::{hash_map, HashMap};
 use cipherstash_client::encryption::Plaintext;
-
+use itertools::{Chunk, Chunks, IntoChunks, Itertools};
 use super::flattened_protected_attributes::{
     FlattenedKey, FlattenedProtectedAttribute, FlattenedProtectedAttributes,
 };
@@ -83,10 +82,55 @@ impl NormalizedProtectedAttributes {
 
         FlattenedProtectedAttributes(inner)
     }
+
+    pub(crate) fn chunks(self, size: usize) -> AttrChunks<hash_map::IntoIter<NormalizedKey, NormalizedValue>> {
+        AttrChunks(self.values.into_iter().chunks(size))
+    }
+}
+
+pub(crate) struct AttrChunks<I>(IntoChunks<I>) where I: Iterator<Item = (NormalizedKey, NormalizedValue)>;
+
+impl<'a, I> IntoIterator for &'a AttrChunks<I>
+where
+    I: Iterator<Item = (NormalizedKey, NormalizedValue)>,
+    I::Item: 'a,
+{
+    type Item = Chunk<'a, I>;
+    type IntoIter = Chunks<'a, I>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+/// Allow a list of key-value pairs to be collected into a [NormalizedProtectedAttributes].
+impl FromIterator<(NormalizedKey, NormalizedValue)> for NormalizedProtectedAttributes {
+    fn from_iter<T: IntoIterator<Item = (NormalizedKey, NormalizedValue)>>(iter: T) -> Self {
+        let values = iter.into_iter().collect();
+        Self { values, prefix: None }
+    }
+}
+
+impl FromIterator<FlattenedProtectedAttribute> for NormalizedProtectedAttributes {
+    fn from_iter<T: IntoIterator<Item = FlattenedProtectedAttribute>>(iter: T) -> Self {
+        iter
+            .into_iter()
+            .fold(Self::new(), |mut acc, fpa| {
+                let (plaintext, key, subkey) = fpa.into_parts();
+                if let Some(subkey) = subkey {
+                    // TODO: What do we do with prefix? It may not be needed for going from flattened to normalized
+                    acc.insert_and_update_map(key, subkey, plaintext);
+                } else {
+                    acc.insert(key, plaintext);
+                }
+                acc
+            })
+            .into()
+    }
 }
 
 #[derive(PartialEq, Debug, Hash, Eq)]
-enum NormalizedKey {
+pub(crate) enum NormalizedKey {
     Scalar(String),
     Map(String),
 }
@@ -101,7 +145,7 @@ impl From<NormalizedKey> for String {
 
 // TODO: Don't debug or only derive in tests
 #[derive(PartialEq, Debug)]
-enum NormalizedValue {
+pub(crate) enum NormalizedValue {
     Scalar(Plaintext),
     Map(HashMap<String, Plaintext>),
 }
