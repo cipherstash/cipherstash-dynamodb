@@ -169,6 +169,10 @@ impl PreparedRecord {
             .map(|(key, attr)| (key.as_str(), attr))
     }
 
+    pub fn unsealed_indexes(&self) -> &[UnsealedIndex] {
+        &self.sealer.unsealed_indexes
+    }
+
     pub fn prepare_record<R>(record: R) -> Result<Self, SealError>
     where
         R: Searchable + Identifiable,
@@ -227,6 +231,10 @@ impl PreparedRecord {
 
     pub fn type_name(&self) -> &str {
         &self.sealer.type_name
+    }
+
+    pub fn protected_indexes(&self) -> &[(Cow<'static, str>, IndexType)] {
+        &self.protected_indexes
     }
 }
 

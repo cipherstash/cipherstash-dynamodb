@@ -20,7 +20,7 @@ use thiserror::Error;
 
 pub use b64_encode::*;
 pub use sealed::{SealedTableEntry, UnsealSpec};
-pub use sealer::Sealer;
+pub use sealer::{Sealer, UnsealedIndex};
 pub use unsealed::Unsealed;
 
 /// In order to stop indexes from exploding with indexes on large strings, cap the number of terms
