@@ -17,6 +17,7 @@ use super::{attrs::NormalizedProtectedAttributes, SealError, Unsealed};
 /// Wrapped to indicate that the value is encrypted
 pub struct SealedTableEntry(pub(super) TableEntry);
 
+// TODO: Remove this
 pub struct UnsealSpec<'a> {
     pub protected_attributes: Cow<'a, [Cow<'a, str>]>,
     pub plaintext_attributes: Cow<'a, [Cow<'a, str>]>,
@@ -95,7 +96,7 @@ impl SealedTableEntry {
         } else {
             let chunk_size = protected_items.len() / unprotected_items.len();
 
-            let r1 = protected_items
+            protected_items
                 .decrypt_all(cipher)
                 .await?
                 .into_iter()
@@ -104,82 +105,13 @@ impl SealedTableEntry {
                 .chunks(chunk_size)
                 .into_iter()
                 .map(|fpa| fpa.into_iter().collect::<NormalizedProtectedAttributes>())
-                .collect_vec();
-
-            dbg!(&r1);
-
-            let r = r1
                 .into_iter()
                 .zip_eq(unprotected_items.into_iter())
                 .map(|(fpa, unprotected)| {
-                    Unsealed::new_from_parts(fpa, unprotected)
+                    Ok(Unsealed::new_from_parts(fpa, unprotected))
                 })
-                .collect();
-
-            Ok(r)
+                .collect()
         }
-
-        /*  
-            let unprotected = unprotected
-                .into_iter()
-                .map(|(name, attribute)| {
-                    /*let attr = match name.deref() {
-                        "sk" => "__sk",
-                        _ => name,
-                    };
-
-                    attributes.get(attr)*/
-                    attribute
-                })
-                .collect::<Vec<TableAttribute>>();
-
-            unprotected_items.push(unprotected);
-        }
-
-        //let decrypted = async_map_somes(decryptable_items, |items| cipher.decrypt(items)).await?;
-        let decrypted = cipher.decrypt(protected_items).await?;
-        //let mut default_iter =
-        //    std::iter::repeat_with::<Plaintext, _>(|| &[]).take(plaintext_items.len());
-        //std::iter::repeat_with::<&[Option<Plaintext>], _>(|| &[]).take(plaintext_items.len());
-
-        /*let mut chunks_exact;
-        //let decrypted_iter: &mut dyn Iterator<Item = &[Option<Plaintext>]> =
-        let decrypted_iter: &mut dyn Iterator<Item = Plaintext> =
-            if protected_attributes.len() > 0 {
-                chunks_exact = decrypted.chunks_exact(protected_attributes.len());
-                &mut chunks_exact
-            } else {
-                &mut default_iter
-            };*/
-
-        // TODO: Handle if protected_attributes is empty
-        let unsealed = decrypted
-            .into_iter()
-            .chunks(protected_attributes.len())
-            .into_iter()
-            .zip(unprotected_items.into_iter())
-            .map(|(decrypted, plaintext_items)| {
-                let mut unsealed = Unsealed::new();
-
-                //println!("----->> EEEE {:?} {:?}", protected_attributes, decrypted);
-
-                for (name, plaintext) in decryptable_names.iter().zip(decrypted) {
-                    println!("DECRYPT: Inserting protected attribute: {}", name);
-                    unsealed.add_protected(name.to_string(), plaintext);
-                }
-
-                for (name, plaintext) in
-                    plaintext_attributes.iter().zip(plaintext_items.into_iter())
-                {
-                    unsealed.add_unprotected(name.to_string(), plaintext.clone());
-                }
-
-                unsealed
-            })
-            .collect::<Vec<_>>();
-
-        dbg!(&unsealed);
-        Ok(unsealed)*/
     }
 
     /// Unseal the current value and return it's plaintext representation
@@ -208,7 +140,6 @@ impl TryFrom<HashMap<String, AttributeValue>> for SealedTableEntry {
     type Error = ReadConversionError;
 
     fn try_from(item: HashMap<String, AttributeValue>) -> Result<Self, Self::Error> {
-        // FIXME: pk and sk should be AttributeValue and term
         let pk = item
             .get("pk")
             .ok_or(ReadConversionError::NoSuchAttribute("pk".to_string()))?
@@ -250,12 +181,7 @@ impl TryFrom<SealedTableEntry> for HashMap<String, AttributeValue> {
         }
 
         item.0.attributes.into_iter().for_each(|(k, v)| {
-            // FIXME: Why would "sk" ever be in the attributes?
             map.insert(
-                /*match k.as_str() {
-                    "sk" => "__sk".to_string(),
-                    _ => k,
-                },*/
                 k,
                 v.into(),
             );

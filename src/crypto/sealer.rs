@@ -49,7 +49,6 @@ struct RecordsWithTerms<'a> {
 
 impl<'a> RecordsWithTerms<'a> {
     fn new(records: Vec<RecordWithTerms<'a>>, num_protected_attributes: usize) -> Self {
-        println!("Creating RecordsWithTerms with {} protected attrs", num_protected_attributes);
         Self {
             num_protected_attributes,
             records,
@@ -93,13 +92,7 @@ impl<'a> RecordsWithTerms<'a> {
                 .collect()
 
         } else {
-            println!("Protecteds before encryption: {:?}", protected);
             let encrypted = protected.encrypt_all(cipher, num_records).await?;
-
-            println!("Encrypted len = {}", encrypted.len());
-            println!("Unprotected len = {}", unprotecteds.len());
-            println!("Encrypted: {:?}", encrypted);
-            println!("Unprotected: {:?}", unprotecteds);
 
             encrypted
                 .into_iter()
@@ -235,124 +228,6 @@ impl Sealer {
         Self::index_all_terms(records, protected_attributes, cipher, term_length)?
             .encrypt(cipher)
             .await
-        /*let records = records.into_iter();
-        let records_len = records.size_hint().1.unwrap_or(1);
-
-        let protected_attributes = protected_attributes.as_ref();
-
-        let mut protected = Vec::with_capacity(records_len * protected_attributes.len());
-        let mut table_entries = Vec::with_capacity(records_len);
-
-        for mut record in records {
-            let mut pk = record.pk;
-            let mut sk = record.sk;
-
-            if record.is_pk_encrypted {
-                pk = b64_encode(hmac(&pk, None, cipher)?);
-            }
-
-            if record.is_sk_encrypted {
-                sk = b64_encode(hmac(&sk, Some(pk.as_str()), cipher)?);
-            }
-
-            let type_name = &record.type_name;
-
-            for attr in protected_attributes.iter() {
-                protected.extend(record.unsealed.remove_protected_with_descriptor(attr)?);
-            }
-
-            let terms: Vec<(Cow<'_, str>, IndexType, Vec<u8>)> = record
-                .unsealed_indexes
-                .into_iter()
-                .map(|(attr, index, index_name, index_type)| {
-                    let term = cipher.compound_index(
-                        &CompoundIndex::new(index),
-                        attr,
-                        Some(format!("{}#{}", type_name, index_name)),
-                        term_length,
-                    )?;
-
-                    Ok::<_, SealError>((index_name, index_type, term))
-                })
-                .map(|index_term| match index_term {
-                    Ok((index_name, index_type, IndexTerm::Binary(x))) => {
-                        Ok(vec![(index_name, index_type, x)])
-                    }
-                    Ok((index_name, index_type, IndexTerm::BinaryVec(x))) => Ok(x
-                        .into_iter()
-                        .take(MAX_TERMS_PER_INDEX)
-                        .map(|x| (index_name.clone(), index_type, x))
-                        .collect()),
-                    _ => Err(SealError::InvalidCiphertext("Invalid index term".into())),
-                })
-                .flatten_ok()
-                .try_collect()?;
-
-            table_entries.push((
-                PrimaryKeyParts { pk, sk },
-                record.unsealed.unprotected().clone(),
-                terms,
-            ));
-        }
-
-        // Only encrypt if there are actually protected attributes
-        if !protected_attributes.is_empty() {
-            let encrypted = cipher
-                .encrypt(protected.iter().map(|(a, b)| (a, b.as_str())))
-                .await?;
-
-            for (encrypted, (_, attributes, _)) in encrypted
-                .chunks_exact(protected.len())
-                .zip(table_entries.iter_mut())
-            {
-                for (enc, name) in encrypted.iter().zip(protected.iter()) {
-                    let name: &str = name.1.deref();
-
-                    println!("Inserting protected attribute: {}", name);
-
-                    attributes.insert(
-                        String::from(match name {
-                            // TODO: Possibly reinstate or move this
-                            //"pk" => "__pk",
-                            //"sk" => "__sk",
-                            _ => name,
-                        }),
-                        TableAttribute::Bytes(enc.to_vec().map_err(|_| {
-                            SealError::InvalidCiphertext(
-                                "Failed to serialize encrypted record as bytes".into(),
-                            )
-                        })?),
-                    );
-                }
-            }
-        }
-
-        let mut output = Vec::with_capacity(table_entries.len());
-
-        for (PrimaryKeyParts { pk, sk }, attributes, terms) in table_entries.into_iter() {
-            let terms = terms
-                .into_iter()
-                .enumerate()
-                .map(|(i, (index_name, index_type, term))| {
-                    let sk = b64_encode(hmac(
-                        &format_term_key(sk.as_str(), &index_name, index_type, i),
-                        Some(pk.as_str()),
-                        cipher,
-                    )?);
-
-                    Ok::<_, SealError>(Term { sk, value: term })
-                })
-                .collect::<Result<_, SealError>>()?;
-
-            output.push(dbg!(Sealed {
-                pk,
-                sk,
-                attributes,
-                terms,
-            }));
-        }
-
-        Ok(output)*/
     }
 
     pub(crate) async fn seal<'a>(
@@ -411,7 +286,6 @@ impl Sealed {
         self,
         mut index_predicate: impl FnMut(&str, &TableAttribute) -> bool,
     ) -> (SealedTableEntry, Vec<SealedTableEntry>) {
-        // TODO: Is this normalization necessary? - try removing it
         let root_attributes = self.attributes;
 
         let index_attributes: TableAttributes = root_attributes
