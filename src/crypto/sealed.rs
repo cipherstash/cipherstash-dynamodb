@@ -1,5 +1,5 @@
 use crate::{
-    crypto::attrs::FlattenedEncryptedAttributes, encrypted_table::TableEntry, traits::{ReadConversionError, WriteConversionError}, Decryptable
+    crypto::attrs::FlattenedEncryptedAttributes, encrypted_table::TableEntry, traits::{ReadConversionError, WriteConversionError}, Decryptable, Identifiable
 };
 use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
 use cipherstash_client::{
@@ -17,14 +17,24 @@ use super::{attrs::NormalizedProtectedAttributes, SealError, Unsealed};
 /// Wrapped to indicate that the value is encrypted
 pub struct SealedTableEntry(pub(super) TableEntry);
 
+// FIXME: Remove this (only used for debugging)
+#[derive(Debug)]
 pub struct UnsealSpec<'a> {
-    pub protected_attributes: Cow<'a, [Cow<'a, str>]>,
+    pub(crate) protected_attributes: Cow<'a, [Cow<'a, str>]>,
+
+    /// The prefix used for sort keys.
+    /// If None, the type name will be used.
+    /// This *must* be the same as the value used when encrypting the data
+    /// so that descriptors can be correctly matched.
+    /// See [TableAttribute::as_encrypted_record]
+    pub(crate) sort_key_prefix: String,
 }
 
 impl UnsealSpec<'static> {
-    pub fn new_for_decryptable<D: Decryptable>() -> Self {
+    pub fn new_for_decryptable<D>() -> Self where D: Decryptable + Identifiable {
         Self {
             protected_attributes: D::protected_attributes(),
+            sort_key_prefix: D::sort_key_prefix().as_deref().map(ToOwned::to_owned).unwrap_or(D::type_name().to_string()),
         }
     }
 }
@@ -62,10 +72,14 @@ impl SealedTableEntry {
 
         let UnsealSpec {
             protected_attributes,
+            sort_key_prefix,
         } = spec;
 
+        let mut protected_items = {
+            let capacity = items.len() * protected_attributes.len();
+            FlattenedEncryptedAttributes::with_capacity(capacity)
+        };
         let mut unprotected_items = Vec::with_capacity(items.len());
-        let mut protected_items = FlattenedEncryptedAttributes::with_capacity(items.len() * protected_attributes.len());
 
         for item in items.into_iter() {
             let (protected, unprotected) = item
@@ -73,12 +87,9 @@ impl SealedTableEntry {
                 .attributes
                 .partition(protected_attributes.as_ref());
 
-            protected_items.try_extend(protected);
+            protected_items.try_extend(protected, sort_key_prefix.clone())?;
             unprotected_items.push(unprotected);
         }
-
-        dbg!(&unprotected_items);
-        dbg!(&protected_items);
 
         if protected_items.is_empty() {
             unprotected_items
@@ -151,10 +162,13 @@ impl TryFrom<HashMap<String, AttributeValue>> for SealedTableEntry {
 
         let mut table_entry = TableEntry::new(pk, sk);
 
+        // This prevents loading special columns when retrieving records
+        // pk/sk are handled specially or will be called __sk and __pk
+        // We never want to read term during queries
         item.into_iter()
             .filter(|(k, _)| k != "pk" && k != "sk" && k != "term")
             .for_each(|(k, v)| {
-                table_entry.add_attribute(&k, v.into());
+                table_entry.add_attribute(k, v.into());
             });
 
         Ok(SealedTableEntry(table_entry))
@@ -177,7 +191,7 @@ impl TryFrom<SealedTableEntry> for HashMap<String, AttributeValue> {
 
         item.0.attributes.into_iter().for_each(|(k, v)| {
             map.insert(
-                k,
+                k.into_stored_name(),
                 v.into(),
             );
         });

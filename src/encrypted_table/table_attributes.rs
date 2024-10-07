@@ -1,11 +1,11 @@
-use super::{SealError, TableAttribute};
-use std::{borrow::Cow, collections::HashMap};
+use super::{AttributeName, SealError, TableAttribute};
+use std::{borrow::Cow, collections::{hash_map::IntoIter, HashMap}};
 
 // FIXME: Remove this (only used for debugging)
 #[derive(Debug, Clone)]
 /// Represents a collection of attributes for a table entry.
 /// Attributes are stored as a map of `String` to `TableAttribute`.
-pub struct TableAttributes(HashMap<String, TableAttribute>);
+pub struct TableAttributes(HashMap<AttributeName, TableAttribute>);
 
 impl TableAttributes {
     pub(crate) fn new() -> Self {
@@ -20,17 +20,17 @@ impl TableAttributes {
 
     // TODO: Test, docs
     // TODO: Remove this logic from the NormalisedKey
-    pub(crate) fn insert(&mut self, key: impl Into<String>, value: impl Into<TableAttribute>) {
-        let key: String = key.into();
-        self.0.insert(to_inner_pksk(key), value.into());
+    pub(crate) fn insert(&mut self, name: impl Into<AttributeName>, value: impl Into<TableAttribute>) {
+        let name: AttributeName = name.into();
+        self.0.insert(name, value.into());
     }
 
     // TODO: Proper error here
     /// Attempts to insert a value into a map with key `subkey` where the map is stored at `key`.
     /// If the map doesn't exist, it will be created.
     /// If an attribute with the same key already exists but is not a map, an error is returned.
-    pub(crate) fn try_insert_map(&mut self, key: impl Into<String>, subkey: impl Into<String>, value: impl Into<TableAttribute>) -> Result<(), SealError> {
-        self.0.entry(key.into())
+    pub(crate) fn try_insert_map(&mut self, name: impl Into<AttributeName>, subkey: impl Into<String>, value: impl Into<TableAttribute>) -> Result<(), SealError> {
+        self.0.entry(name.into())
             .or_insert(TableAttribute::new_map())
             .try_insert_map(subkey.into(), value.into())
     }
@@ -41,7 +41,7 @@ impl TableAttributes {
     pub(crate) fn partition(self, protected_keys: &[Cow<'_, str>]) -> (Self, Self) {
         let (protected, unprotected): (HashMap<_, _>, HashMap<_, _>) =
             self.0.into_iter().partition(|(k, _)| {
-                let check = from_inner_pksk_ref(k);
+                let check = k.as_external_name();
                 protected_keys.iter().any(|key| match_key(check, key))
             });
 
@@ -49,35 +49,13 @@ impl TableAttributes {
     }
 
     // TODO: Doc, test
-    pub(crate) fn get(&self, key: &str) -> Option<&TableAttribute> {
-        self.0.get(to_inner_pksk_ref(key))
+    pub(crate) fn get(&self, name: impl Into<AttributeName>) -> Option<&TableAttribute> {
+        let name: AttributeName = name.into();
+        self.0.get(&name)
     }
 }
 
-impl From<HashMap<String, TableAttribute>> for TableAttributes {
-    fn from(map: HashMap<String, TableAttribute>) -> Self {
-        Self(map)
-    }
-}
-
-impl IntoIterator for TableAttributes {
-    type Item = (String, TableAttribute);
-    type IntoIter = std::collections::hash_map::IntoIter<String, TableAttribute>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl Default for TableAttributes {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-// TODO: This may no longer be required - remove and test
-// TODO: Make a type for keys that can be namespaced and prefixed
-// and implement PartialEq for it - its the same as FlattenedKey
+// TODO: This shouldn't be needed anymore
 fn match_key(key: &str, other: &Cow<str>) -> bool {
     let namespaced_key = match key.split_once("/") {
         None => key,
@@ -90,29 +68,24 @@ fn match_key(key: &str, other: &Cow<str>) -> bool {
     key == other.as_ref()
 }
 
-#[inline]
-fn to_inner_pksk(key: String) -> String {
-    match key.as_str() {
-        "pk" => "__pk".into(),
-        "sk" => "__sk".into(),
-        _ => key,
+impl From<HashMap<AttributeName, TableAttribute>> for TableAttributes {
+    fn from(map: HashMap<AttributeName, TableAttribute>) -> Self {
+        Self(map)
     }
 }
 
-#[inline]
-fn to_inner_pksk_ref(key: &str) -> &str {
-    match key {
-        "pk" => "__pk",
-        "sk" => "__sk",
-        _ => key,
+impl IntoIterator for TableAttributes {
+    type Item = (AttributeName, TableAttribute);
+    type IntoIter = IntoIter<AttributeName, TableAttribute>;
+
+    /// Iterates over the table attributes, returning each pair of [AttributeName] and [TableAttribute].
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }
 
-#[inline]
-fn from_inner_pksk_ref(key: &str) -> &str {
-    match key {
-        "__pk" => "pk",
-        "__sk" => "sk",
-        _ => key,
+impl Default for TableAttributes {
+    fn default() -> Self {
+        Self::new()
     }
 }

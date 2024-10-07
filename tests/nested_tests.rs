@@ -47,7 +47,7 @@ impl Identifiable for Test {
         None
     }
     fn is_pk_encrypted() -> bool {
-        true
+        false
     }
     fn is_sk_encrypted() -> bool {
         false
@@ -70,7 +70,11 @@ impl Encryptable for Test {
     }
 
     fn plaintext_attributes() -> Cow<'static, [Cow<'static, str>]> {
-        Cow::Borrowed(&[Cow::Borrowed("tag")])
+        Cow::Borrowed(&[
+            Cow::Borrowed("tag"),
+            Cow::Borrowed("pk"),
+            Cow::Borrowed("sk"),
+        ])
     }
 
     fn into_unsealed(self) -> Unsealed {
@@ -81,6 +85,7 @@ impl Encryptable for Test {
         unsealed.add_protected("age", self.age);
         unsealed.add_unprotected("tag", self.tag);
         put_attrs(&mut unsealed, self.attrs);
+        println!("Encryption: {:?}", unsealed);
         unsealed
     }
 }
@@ -99,6 +104,7 @@ where
 
 impl Decryptable for Test {
     fn from_unsealed(mut unsealed: Unsealed) -> Result<Self, SealError> {
+        println!("{:?}", unsealed);
         Ok(Self {
             pk: TryFromTableAttr::try_from_table_attr(
                 unsealed.get_plaintext("pk"),
@@ -128,7 +134,11 @@ impl Decryptable for Test {
     }
 
     fn plaintext_attributes() -> Cow<'static, [Cow<'static, str>]> {
-        Cow::Borrowed(&[Cow::Borrowed("tag")])
+        Cow::Borrowed(&[
+            Cow::Borrowed("tag"),
+            Cow::Borrowed("pk"),
+            Cow::Borrowed("sk"),
+        ])
     }
 }
 

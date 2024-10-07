@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use cipherstash_client::encryption::Plaintext;
 use super::flattened_protected_attributes::{
-    FlattenedKey, FlattenedProtectedAttribute, FlattenedProtectedAttributes,
+    FlattenedAttrName, FlattenedProtectedAttribute, FlattenedProtectedAttributes,
 };
 
 // FIXME: Remove this (only used for debugging)
@@ -128,9 +128,9 @@ impl NormalizedKey {
     }
 
     /// Converts the key into a [FlattenedKey].
-    fn flatten(self, prefix: Option<String>) -> FlattenedKey {
+    fn flatten(self, prefix: Option<String>) -> FlattenedAttrName {
         let key: String = String::from(self);
-        FlattenedKey::new(prefix, key)
+        FlattenedAttrName::new(prefix, key)
     }
 }
 
@@ -262,7 +262,7 @@ mod tests {
             flattened,
             vec![FlattenedProtectedAttribute::new(
                 Plaintext::from("value"),
-                FlattenedKey::new(None, "key".to_string())
+                FlattenedAttrName::new(None, "key".to_string())
             )]
         );
     }
@@ -278,7 +278,7 @@ mod tests {
             flattened,
             vec![FlattenedProtectedAttribute::new(
                 Plaintext::from("value"),
-                FlattenedKey::new(Some("prefix".to_string()), "key".to_string())
+                FlattenedAttrName::new(Some("prefix".to_string()), "key".to_string())
             )]
         );
     }
@@ -293,11 +293,11 @@ mod tests {
         let flattened = key.flatten(NormalizedKey::Map("key".to_string()), None);
         assert!(flattened.contains(&FlattenedProtectedAttribute::new(
             Plaintext::from("value-a"),
-            FlattenedKey::new(None, "key".to_string()).with_subkey("a".to_string())
+            FlattenedAttrName::new(None, "key".to_string()).with_subkey("a".to_string())
         )));
         assert!(flattened.contains(&FlattenedProtectedAttribute::new(
             Plaintext::from("value-b"),
-            FlattenedKey::new(None, "key".to_string()).with_subkey("b".to_string())
+            FlattenedAttrName::new(None, "key".to_string()).with_subkey("b".to_string())
         )));
     }
 
@@ -314,12 +314,12 @@ mod tests {
         );
         assert!(flattened.contains(&FlattenedProtectedAttribute::new(
             Plaintext::from("value-a"),
-            FlattenedKey::new(Some("prefix".to_string()), "key".to_string())
+            FlattenedAttrName::new(Some("prefix".to_string()), "key".to_string())
                 .with_subkey("a".to_string())
         )));
         assert!(flattened.contains(&FlattenedProtectedAttribute::new(
             Plaintext::from("value-b"),
-            FlattenedKey::new(Some("prefix".to_string()), "key".to_string())
+            FlattenedAttrName::new(Some("prefix".to_string()), "key".to_string())
                 .with_subkey("b".to_string())
         )));
     }

@@ -3,9 +3,7 @@ mod b64_encode;
 mod sealed;
 mod sealer;
 mod unsealed;
-
 use std::borrow::Cow;
-
 use crate::{
     traits::{PrimaryKeyError, PrimaryKeyParts, ReadConversionError, WriteConversionError},
     Identifiable, IndexType, PrimaryKey,
@@ -15,11 +13,12 @@ use cipherstash_client::{
     encryption::{
         compound_indexer::{CompoundIndex, ExactIndex},
         Encryption, EncryptionError, Plaintext, TypeParseError,
-    },
+    }, vitur_client::DecryptError,
 };
 use miette::Diagnostic;
 use thiserror::Error;
 
+// Re-exports
 pub use b64_encode::*;
 pub use sealed::{SealedTableEntry, UnsealSpec};
 pub use sealer::{Sealer, UnsealedIndex};
@@ -34,13 +33,10 @@ const MAX_TERMS_PER_INDEX: usize = 25;
 pub enum SealError {
     #[error("Error when creating primary key: {0}")]
     PrimaryKeyError(#[from] PrimaryKeyError),
-    #[error("Failed to encrypt partition key")]
-    CryptoError(#[from] EncryptionError),
-    #[error(transparent)]
+    #[error("ReadConversionError: {0}")]
     ReadConversionError(#[from] ReadConversionError),
-    #[error(transparent)]
+    #[error("WriteConversionError: {0}")]
     WriteConversionError(#[from] WriteConversionError),
-    // TODO: Does TypeParseError correctly redact the plaintext value?
     #[error("TypeParseError: {0}")]
     TypeParseError(#[from] TypeParseError),
     #[error("Missing attribute: {0}")]
@@ -49,6 +45,13 @@ pub enum SealError {
     InvalidCiphertext(String),
     #[error("Assertion failed: {0}")]
     AssertionFailed(String),
+
+    // Note that we don't expose the specific error type here
+    // so as to avoid leaking any information
+    #[error("Encryption failed")]
+    EncryptionError(#[from] EncryptionError),
+    #[error("Decryption failed")]
+    DecryptionError(#[from] DecryptError),
 }
 
 #[derive(Error, Debug)]

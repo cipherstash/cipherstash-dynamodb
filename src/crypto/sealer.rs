@@ -3,7 +3,7 @@ use super::{
     SealedTableEntry, Unsealed, MAX_TERMS_PER_INDEX,
 };
 use crate::{
-    encrypted_table::{TableAttribute, TableAttributes, TableEntry},
+    encrypted_table::{AttributeName, TableAttribute, TableAttributes, TableEntry},
     traits::PrimaryKeyParts,
     IndexType,
 };
@@ -281,15 +281,15 @@ impl Sealed {
     /// `index_predicate` is used to... TODO!!!.
     pub fn into_table_entries(
         self,
-        mut index_predicate: impl FnMut(&str, &TableAttribute) -> bool,
+        mut index_predicate: impl FnMut(&AttributeName, &TableAttribute) -> bool,
     ) -> (SealedTableEntry, Vec<SealedTableEntry>) {
         let root_attributes = self.attributes;
 
         let index_attributes: TableAttributes = root_attributes
             .clone()
             .into_iter()
-            .filter(|(key, value)| index_predicate(key, value))
-            .map(|(key, value)| (key.to_string(), value.clone()))
+            .filter(|(name, value)| index_predicate(name, value))
+            .map(|(name, value)| (name, value.clone()))
             .collect::<HashMap<_, _>>()
             .into();
 

@@ -1,9 +1,11 @@
 pub mod query;
+mod attribute_name;
 mod table_attribute;
 mod table_attributes;
 mod table_entry;
 pub use self::{
     query::QueryBuilder,
+    attribute_name::AttributeName,
     table_attribute::{TableAttribute, TryFromTableAttr},
     table_attributes::TableAttributes,
     table_entry::TableEntry,
@@ -184,11 +186,6 @@ impl PreparedRecord {
                             .map(|index| (attr, index, index_name.clone(), *index_type))
                     })
                     .ok_or(SealError::MissingAttribute(index_name.to_string()))
-                    // TODO: Remove
-                    .map(|e| {
-                        println!("HHHHHHH {:?}", e);
-                        e
-                    })
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -287,7 +284,6 @@ impl<D> EncryptedTable<D> {
         spec: UnsealSpec<'_>,
     ) -> Result<Vec<Unsealed>, DecryptError> {
         let table_entries = SealedTableEntry::vec_from(items)?;
-        dbg!(&table_entries);
         let results = SealedTableEntry::unseal_all(table_entries, spec, &self.cipher).await?;
         Ok(results)
     }
@@ -302,10 +298,12 @@ impl<D> EncryptedTable<D> {
         Ok(result)
     }
 
-    pub async fn decrypt_all<T: Decryptable>(
+    pub async fn decrypt_all<T>(
         &self,
         items: impl IntoIterator<Item = HashMap<String, AttributeValue>>,
-    ) -> Result<Vec<T>, DecryptError> {
+    ) -> Result<Vec<T>, DecryptError>
+    where T: Decryptable + Identifiable,
+    {
         let items = self
             .unseal_all(items, UnsealSpec::new_for_decryptable::<T>())
             .await?;
@@ -316,12 +314,17 @@ impl<D> EncryptedTable<D> {
             .collect::<Result<Vec<_>, _>>()?)
     }
 
-    pub async fn decrypt<T: Decryptable>(
+    pub async fn decrypt<T>(
         &self,
         item: HashMap<String, AttributeValue>,
-    ) -> Result<T, DecryptError> {
+    ) -> Result<T, DecryptError>
+    where T: Decryptable + Identifiable,
+    {
+        let uspec = UnsealSpec::new_for_decryptable::<T>();
+        println!("USPEC: {:?}", uspec);
+
         let item = self
-            .unseal(item, UnsealSpec::new_for_decryptable::<T>())
+            .unseal(item, uspec)
             .await?;
 
         Ok(item.into_value()?)
@@ -361,7 +364,7 @@ impl<D> EncryptedTable<D> {
         &self,
         record: PreparedRecord,
         // TODO: Make sure the index_predicate is used correctly
-        index_predicate: impl FnMut(&str, &TableAttribute) -> bool,
+        index_predicate: impl FnMut(&AttributeName, &TableAttribute) -> bool,
     ) -> Result<DynamoRecordPatch, PutError> {
         let mut seen_sk = HashSet::new();
 
@@ -383,7 +386,10 @@ impl<D> EncryptedTable<D> {
 
         let PrimaryKeyParts { pk, sk } = sealed.primary_key();
 
+        println!("PUT: PK: {}, SK: {}", pk, sk);
+
         let (root, index_entries) = sealed.into_table_entries(index_predicate);
+        println!("ROOT: {:?}", root);
 
         seen_sk.insert(root.inner().sk.clone());
         put_records.push(root.try_into()?);
@@ -456,6 +462,8 @@ impl EncryptedTable<Dynamo> {
         let PrimaryKeyParts { pk, sk } =
             self.encrypt_primary_key_parts(PreparedPrimaryKey::new::<T>(k))?;
 
+        println!("GET: PK: {}, SK: {}", pk, sk);
+
         let result = self
             .db
             .get_item()
@@ -465,6 +473,8 @@ impl EncryptedTable<Dynamo> {
             .send()
             .await
             .map_err(|e| GetError::Aws(format!("{e:?}")))?;
+
+        println!("RESULT: {:?}", result);
 
         if let Some(item) = result.item {
             Ok(Some(self.decrypt(item).await?))

@@ -1,7 +1,7 @@
 use super::{
     flattened_encrypted_attributes::FlattenedEncryptedAttributes, normalized_protected_attributes::NormalizedKey
 };
-use crate::crypto::SealError;
+use crate::{crypto::SealError, encrypted_table::AttributeName};
 use cipherstash_client::{
     credentials::{service_credentials::ServiceToken, Credentials},
     encryption::{BytesWithDescriptor, Encryption, Plaintext},
@@ -35,7 +35,6 @@ impl FlattenedProtectedAttributes {
         chunk_into: usize,
     ) -> Result<Vec<FlattenedEncryptedAttributes>, SealError> {
         let chunk_size = self.0.len() / chunk_into;
-        println!("Encrypting all attributes, chunk into: {}, chunk_size = {}", chunk_into, chunk_size);
 
         cipher
             .encrypt(self.0.into_iter())
@@ -68,11 +67,11 @@ impl FromIterator<(Plaintext, String)> for FlattenedProtectedAttributes {
 #[derive(PartialEq, Debug)]
 pub(crate) struct FlattenedProtectedAttribute {
     plaintext: Plaintext,
-    key: FlattenedKey,
+    key: FlattenedAttrName,
 }
 
 impl FlattenedProtectedAttribute {
-    pub(super) fn new(plaintext: impl Into<Plaintext>, key: impl Into<FlattenedKey>) -> Self {
+    pub(super) fn new(plaintext: impl Into<Plaintext>, key: impl Into<FlattenedAttrName>) -> Self {
         Self {
             plaintext: plaintext.into(),
             key: key.into(),
@@ -85,7 +84,10 @@ impl FlattenedProtectedAttribute {
         (self.plaintext, normalized, subkey)
     }
 
-    fn descriptor(&self) -> String {
+    /// Returns the name of the attribute used to store the plaintext in the encrypted table.
+    /// This is used as the descriptor when encrypting the attribute and
+    /// is intended to tie the encrypted value to its location in a table.
+    fn storage_descriptor(&self) -> String {
         self.key.descriptor()
     }
 }
@@ -94,7 +96,7 @@ impl Into<BytesWithDescriptor> for FlattenedProtectedAttribute {
     fn into(self) -> BytesWithDescriptor {
         BytesWithDescriptor {
             bytes: self.plaintext.to_vec(),
-            descriptor: self.descriptor(),
+            descriptor: self.storage_descriptor(),
         }
     }
 }
@@ -105,17 +107,19 @@ impl Into<BytesWithDescriptor> for FlattenedProtectedAttribute {
 /// A Map would have a key and a subkey, while a scalar would only have a key.
 // TODO: Only implement Debug in tests
 #[derive(PartialEq, Hash, Eq, Clone, Debug)]
-pub(super) struct FlattenedKey {
+pub(super) struct FlattenedAttrName {
+    // TODO: Use a Cow to avoid copies during decryption
+    // We may also never set this to None in which can we can remove the Option
     prefix: Option<String>,
-    key: String,
+    name: AttributeName,
     subkey: Option<String>,
 }
 
-impl FlattenedKey {
-    pub(super) fn new(prefix: Option<String>, key: impl Into<String>) -> Self {
+impl FlattenedAttrName {
+    pub(super) fn new(prefix: Option<String>, name: impl Into<AttributeName>) -> Self {
         Self {
             prefix,
-            key: key.into(),
+            name: name.into(),
             subkey: None,
         }
     }
@@ -126,18 +130,18 @@ impl FlattenedKey {
     /// Prefix is discarded as it is not needed after decryption.
     pub(super) fn normalize(self) -> (NormalizedKey, Option<String>) {
         match self.subkey {
-            Some(_) => (NormalizedKey::new_map(self.key), self.subkey),
-            None => (NormalizedKey::new_scalar(self.key), None),
+            Some(_) => (NormalizedKey::new_map(self.name.as_external_name()), self.subkey),
+            None => (NormalizedKey::new_scalar(self.name.as_external_name()), None),
         }
     }
 
     // TODO: Rename this to try_parse
     /// Parse a descriptor into a [FlattenedKey].
     pub(super) fn parse(descriptor: &str) -> Self {
-        fn split_subkey(prefix: Option<String>, key: &str) -> FlattenedKey {
+        fn split_subkey(prefix: Option<String>, key: &str) -> FlattenedAttrName {
             match key.split_once(".") {
-                None => FlattenedKey::new(prefix, key),
-                Some((key, subkey)) => FlattenedKey::new(prefix, key).with_subkey(subkey),
+                None => FlattenedAttrName::new(prefix, key),
+                Some((key, subkey)) => FlattenedAttrName::new(prefix, key).with_subkey(subkey),
             }
         }
         match descriptor.split_once("/") {
@@ -153,40 +157,40 @@ impl FlattenedKey {
 
     pub(crate) fn descriptor(&self) -> String {
         match (self.prefix.as_ref(), self.subkey.as_ref()) {
-            (Some(prefix), Some(subkey)) => format!("{}/{}.{}", prefix, self.key, subkey),
-            (Some(prefix), None) => format!("{}/{}", prefix, self.key),
-            (None, Some(subkey)) => format!("{}.{}", self.key, subkey),
-            (None, None) => self.key.to_string(),
+            (Some(prefix), Some(subkey)) => format!("{}/{}.{}", prefix, self.name.as_stored_name(), subkey),
+            (Some(prefix), None) => format!("{}/{}", prefix, self.name.as_stored_name()),
+            (None, Some(subkey)) => format!("{}.{}", self.name.as_stored_name(), subkey),
+            (None, None) => self.name.as_stored_name().to_string(),
         }
     }
 
     /// Consume and return the parts of the key (not including the prefix).
-    pub fn into_key_parts(self) -> (String, Option<String>) {
-        (self.key, self.subkey)
+    pub fn into_parts(self) -> (AttributeName, Option<String>) {
+        (self.name, self.subkey)
     }
 }
 
 // TODO: Change to TryFrom
-impl From<String> for FlattenedKey {
+impl From<String> for FlattenedAttrName {
     fn from(key: String) -> Self {
         Self::parse(key.as_str())
     }
 }
 
-impl From<&str> for FlattenedKey {
+impl From<&str> for FlattenedAttrName {
     fn from(key: &str) -> Self {
         Self::parse(key)
     }
 }
 
-impl From<(String, String)> for FlattenedKey {
+impl From<(String, String)> for FlattenedAttrName {
     fn from((prefix, key): (String, String)) -> Self {
         // TODO: Check that neither string is empty
         Self::new(Some(prefix), key)
     }
 }
 
-impl From<(&str, &str)> for FlattenedKey {
+impl From<(&str, &str)> for FlattenedAttrName {
     fn from((prefix, key): (&str, &str)) -> Self {
         Self::new(Some(prefix.to_string()), key)
     }
@@ -198,37 +202,38 @@ mod tests {
 
     #[test]
     fn test_flattened_key_from_string() {
-        assert_eq!(FlattenedKey::new(None, "foo"), "foo".into());
+        assert_eq!(FlattenedAttrName::new(None, "foo"), "foo".into());
     }
 
     #[test]
     fn test_flattened_key_from_tuple() {
         assert_eq!(
-            FlattenedKey::new(Some("prefix".to_string()), "foo"),
+            FlattenedAttrName::new(Some("prefix".to_string()), "foo"),
             ("prefix", "foo").into()
         );
     }
 
+    // TODO: Test that pk and sk are renamed to __pk and __sk respectively
     #[test]
     fn test_flattened_key_descriptor() {
-        assert_eq!(FlattenedKey::new(None, "foo").descriptor(), "foo");
+        assert_eq!(FlattenedAttrName::new(None, "foo").descriptor(), "foo");
         assert_eq!(
-            FlattenedKey::new(Some("pref".to_string()), "foo").descriptor(),
+            FlattenedAttrName::new(Some("pref".to_string()), "foo").descriptor(),
             "pref/foo"
         );
         assert_eq!(
-            FlattenedKey::new(None, "foo").with_subkey("x").descriptor(),
+            FlattenedAttrName::new(None, "foo").with_subkey("x").descriptor(),
             "foo.x"
         );
         assert_eq!(
-            FlattenedKey::new(Some("pref".to_string()), "foo")
+            FlattenedAttrName::new(Some("pref".to_string()), "foo")
                 .with_subkey("x")
                 .descriptor(),
             "pref/foo.x"
         );
     }
 
-    // TODO: Test normalize
+    // TODO: Test normalize the FlattenedAttrName
 
     #[test]
     fn test_into_iter() {
@@ -319,9 +324,9 @@ mod tests {
 
     #[test]
     fn test_flattened_key_parse() {
-        assert_eq!(FlattenedKey::parse("key"), "key".into());
-        assert_eq!(FlattenedKey::parse("prefix/key"), ("prefix", "key").into());
-        assert_eq!(FlattenedKey::parse("key.subkey"), FlattenedKey::from("key").with_subkey("subkey"));
-        assert_eq!(FlattenedKey::parse("prefix/key.subkey"), FlattenedKey::from(("prefix", "key")).with_subkey("subkey"));
+        assert_eq!(FlattenedAttrName::parse("key"), "key".into());
+        assert_eq!(FlattenedAttrName::parse("prefix/key"), ("prefix", "key").into());
+        assert_eq!(FlattenedAttrName::parse("key.subkey"), FlattenedAttrName::from("key").with_subkey("subkey"));
+        assert_eq!(FlattenedAttrName::parse("prefix/key.subkey"), FlattenedAttrName::from(("prefix", "key")).with_subkey("subkey"));
     }
 }

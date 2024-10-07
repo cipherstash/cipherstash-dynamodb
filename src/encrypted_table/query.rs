@@ -140,7 +140,7 @@ impl<S> QueryBuilder<S, &EncryptedTable<Dynamo>>
 where
     S: Searchable + Identifiable,
 {
-    pub async fn load<T: Decryptable>(self) -> Result<Vec<T>, QueryError> {
+    pub async fn load<T>(self) -> Result<Vec<T>, QueryError> where T: Decryptable + Identifiable {
         let table = self.backend;
         let query = self.build()?;
 

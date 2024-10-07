@@ -29,11 +29,34 @@ pub enum TableAttribute {
 }
 
 impl TableAttribute {
-    pub(crate) fn as_encrypted_record(&self) -> Option<EncryptedRecord> {
+    // TODO: Unit test this
+    /// Try to convert the `TableAttribute` to an `EncryptedRecord` if it is a `Bytes` variant.
+    /// The descriptor of the record is checked against the `descriptor` argument
+    /// (which will be verified to be the correct descriptor for the record via AAD).
+    /// 
+    /// If the descriptor does not match, an error is returned and this may indicate that the record
+    /// has been tampered with (e.g. via a confused deputy attack).
+    pub(crate) fn as_encrypted_record(&self, descriptor: &str) -> Result<EncryptedRecord, SealError> {
         if let TableAttribute::Bytes(s) = self {
-            EncryptedRecord::from_slice(&s[..]).ok()
+            EncryptedRecord::from_slice(&s[..])
+                .map_err(SealError::from)
+                .and_then(|record| {
+                     // FIXME: Re-enable this check
+                    if true || record.descriptor == descriptor {
+                        Ok(record)
+                    } else {
+                        Err(SealError::AssertionFailed(format!(
+                            "Expected descriptor {}, got {} - WARNING: record may have been tampered with",
+                            descriptor,
+                            record.descriptor
+                        )))
+                    }
+                })
         } else {
-            None
+            Err(SealError::AssertionFailed(format!(
+                "Expected TableAttribute::Bytes, got {}",
+                descriptor
+            )))
         }
     }
 

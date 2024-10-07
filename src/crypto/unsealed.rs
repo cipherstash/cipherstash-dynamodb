@@ -3,7 +3,7 @@ use super::{
     SealError,
 };
 use crate::{
-    encrypted_table::{TableAttribute, TableAttributes},
+    encrypted_table::{AttributeName, TableAttribute, TableAttributes},
     Decryptable,
 };
 use cipherstash_client::encryption::Plaintext;
@@ -41,7 +41,7 @@ impl Unsealed {
     }
 
     // TODO: Change this to take_unprotected
-    pub fn get_plaintext(&self, name: &str) -> TableAttribute {
+    pub fn get_plaintext(&self, name: impl Into<AttributeName>) -> TableAttribute {
         self.unprotected
             .get(name)
             .cloned()
@@ -64,8 +64,8 @@ impl Unsealed {
         self.protected.insert_and_update_map(name, subkey, value.into());
     }
 
-    pub fn add_unprotected(&mut self, name: impl Into<String>, attribute: impl Into<TableAttribute>) {
-        self.unprotected.insert(name.into(), attribute);
+    pub fn add_unprotected(&mut self, name: impl Into<AttributeName>, attribute: impl Into<TableAttribute>) {
+        self.unprotected.insert(name, attribute);
     }
 
     /// Removes and returns the protected attribute, `name`.

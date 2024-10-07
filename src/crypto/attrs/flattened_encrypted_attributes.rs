@@ -1,6 +1,6 @@
 use cipherstash_client::{credentials::{service_credentials::ServiceToken, Credentials}, encryption::{Encryption, EncryptionError}, zero_kms::EncryptedRecord};
 use itertools::Itertools;
-use crate::{crypto::{attrs::flattened_protected_attributes::FlattenedKey, SealError}, encrypted_table::TableAttributes, traits::TableAttribute};
+use crate::{crypto::{attrs::flattened_protected_attributes::FlattenedAttrName, SealError}, encrypted_table::TableAttributes, traits::TableAttribute};
 
 use super::FlattenedProtectedAttributes;
 
@@ -8,20 +8,22 @@ use super::FlattenedProtectedAttributes;
 /// Represents a set of encrypted records that have not yet been normalized into an output type.
 // TODO: Remove the Debug derive
 #[derive(Debug)]
-pub(crate) struct FlattenedEncryptedAttributes(Vec<EncryptedRecord>);
+pub(crate) struct FlattenedEncryptedAttributes {
+    attrs: Vec<EncryptedRecord>,
+}
 
 impl FlattenedEncryptedAttributes {
     pub(crate) fn with_capacity(capacity: usize) -> Self {
-        Self(Vec::with_capacity(capacity))
+        Self { attrs: Vec::with_capacity(capacity) }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.attrs.is_empty()
     }
 
     // TODO: REmove this
     pub(crate) fn len(&self) -> usize {
-        self.0.len()
+        self.attrs.len()
     }
 
     // TODO: Test this
@@ -30,10 +32,10 @@ impl FlattenedEncryptedAttributes {
         self,
         cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
     ) -> Result<FlattenedProtectedAttributes, SealError> {
-        let descriptors = self.0.iter().map(|record| record.descriptor.clone()).collect_vec();
+        let descriptors = self.attrs.iter().map(|record| record.descriptor.clone()).collect_vec();
 
         cipher
-            .decrypt(self.0.into_iter())
+            .decrypt(self.attrs.into_iter())
             .await
             .map(|records| {
                 records
@@ -48,24 +50,24 @@ impl FlattenedEncryptedAttributes {
     /// The descriptor is parsed into a [FlattenedKey] which is used to determine the key and subkey.
     /// If a subkey is present, the attribute is inserted to a map with the key and subkey.
     pub(crate) fn denormalize(self) -> Result<TableAttributes, SealError> {
-        self.0
+        self.attrs
             .into_iter()
             .map(|record| {
                 record
                     .to_vec()
-                    .map(|data| (FlattenedKey::parse(&record.descriptor), data))
+                    .map(|data| (FlattenedAttrName::parse(&record.descriptor), data))
                     .map_err(EncryptionError::from)
             })
-            .fold_ok(Ok(TableAttributes::new()), |acc, (flattened_key, bytes)| {
-                let (key, subkey) = flattened_key.into_key_parts();
+            .fold_ok(Ok(TableAttributes::new()), |acc, (flattened_attr_name, bytes)| {
+                let (name, subkey) = flattened_attr_name.into_parts();
                 if let Some(subkey) = subkey {
                     acc
                     .and_then(|mut acc| acc
-                        .try_insert_map(key, subkey, bytes)
+                        .try_insert_map(name, subkey, bytes)
                         .map(|_| acc))
                 } else {
                     acc.map(|mut acc| {
-                        acc.insert(key, bytes);
+                        acc.insert(name, bytes);
                         acc
                     })
                 }
@@ -74,36 +76,48 @@ impl FlattenedEncryptedAttributes {
 
     // TODO: Test this
     /// Normalize the TableAttributes into a set of encrypted records.
-    pub(crate) fn try_extend(&mut self, attributes: TableAttributes) {
-        for (key, value) in attributes.into_iter() {
+    /// An error will be returned if the TableAttributes contain an unsupported attribute type
+    /// (only `Bytes` and `Map` are currently supported).
+    /// 
+    /// Bytes data is converted to an [EncryptedRecord] using [TableAttribute::as_encrypted_record]
+    /// which validates that the descriptor matches the key and subkey.
+    /// 
+    /// This method is used during decrypt and load operations.
+    pub(crate) fn try_extend(&mut self, attributes: TableAttributes, prefix: String) -> Result<(), SealError> {
+        for (name, value) in attributes.into_iter() {
             match value {
                 TableAttribute::Map(map) => {
                     for (subkey, value) in map.into_iter() {
-                        let descriptor = FlattenedKey::from(key.as_str()).with_subkey(subkey);
-                        // TODO: This is where we check that attr names match the descriptor to prevent confused deputy attacks
-                        // TODO: The prefix is ideally included here while doing this check
-                        self.0.push(value.as_encrypted_record().unwrap()); // TODO: throw an error
+                        let attr_key = FlattenedAttrName::new(Some(prefix.clone()), name.clone()).with_subkey(subkey);
+                        // Load the bytes and check for a confused deputy attack
+                        let record = value.as_encrypted_record(&attr_key.descriptor())?;
+                        self.attrs.push(record);
                     }
                 }
                 TableAttribute::Bytes(_) => {
-                    let descriptor = FlattenedKey::from(key.as_str());
-                    // TODO: Confused deputy attack check
-                    self.0.push(value.as_encrypted_record().unwrap()); // TODO: throw an error
+                    let attr_key = FlattenedAttrName::new(Some(prefix.clone()), name);
+                    // Load the bytes and check for a confused deputy attack
+                    let record = value.as_encrypted_record(&attr_key.descriptor())?;
+                    self.attrs.push(record);
                 }
-                _ => todo!(), // TODO: throw an error
+                _ => {
+                    Err(SealError::AssertionFailed("Unsupported attribute type".to_string()))?;
+                }
             }
         }
+
+        Ok(())
     }
 }
 
 impl From<Vec<EncryptedRecord>> for FlattenedEncryptedAttributes {
-    fn from(records: Vec<EncryptedRecord>) -> Self {
-        Self(records)
+    fn from(attrs: Vec<EncryptedRecord>) -> Self {
+        Self { attrs }
     }
 }
 
 impl FromIterator<EncryptedRecord> for FlattenedEncryptedAttributes {
     fn from_iter<T: IntoIterator<Item = EncryptedRecord>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
+        Self { attrs: iter.into_iter().collect() }
     }
 }

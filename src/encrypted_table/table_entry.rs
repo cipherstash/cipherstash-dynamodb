@@ -1,4 +1,4 @@
-use super::{table_attribute::TableAttribute, table_attributes::TableAttributes};
+use super::{table_attribute::TableAttribute, table_attributes::TableAttributes, AttributeName};
 
 // FIXME: Clean this up
 // FIXME: Can we remove the Clone and Debug?
@@ -35,7 +35,7 @@ impl TableEntry {
         }
     }
 
-    pub fn add_attribute(&mut self, k: impl Into<String>, v: TableAttribute) {
-        self.attributes.insert(k.into(), v);
+    pub fn add_attribute(&mut self, name: impl Into<AttributeName>, v: TableAttribute) {
+        self.attributes.insert(name.into(), v);
     }
 }
