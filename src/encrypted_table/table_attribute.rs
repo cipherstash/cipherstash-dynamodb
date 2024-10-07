@@ -44,8 +44,7 @@ impl TableAttribute {
             EncryptedRecord::from_slice(&s[..])
                 .map_err(SealError::from)
                 .and_then(|record| {
-                     // FIXME: Re-enable this check
-                    if true || record.descriptor == descriptor {
+                    if record.descriptor == descriptor {
                         Ok(record)
                     } else {
                         Err(SealError::AssertionFailed(format!(

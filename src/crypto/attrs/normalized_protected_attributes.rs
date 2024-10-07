@@ -108,7 +108,6 @@ impl FromIterator<FlattenedProtectedAttribute> for NormalizedProtectedAttributes
                 }
                 acc
             })
-            .into()
     }
 }
 

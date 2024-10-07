@@ -97,11 +97,11 @@ impl FlattenedProtectedAttribute {
     }
 }
 
-impl Into<BytesWithDescriptor> for FlattenedProtectedAttribute {
-    fn into(self) -> BytesWithDescriptor {
-        BytesWithDescriptor {
-            bytes: self.plaintext.to_vec(),
-            descriptor: self.storage_descriptor(),
+impl From<FlattenedProtectedAttribute> for BytesWithDescriptor {
+    fn from(fpa: FlattenedProtectedAttribute) -> Self {
+        Self {
+            bytes: fpa.plaintext.to_vec(),
+            descriptor: fpa.storage_descriptor(),
         }
     }
 }
@@ -150,12 +150,12 @@ impl FlattenedAttrName {
     /// Parse a descriptor into a [FlattenedKey].
     pub(super) fn parse(descriptor: &str) -> Self {
         fn split_subkey(prefix: Option<String>, key: &str) -> FlattenedAttrName {
-            match key.split_once(".") {
+            match key.split_once('.') {
                 None => FlattenedAttrName::new(prefix, key),
                 Some((key, subkey)) => FlattenedAttrName::new(prefix, key).with_subkey(subkey),
             }
         }
-        match descriptor.split_once("/") {
+        match descriptor.split_once('/') {
             None => split_subkey(None, descriptor),
             Some((prefix, key)) => split_subkey(Some(prefix.to_string()), key),
         }
