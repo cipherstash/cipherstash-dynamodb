@@ -42,13 +42,13 @@ pub struct Sealer {
     pub(crate) unsealed: Unsealed,
 }
 
-struct RecordsWithTerms<'a> {
+struct RecordsWithTerms {
     num_protected_attributes: usize,
-    records: Vec<RecordWithTerms<'a>>,
+    records: Vec<RecordWithTerms>,
 }
 
-impl<'a> RecordsWithTerms<'a> {
-    fn new(records: Vec<RecordWithTerms<'a>>, num_protected_attributes: usize) -> Self {
+impl RecordsWithTerms {
+    fn new(records: Vec<RecordWithTerms>, num_protected_attributes: usize) -> Self {
         Self {
             num_protected_attributes,
             records,
@@ -117,15 +117,13 @@ impl<'a> RecordsWithTerms<'a> {
     }
 }
 
-struct RecordWithTerms<'a> {
+struct RecordWithTerms {
     pksk: PrimaryKeyParts,
     unsealed: Unsealed,
     terms: Vec<Term>,
-    // FIXME: Don't use a Vec here - too many copies
-    protected_attributes: Vec<Cow<'a, str>>,
 }
 
-impl<'a> RecordWithTerms<'a> {
+impl RecordWithTerms {
     fn into_parts(
         self,
     ) -> (
@@ -145,7 +143,7 @@ impl Sealer {
         protected_attributes: impl AsRef<[Cow<'a, str>]>,
         cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
         term_length: usize,
-    ) -> Result<RecordsWithTerms<'a>, SealError> {
+    ) -> Result<RecordsWithTerms, SealError> {
         let protected_attributes = protected_attributes.as_ref();
         let num_protected_attributes = protected_attributes.len();
 
@@ -211,7 +209,6 @@ impl Sealer {
                     pksk: PrimaryKeyParts { pk, sk },
                     unsealed: sealer.unsealed,
                     terms,
-                    protected_attributes: protected_attributes.to_vec(),
                 })
             })
             .try_collect()

@@ -17,17 +17,14 @@ use super::{attrs::NormalizedProtectedAttributes, SealError, Unsealed};
 /// Wrapped to indicate that the value is encrypted
 pub struct SealedTableEntry(pub(super) TableEntry);
 
-// TODO: Remove this
 pub struct UnsealSpec<'a> {
     pub protected_attributes: Cow<'a, [Cow<'a, str>]>,
-    pub plaintext_attributes: Cow<'a, [Cow<'a, str>]>,
 }
 
 impl UnsealSpec<'static> {
     pub fn new_for_decryptable<D: Decryptable>() -> Self {
         Self {
             protected_attributes: D::protected_attributes(),
-            plaintext_attributes: D::plaintext_attributes(),
         }
     }
 }
@@ -65,8 +62,6 @@ impl SealedTableEntry {
 
         let UnsealSpec {
             protected_attributes,
-            // TODO: Why is this here?
-            plaintext_attributes,
         } = spec;
 
         let mut unprotected_items = Vec::with_capacity(items.len());
