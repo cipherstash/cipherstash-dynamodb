@@ -2,8 +2,7 @@ mod common;
 
 // TODO: Use the derive macros for this test
 use std::{borrow::Cow, collections::BTreeMap};
-use tracing_test::traced_test;
-
+use miette::IntoDiagnostic;
 use cipherstash_client::encryption::TypeParseError;
 use cipherstash_dynamodb::{
     crypto::Unsealed,
@@ -55,10 +54,9 @@ impl Identifiable for Test {
     }
 }
 
-// TODO: Make this function consume and return the Unsealed
 fn put_attrs(unsealed: &mut Unsealed, attrs: BTreeMap<String, String>) {
     attrs.into_iter().for_each(|(k, v)| {
-        unsealed.add_protected(format!("attrs.{k}"), Plaintext::from(v));
+        unsealed.add_protected_map_field("attrs", k, Plaintext::from(v));
     })
 }
 
@@ -76,9 +74,8 @@ impl Encryptable for Test {
     }
 
     fn into_unsealed(self) -> Unsealed {
-        // FIXME: This should be a "consuming" method
         let mut unsealed = Unsealed::new_with_descriptor(<Self as Identifiable>::type_name());
-        unsealed.add_protected("pk", Plaintext::from(self.pk));
+        unsealed.add_unprotected("pk", TableAttribute::from(self.pk));
         unsealed.add_unprotected("sk", TableAttribute::from(self.sk));
         unsealed.add_protected("name", Plaintext::from(self.name));
         unsealed.add_protected("age", Plaintext::from(self.age));
@@ -94,7 +91,6 @@ where
 {
     unsealed
         .take_protected_map("attrs")
-        // FIXME: This method should have a better error
         .ok_or(TypeParseError("attrs".to_string()))?
         .into_iter()
         .map(|(k, v)| TryFromPlaintext::try_from_plaintext(v).map(|v| (k, v)))
@@ -103,26 +99,23 @@ where
 
 impl Decryptable for Test {
     fn from_unsealed(mut unsealed: Unsealed) -> Result<Self, SealError> {
-        println!("IN FROM UNSEALED");
         Ok(Self {
-            /*pk: TryFromTableAttr::try_from_table_attr(
+            pk: TryFromTableAttr::try_from_table_attr(
                 unsealed.get_plaintext("pk"),
             )?,
             sk: TryFromTableAttr::try_from_table_attr(
                 unsealed.get_plaintext("sk"),
-            )?,*/
-            pk: String::from("pk-hack"),
-            sk: String::from("sk-hack"),
-            name: dbg!(TryFromPlaintext::try_from_optional_plaintext(
-                dbg!(unsealed.take_protected("name")),
-            ))?,
-            age: dbg!(TryFromPlaintext::try_from_optional_plaintext(
+            )?,
+            name: TryFromPlaintext::try_from_optional_plaintext(
+                unsealed.take_protected("name"),
+            )?,
+            age: TryFromPlaintext::try_from_optional_plaintext(
                 unsealed.take_protected("age"),
-            ))?,
-            tag: dbg!(TryFromTableAttr::try_from_table_attr(
+            )?,
+            tag: TryFromTableAttr::try_from_table_attr(
                 unsealed.get_plaintext("tag"),
-            ))?,
-            attrs: dbg!(get_attrs(&mut unsealed))?,
+            )?,
+            attrs: get_attrs(&mut unsealed)?,
         })
     }
 
@@ -140,8 +133,7 @@ impl Decryptable for Test {
 }
 
 #[tokio::test]
-#[traced_test]
-async fn test_round_trip() {
+async fn test_round_trip() -> Result<(), Box<dyn std::error::Error>> {
     let config = aws_config::from_env()
         .endpoint_url("http://localhost:8000")
         .load()
@@ -154,7 +146,7 @@ async fn test_round_trip() {
 
     let table = EncryptedTable::init(client, table_name)
         .await
-        .expect("Failed to init table");
+        .into_diagnostic()?;
 
     let record = Test {
         pk: "pk".to_string(),
@@ -168,17 +160,14 @@ async fn test_round_trip() {
     table
         .put(record.clone())
         .await
-        .expect("Failed to insert record");
+        .into_diagnostic()?;
 
-    /*let check = table
+    let check = table
         .get::<Test>(("pk", "sk"))
-        .await;
+        .await
+        .into_diagnostic()?;
 
-    if let Err(e) = check {
-        panic!("Failed to get record: {:?}", e);
-    }*/
+    assert_eq!(check, Some(record));
 
-    assert!(false);
-
-    //assert_eq!(check, record);
+    Ok(())
 }

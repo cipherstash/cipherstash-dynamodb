@@ -19,6 +19,11 @@ impl FlattenedEncryptedAttributes {
         self.0.is_empty()
     }
 
+    // TODO: REmove this
+    pub(crate) fn len(&self) -> usize {
+        self.0.len()
+    }
+
     // TODO: Test this
     /// Decrypt self, returning a [FlattenedProtectedAttributes].
     pub(crate) async fn decrypt_all(

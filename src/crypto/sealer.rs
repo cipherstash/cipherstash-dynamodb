@@ -93,7 +93,13 @@ impl<'a> RecordsWithTerms<'a> {
                 .collect()
 
         } else {
-            let encrypted = protected.encrypt_all(cipher, self.num_protected_attributes).await?;
+            println!("Protecteds before encryption: {:?}", protected);
+            let encrypted = protected.encrypt_all(cipher, num_records).await?;
+
+            println!("Encrypted len = {}", encrypted.len());
+            println!("Unprotected len = {}", unprotecteds.len());
+            println!("Encrypted: {:?}", encrypted);
+            println!("Unprotected: {:?}", unprotecteds);
 
             encrypted
                 .into_iter()
@@ -149,9 +155,6 @@ impl Sealer {
     ) -> Result<RecordsWithTerms<'a>, SealError> {
         let protected_attributes = protected_attributes.as_ref();
         let num_protected_attributes = protected_attributes.len();
-
-        dbg!(&protected_attributes);
-        dbg!(num_protected_attributes);
 
         records
             .into_iter()

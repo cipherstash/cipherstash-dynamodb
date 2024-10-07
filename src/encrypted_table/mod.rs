@@ -366,8 +366,6 @@ impl<D> EncryptedTable<D> {
     ) -> Result<DynamoRecordPatch, PutError> {
         let mut seen_sk = HashSet::new();
 
-        dbg!(&record);
-
         let PreparedRecord {
             protected_attributes,
             protected_indexes,

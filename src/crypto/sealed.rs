@@ -105,11 +105,15 @@ impl SealedTableEntry {
                 })
                 .collect()
         } else {
+            let chunk_size = protected_items.len() / unprotected_items.len();
+
             let r1 = protected_items
                 .decrypt_all(cipher)
                 .await?
                 .into_iter()
-                .chunks(protected_attributes.len())
+                // FIXME: chunk_size is not the same as protected_attributes.len() when dealing with maps
+                // TODO: Can we make decrypt_all return a Vec of FlattenedProtectedAttributes? (like the mirror of encrypt_all)
+                .chunks(chunk_size)
                 .into_iter()
                 .map(|fpa| fpa.into_iter().collect::<NormalizedProtectedAttributes>())
                 .collect_vec();

@@ -26,22 +26,20 @@ impl FlattenedProtectedAttributes {
         self.0.into_iter()
     }
 
+    // TODO: Do some more testing with the chunking
     /// Encrypt all attributes in the set and return a list of [FlattenedEncryptedAttributes] objects.
-    /// Each [FlattenedEncryptedAttributes] object contains `chunk_size` encrypted attributes.
+    /// The output is a vec of `chunk_into` [FlattenedEncryptedAttributes] objects.
     pub(crate) async fn encrypt_all(
         self,
         cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
-        chunk_size: usize,
+        chunk_into: usize,
     ) -> Result<Vec<FlattenedEncryptedAttributes>, SealError> {
-        println!("Encrypting all attributes, chunk size: {}", chunk_size);
+        let chunk_size = self.0.len() / chunk_into;
+        println!("Encrypting all attributes, chunk into: {}, chunk_size = {}", chunk_into, chunk_size);
 
-        let x = cipher
+        cipher
             .encrypt(self.0.into_iter())
-            .await?;
-
-        dbg!(&x);
-
-        x
+            .await?
             .into_iter()
             .chunks(chunk_size)
             .into_iter()

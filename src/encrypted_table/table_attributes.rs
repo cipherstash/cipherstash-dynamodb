@@ -5,20 +5,6 @@ use std::{borrow::Cow, collections::HashMap};
 #[derive(Debug, Clone)]
 /// Represents a collection of attributes for a table entry.
 /// Attributes are stored as a map of `String` to `TableAttribute`.
-///
-/// ## Namespacing
-///
-/// Attributes can be namespaced by using a dot (`.`) in the attribute name.
-/// For example:
-///
-/// ```rust
-/// use cipherstash_dynamodb::TableAttributes;
-/// use std::collections::HashMap;
-///
-/// // TODO: Add a test for this
-/// ```
-///
-/// TODO: Explain how namespacing works with normalizing and denormalizing
 pub struct TableAttributes(HashMap<String, TableAttribute>);
 
 impl TableAttributes {
