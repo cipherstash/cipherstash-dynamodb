@@ -132,6 +132,10 @@ impl PreparedDelete {
     pub fn prepared_primary_key(&self) -> PreparedPrimaryKey {
         self.primary_key.clone()
     }
+
+    pub fn protected_indexes(&self) -> &[(Cow<'static, str>, IndexType)] {
+        &self.protected_indexes
+    }
 }
 
 impl PreparedRecord {
