@@ -96,18 +96,17 @@ impl FromIterator<(NormalizedKey, NormalizedValue)> for NormalizedProtectedAttri
 
 impl FromIterator<FlattenedProtectedAttribute> for NormalizedProtectedAttributes {
     fn from_iter<T: IntoIterator<Item = FlattenedProtectedAttribute>>(iter: T) -> Self {
-        iter.into_iter()
-            .fold(Self::new(), |mut acc, fpa| {
-                match fpa.normalize_into_parts() {
-                    (plaintext, key, Some(subkey)) => {
-                        acc.insert_and_update_map(key, subkey, plaintext);
-                    }
-                    (plaintext, key, None) => {
-                        acc.insert(key, plaintext);
-                    }
+        iter.into_iter().fold(Self::new(), |mut acc, fpa| {
+            match fpa.normalize_into_parts() {
+                (plaintext, key, Some(subkey)) => {
+                    acc.insert_and_update_map(key, subkey, plaintext);
                 }
-                acc
-            })
+                (plaintext, key, None) => {
+                    acc.insert(key, plaintext);
+                }
+            }
+            acc
+        })
     }
 }
 

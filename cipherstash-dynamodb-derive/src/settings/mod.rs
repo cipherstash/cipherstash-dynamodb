@@ -1,9 +1,11 @@
 mod builder;
 pub mod index_type;
+use std::collections::HashMap;
+
 use self::{builder::SettingsBuilder, index_type::IndexType};
 use itertools::Itertools;
 use proc_macro2::Ident;
-use syn::DeriveInput;
+use syn::{DeriveInput, ExprPath};
 
 pub(crate) enum AttributeMode {
     Protected,
@@ -19,6 +21,12 @@ pub(crate) struct Settings {
     pub(crate) partition_key_field: Option<String>,
     protected_attributes: Vec<String>,
     unprotected_attributes: Vec<String>,
+
+    /// Map of attribute names to the encryption handler to use.
+    encrypt_handlers: HashMap<String, ExprPath>,
+
+    /// Map of attribute names to the decryption handler to use.
+    decrypt_handlers: HashMap<String, ExprPath>,
 
     /// Skipped attributes are never encrypted by the `DecryptedRecord` trait will
     /// use these to reconstruct the struct via `Default` (like serde).
@@ -41,6 +49,24 @@ impl Settings {
             .map(|s| s.as_str())
             .sorted()
             .collect::<Vec<_>>()
+    }
+
+    pub(crate) fn protected_attributes_excluding_handlers(&self) -> Vec<&str> {
+        self.protected_attributes
+            .iter()
+            .filter(|s| !self.encrypt_handlers.contains_key(s.as_str()))
+            .filter(|s| !self.decrypt_handlers.contains_key(s.as_str()))
+            .map(|s| s.as_str())
+            .sorted()
+            .collect::<Vec<_>>()
+    }
+
+    pub(crate) fn encrypt_handlers(&self) -> &HashMap<String, ExprPath> {
+        &self.encrypt_handlers
+    }
+
+    pub(crate) fn decrypt_handlers(&self) -> &HashMap<String, ExprPath> {
+        &self.decrypt_handlers
     }
 
     pub(crate) fn plaintext_attributes(&self) -> Vec<&str> {

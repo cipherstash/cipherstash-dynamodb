@@ -9,7 +9,7 @@ pub(crate) fn derive_decryptable(input: DeriveInput) -> Result<TokenStream, syn:
         .field_attributes(&input)?
         .build()?;
 
-    let protected_attributes = settings.protected_attributes();
+    let protected_excluding_handlers = settings.protected_attributes_excluding_handlers();
     let plaintext_attributes = settings.plaintext_attributes();
 
     let protected_attributes_cow = settings
@@ -25,7 +25,7 @@ pub(crate) fn derive_decryptable(input: DeriveInput) -> Result<TokenStream, syn:
     let skipped_attributes = settings.skipped_attributes();
     let ident = settings.ident();
 
-    let from_unsealed_impl = protected_attributes
+    let from_unsealed_impl = protected_excluding_handlers
         .iter()
         .map(|attr| {
             let attr_ident = format_ident!("{attr}");
@@ -46,6 +46,13 @@ pub(crate) fn derive_decryptable(input: DeriveInput) -> Result<TokenStream, syn:
 
             quote! {
                 #attr_ident: Default::default()
+            }
+        }))
+        .chain(settings.decrypt_handlers().iter().map(|(attr, handler)| {
+            let attr_ident = format_ident!("{attr}");
+
+            quote! {
+                #attr_ident: #handler(&mut unsealed)?
             }
         }));
 
