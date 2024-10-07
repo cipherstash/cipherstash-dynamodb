@@ -1,5 +1,8 @@
 use super::{AttributeName, SealError, TableAttribute};
-use std::{borrow::Cow, collections::{hash_map::IntoIter, HashMap}};
+use std::{
+    borrow::Cow,
+    collections::{hash_map::IntoIter, HashMap},
+};
 
 // FIXME: Remove this (only used for debugging)
 #[derive(Debug, Clone)]
@@ -20,17 +23,26 @@ impl TableAttributes {
 
     // TODO: Test, docs
     // TODO: Remove this logic from the NormalisedKey
-    pub(crate) fn insert(&mut self, name: impl Into<AttributeName>, value: impl Into<TableAttribute>) {
+    pub(crate) fn insert(
+        &mut self,
+        name: impl Into<AttributeName>,
+        value: impl Into<TableAttribute>,
+    ) {
         let name: AttributeName = name.into();
         self.0.insert(name, value.into());
     }
 
-    // TODO: Proper error here
     /// Attempts to insert a value into a map with key `subkey` where the map is stored at `key`.
     /// If the map doesn't exist, it will be created.
     /// If an attribute with the same key already exists but is not a map, an error is returned.
-    pub(crate) fn try_insert_map(&mut self, name: impl Into<AttributeName>, subkey: impl Into<String>, value: impl Into<TableAttribute>) -> Result<(), SealError> {
-        self.0.entry(name.into())
+    pub(crate) fn try_insert_map(
+        &mut self,
+        name: impl Into<AttributeName>,
+        subkey: impl Into<String>,
+        value: impl Into<TableAttribute>,
+    ) -> Result<(), SealError> {
+        self.0
+            .entry(name.into())
             .or_insert(TableAttribute::new_map())
             .try_insert_map(subkey.into(), value.into())
     }
@@ -42,7 +54,8 @@ impl TableAttributes {
         let (protected, unprotected): (HashMap<_, _>, HashMap<_, _>) =
             self.0.into_iter().partition(|(k, _)| {
                 let check = k.as_external_name();
-                protected_keys.iter().any(|key| match_key(check, key))
+                //protected_keys.iter().any(|key| match_key(check, key))
+                protected_keys.iter().any(|key| check == key)
             });
 
         (protected.into(), unprotected.into())
@@ -53,19 +66,6 @@ impl TableAttributes {
         let name: AttributeName = name.into();
         self.0.get(&name)
     }
-}
-
-// TODO: This shouldn't be needed anymore
-fn match_key(key: &str, other: &Cow<str>) -> bool {
-    let namespaced_key = match key.split_once("/") {
-        None => key,
-        Some((_, key)) => key,
-    };
-    let key = match namespaced_key.split_once(".") {
-        None => namespaced_key,
-        Some((key, _)) => key,
-    };
-    key == other.as_ref()
 }
 
 impl From<HashMap<AttributeName, TableAttribute>> for TableAttributes {

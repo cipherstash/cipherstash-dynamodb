@@ -1,5 +1,8 @@
 use crate::{
-    crypto::attrs::FlattenedEncryptedAttributes, encrypted_table::TableEntry, traits::{ReadConversionError, WriteConversionError}, Decryptable, Identifiable
+    crypto::attrs::FlattenedEncryptedAttributes,
+    encrypted_table::TableEntry,
+    traits::{ReadConversionError, WriteConversionError},
+    Decryptable, Identifiable,
 };
 use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
 use cipherstash_client::{
@@ -31,10 +34,16 @@ pub struct UnsealSpec<'a> {
 }
 
 impl UnsealSpec<'static> {
-    pub fn new_for_decryptable<D>() -> Self where D: Decryptable + Identifiable {
+    pub fn new_for_decryptable<D>() -> Self
+    where
+        D: Decryptable + Identifiable,
+    {
         Self {
             protected_attributes: D::protected_attributes(),
-            sort_key_prefix: D::sort_key_prefix().as_deref().map(ToOwned::to_owned).unwrap_or(D::type_name().to_string()),
+            sort_key_prefix: D::sort_key_prefix()
+                .as_deref()
+                .map(ToOwned::to_owned)
+                .unwrap_or(D::type_name().to_string()),
         }
     }
 }
@@ -69,7 +78,6 @@ impl SealedTableEntry {
         spec: UnsealSpec<'_>,
         cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
     ) -> Result<Vec<Unsealed>, SealError> {
-
         let UnsealSpec {
             protected_attributes,
             sort_key_prefix,
@@ -96,7 +104,10 @@ impl SealedTableEntry {
                 .into_iter()
                 .map(|unprotected| {
                     // TODO: Create a new_from_unprotected method
-                    Ok(Unsealed::new_from_parts(NormalizedProtectedAttributes::new(), unprotected))
+                    Ok(Unsealed::new_from_parts(
+                        NormalizedProtectedAttributes::new(),
+                        unprotected,
+                    ))
                 })
                 .collect()
         } else {
@@ -113,9 +124,7 @@ impl SealedTableEntry {
                 .map(|fpa| fpa.into_iter().collect::<NormalizedProtectedAttributes>())
                 .into_iter()
                 .zip_eq(unprotected_items.into_iter())
-                .map(|(fpa, unprotected)| {
-                    Ok(Unsealed::new_from_parts(fpa, unprotected))
-                })
+                .map(|(fpa, unprotected)| Ok(Unsealed::new_from_parts(fpa, unprotected)))
                 .collect()
         }
     }
@@ -190,10 +199,7 @@ impl TryFrom<SealedTableEntry> for HashMap<String, AttributeValue> {
         }
 
         item.0.attributes.into_iter().for_each(|(k, v)| {
-            map.insert(
-                k.into_stored_name(),
-                v.into(),
-            );
+            map.insert(k.into_stored_name(), v.into());
         });
 
         Ok(map)

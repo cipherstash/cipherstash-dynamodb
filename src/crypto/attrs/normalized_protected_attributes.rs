@@ -1,8 +1,8 @@
-use std::collections::HashMap;
-use cipherstash_client::encryption::Plaintext;
 use super::flattened_protected_attributes::{
     FlattenedAttrName, FlattenedProtectedAttribute, FlattenedProtectedAttributes,
 };
+use cipherstash_client::encryption::Plaintext;
+use std::collections::HashMap;
 
 // FIXME: Remove this (only used for debugging)
 #[derive(Debug)]
@@ -87,14 +87,16 @@ impl NormalizedProtectedAttributes {
 impl FromIterator<(NormalizedKey, NormalizedValue)> for NormalizedProtectedAttributes {
     fn from_iter<T: IntoIterator<Item = (NormalizedKey, NormalizedValue)>>(iter: T) -> Self {
         let values = iter.into_iter().collect();
-        Self { values, prefix: None }
+        Self {
+            values,
+            prefix: None,
+        }
     }
 }
 
 impl FromIterator<FlattenedProtectedAttribute> for NormalizedProtectedAttributes {
     fn from_iter<T: IntoIterator<Item = FlattenedProtectedAttribute>>(iter: T) -> Self {
-        iter
-            .into_iter()
+        iter.into_iter()
             .fold(Self::new(), |mut acc, fpa| {
                 match fpa.normalize_into_parts() {
                     (plaintext, key, Some(subkey)) => {
@@ -104,7 +106,7 @@ impl FromIterator<FlattenedProtectedAttribute> for NormalizedProtectedAttributes
                         acc.insert(key, plaintext);
                     }
                 }
-                acc 
+                acc
             })
             .into()
     }

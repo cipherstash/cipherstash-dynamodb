@@ -1,11 +1,11 @@
-pub mod query;
 mod attribute_name;
+pub mod query;
 mod table_attribute;
 mod table_attributes;
 mod table_entry;
 pub use self::{
-    query::QueryBuilder,
     attribute_name::AttributeName,
+    query::QueryBuilder,
     table_attribute::{TableAttribute, TryFromTableAttr},
     table_attributes::TableAttributes,
     table_entry::TableEntry,
@@ -302,7 +302,8 @@ impl<D> EncryptedTable<D> {
         &self,
         items: impl IntoIterator<Item = HashMap<String, AttributeValue>>,
     ) -> Result<Vec<T>, DecryptError>
-    where T: Decryptable + Identifiable,
+    where
+        T: Decryptable + Identifiable,
     {
         let items = self
             .unseal_all(items, UnsealSpec::new_for_decryptable::<T>())
@@ -314,18 +315,14 @@ impl<D> EncryptedTable<D> {
             .collect::<Result<Vec<_>, _>>()?)
     }
 
-    pub async fn decrypt<T>(
-        &self,
-        item: HashMap<String, AttributeValue>,
-    ) -> Result<T, DecryptError>
-    where T: Decryptable + Identifiable,
+    pub async fn decrypt<T>(&self, item: HashMap<String, AttributeValue>) -> Result<T, DecryptError>
+    where
+        T: Decryptable + Identifiable,
     {
         let uspec = UnsealSpec::new_for_decryptable::<T>();
         println!("USPEC: {:?}", uspec);
 
-        let item = self
-            .unseal(item, uspec)
-            .await?;
+        let item = self.unseal(item, uspec).await?;
 
         Ok(item.into_value()?)
     }

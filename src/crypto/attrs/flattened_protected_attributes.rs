@@ -1,5 +1,6 @@
 use super::{
-    flattened_encrypted_attributes::FlattenedEncryptedAttributes, normalized_protected_attributes::NormalizedKey
+    flattened_encrypted_attributes::FlattenedEncryptedAttributes,
+    normalized_protected_attributes::NormalizedKey,
 };
 use crate::{crypto::SealError, encrypted_table::AttributeName};
 use cipherstash_client::{
@@ -56,7 +57,11 @@ impl Extend<FlattenedProtectedAttribute> for FlattenedProtectedAttributes {
 /// Allows us to collect a list of (Plaintext, String) tuples into a [FlattenedProtectedAttributes] object.
 impl FromIterator<(Plaintext, String)> for FlattenedProtectedAttributes {
     fn from_iter<T: IntoIterator<Item = (Plaintext, String)>>(iter: T) -> Self {
-        Self(iter.into_iter().map(|(plaintext, key)| FlattenedProtectedAttribute::new(plaintext, key)).collect())
+        Self(
+            iter.into_iter()
+                .map(|(plaintext, key)| FlattenedProtectedAttribute::new(plaintext, key))
+                .collect(),
+        )
     }
 }
 
@@ -130,8 +135,14 @@ impl FlattenedAttrName {
     /// Prefix is discarded as it is not needed after decryption.
     pub(super) fn normalize(self) -> (NormalizedKey, Option<String>) {
         match self.subkey {
-            Some(_) => (NormalizedKey::new_map(self.name.as_external_name()), self.subkey),
-            None => (NormalizedKey::new_scalar(self.name.as_external_name()), None),
+            Some(_) => (
+                NormalizedKey::new_map(self.name.as_external_name()),
+                self.subkey,
+            ),
+            None => (
+                NormalizedKey::new_scalar(self.name.as_external_name()),
+                None,
+            ),
         }
     }
 
@@ -157,7 +168,9 @@ impl FlattenedAttrName {
 
     pub(crate) fn descriptor(&self) -> String {
         match (self.prefix.as_ref(), self.subkey.as_ref()) {
-            (Some(prefix), Some(subkey)) => format!("{}/{}.{}", prefix, self.name.as_stored_name(), subkey),
+            (Some(prefix), Some(subkey)) => {
+                format!("{}/{}.{}", prefix, self.name.as_stored_name(), subkey)
+            }
             (Some(prefix), None) => format!("{}/{}", prefix, self.name.as_stored_name()),
             (None, Some(subkey)) => format!("{}.{}", self.name.as_stored_name(), subkey),
             (None, None) => self.name.as_stored_name().to_string(),
@@ -222,7 +235,9 @@ mod tests {
             "pref/foo"
         );
         assert_eq!(
-            FlattenedAttrName::new(None, "foo").with_subkey("x").descriptor(),
+            FlattenedAttrName::new(None, "foo")
+                .with_subkey("x")
+                .descriptor(),
             "foo.x"
         );
         assert_eq!(
@@ -325,8 +340,17 @@ mod tests {
     #[test]
     fn test_flattened_key_parse() {
         assert_eq!(FlattenedAttrName::parse("key"), "key".into());
-        assert_eq!(FlattenedAttrName::parse("prefix/key"), ("prefix", "key").into());
-        assert_eq!(FlattenedAttrName::parse("key.subkey"), FlattenedAttrName::from("key").with_subkey("subkey"));
-        assert_eq!(FlattenedAttrName::parse("prefix/key.subkey"), FlattenedAttrName::from(("prefix", "key")).with_subkey("subkey"));
+        assert_eq!(
+            FlattenedAttrName::parse("prefix/key"),
+            ("prefix", "key").into()
+        );
+        assert_eq!(
+            FlattenedAttrName::parse("key.subkey"),
+            FlattenedAttrName::from("key").with_subkey("subkey")
+        );
+        assert_eq!(
+            FlattenedAttrName::parse("prefix/key.subkey"),
+            FlattenedAttrName::from(("prefix", "key")).with_subkey("subkey")
+        );
     }
 }

@@ -89,7 +89,6 @@ pub enum QueryError {
     // TODO: Remove this (and repeat for all the operations)
     //#[error("AwsError: {0}")]
     //AwsError(String),
-
     #[error(transparent)]
     DynamoError(#[from] SdkError<operation::query::QueryError>),
 }

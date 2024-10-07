@@ -1,8 +1,6 @@
 mod common;
 
 // TODO: Use the derive macros for this test
-use std::{borrow::Cow, collections::BTreeMap};
-use miette::IntoDiagnostic;
 use cipherstash_client::encryption::TypeParseError;
 use cipherstash_dynamodb::{
     crypto::Unsealed,
@@ -11,6 +9,8 @@ use cipherstash_dynamodb::{
     Decryptable, Encryptable, EncryptedTable, Identifiable, PkSk,
 };
 use cipherstash_dynamodb_derive::Searchable;
+use miette::IntoDiagnostic;
+use std::{borrow::Cow, collections::BTreeMap};
 
 fn make_btree_map() -> BTreeMap<String, String> {
     let mut map = BTreeMap::new();
@@ -106,21 +106,11 @@ impl Decryptable for Test {
     fn from_unsealed(mut unsealed: Unsealed) -> Result<Self, SealError> {
         println!("{:?}", unsealed);
         Ok(Self {
-            pk: TryFromTableAttr::try_from_table_attr(
-                unsealed.get_plaintext("pk"),
-            )?,
-            sk: TryFromTableAttr::try_from_table_attr(
-                unsealed.get_plaintext("sk"),
-            )?,
-            name: TryFromPlaintext::try_from_optional_plaintext(
-                unsealed.take_protected("name"),
-            )?,
-            age: TryFromPlaintext::try_from_optional_plaintext(
-                unsealed.take_protected("age"),
-            )?,
-            tag: TryFromTableAttr::try_from_table_attr(
-                unsealed.get_plaintext("tag"),
-            )?,
+            pk: TryFromTableAttr::try_from_table_attr(unsealed.get_plaintext("pk"))?,
+            sk: TryFromTableAttr::try_from_table_attr(unsealed.get_plaintext("sk"))?,
+            name: TryFromPlaintext::try_from_optional_plaintext(unsealed.take_protected("name"))?,
+            age: TryFromPlaintext::try_from_optional_plaintext(unsealed.take_protected("age"))?,
+            tag: TryFromTableAttr::try_from_table_attr(unsealed.get_plaintext("tag"))?,
             attrs: get_attrs(&mut unsealed)?,
         })
     }
@@ -167,15 +157,9 @@ async fn test_round_trip() -> Result<(), Box<dyn std::error::Error>> {
         attrs: make_btree_map(),
     };
 
-    table
-        .put(record.clone())
-        .await
-        .into_diagnostic()?;
+    table.put(record.clone()).await.into_diagnostic()?;
 
-    let check = table
-        .get::<Test>(("pk", "sk"))
-        .await
-        .into_diagnostic()?;
+    let check = table.get::<Test>(("pk", "sk")).await.into_diagnostic()?;
 
     assert_eq!(check, Some(record));
 

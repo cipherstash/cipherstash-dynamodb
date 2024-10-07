@@ -3,7 +3,6 @@ mod b64_encode;
 mod sealed;
 mod sealer;
 mod unsealed;
-use std::borrow::Cow;
 use crate::{
     traits::{PrimaryKeyError, PrimaryKeyParts, ReadConversionError, WriteConversionError},
     Identifiable, IndexType, PrimaryKey,
@@ -13,9 +12,11 @@ use cipherstash_client::{
     encryption::{
         compound_indexer::{CompoundIndex, ExactIndex},
         Encryption, EncryptionError, Plaintext, TypeParseError,
-    }, vitur_client::DecryptError,
+    },
+    vitur_client::DecryptError,
 };
 use miette::Diagnostic;
+use std::borrow::Cow;
 use thiserror::Error;
 
 // Re-exports

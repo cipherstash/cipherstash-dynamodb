@@ -33,10 +33,13 @@ impl TableAttribute {
     /// Try to convert the `TableAttribute` to an `EncryptedRecord` if it is a `Bytes` variant.
     /// The descriptor of the record is checked against the `descriptor` argument
     /// (which will be verified to be the correct descriptor for the record via AAD).
-    /// 
+    ///
     /// If the descriptor does not match, an error is returned and this may indicate that the record
     /// has been tampered with (e.g. via a confused deputy attack).
-    pub(crate) fn as_encrypted_record(&self, descriptor: &str) -> Result<EncryptedRecord, SealError> {
+    pub(crate) fn as_encrypted_record(
+        &self,
+        descriptor: &str,
+    ) -> Result<EncryptedRecord, SealError> {
         if let TableAttribute::Bytes(s) = self {
             EncryptedRecord::from_slice(&s[..])
                 .map_err(SealError::from)

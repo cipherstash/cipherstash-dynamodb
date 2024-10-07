@@ -41,7 +41,8 @@ type TestResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
 async fn run_test<F>(mut f: impl FnMut(EncryptedTable) -> F) -> TestResult
 where
-    F: Future<Output = TestResult> {
+    F: Future<Output = TestResult>,
+{
     let config = aws_config::from_env()
         .endpoint_url("http://localhost:8000")
         .load()
@@ -124,7 +125,7 @@ async fn test_query_single_prefix() -> TestResult {
 
 #[tokio::test]
 #[serial]
-async fn test_query_compound() -> TestResult{
+async fn test_query_compound() -> TestResult {
     run_test(|table| async move {
         let res: Vec<User> = table
             .query()
@@ -145,11 +146,9 @@ async fn test_query_compound() -> TestResult{
 
 #[tokio::test]
 #[serial]
-async fn test_get_by_partition_key() -> TestResult{
+async fn test_get_by_partition_key() -> TestResult {
     run_test(|table| async move {
-        let res: Option<User> = table
-            .get(("dan@coderdan.co", "Dan Draper"))
-            .await?;
+        let res: Option<User> = table.get(("dan@coderdan.co", "Dan Draper")).await?;
 
         assert_eq!(
             res,

@@ -60,11 +60,21 @@ impl Unsealed {
     /// If the map does not exist, it will be created.
     /// If the map exists, the key-value pair will be updated.
     /// If an attribute called `name` already exists but is not a map, this will panic.
-    pub fn add_protected_map_field(&mut self, name: impl Into<String>, subkey: impl Into<String>, value: impl Into<Plaintext>) {
-        self.protected.insert_and_update_map(name, subkey, value.into());
+    pub fn add_protected_map_field(
+        &mut self,
+        name: impl Into<String>,
+        subkey: impl Into<String>,
+        value: impl Into<Plaintext>,
+    ) {
+        self.protected
+            .insert_and_update_map(name, subkey, value.into());
     }
 
-    pub fn add_unprotected(&mut self, name: impl Into<AttributeName>, attribute: impl Into<TableAttribute>) {
+    pub fn add_unprotected(
+        &mut self,
+        name: impl Into<AttributeName>,
+        attribute: impl Into<TableAttribute>,
+    ) {
         self.unprotected.insert(name, attribute);
     }
 

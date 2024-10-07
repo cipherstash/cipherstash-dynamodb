@@ -55,15 +55,17 @@ impl RecordsWithTerms {
         }
     }
 
-    async fn encrypt(self,
+    async fn encrypt(
+        self,
         cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
     ) -> Result<Vec<Sealed>, SealError> {
         let num_records = self.records.len();
         let mut pksks = Vec::with_capacity(num_records);
         let mut record_terms = Vec::with_capacity(num_records);
         let mut unprotecteds = Vec::with_capacity(num_records);
-        let mut protected =
-            FlattenedProtectedAttributes::new_with_capacity(num_records * self.num_protected_attributes);
+        let mut protected = FlattenedProtectedAttributes::new_with_capacity(
+            num_records * self.num_protected_attributes,
+        );
 
         for sealer_with_terms in self.records {
             let (pksk, terms, flattened_protected, unprotected) = sealer_with_terms.into_parts();
@@ -90,7 +92,6 @@ impl RecordsWithTerms {
                     })
                 })
                 .collect()
-
         } else {
             let encrypted = protected.encrypt_all(cipher, num_records).await?;
 
@@ -101,16 +102,12 @@ impl RecordsWithTerms {
                 .zip_eq(pksks.into_iter())
                 .map(|record| {
                     let (enc_attrs, unprotecteds, terms, pksk) = flatten_tuple_4(record);
-                    enc_attrs
-                        .denormalize()
-                        .map(|protected_attrs| {
-                            Sealed {
-                                pk: pksk.pk,
-                                sk: pksk.sk,
-                                attributes: unprotecteds.merge(protected_attrs),
-                                terms,
-                            }
-                        })
+                    enc_attrs.denormalize().map(|protected_attrs| Sealed {
+                        pk: pksk.pk,
+                        sk: pksk.sk,
+                        attributes: unprotecteds.merge(protected_attrs),
+                        terms,
+                    })
                 })
                 .collect()
         }
@@ -215,7 +212,6 @@ impl Sealer {
             .map(|records| RecordsWithTerms::new(records, num_protected_attributes))
     }
 
-    
     pub(crate) async fn seal_all<'a>(
         records: impl IntoIterator<Item = Sealer>,
         protected_attributes: impl AsRef<[Cow<'a, str>]>,

@@ -75,9 +75,7 @@ impl PreparedQuery {
             .key_condition_expression("term = :term")
             .expression_attribute_values(":term", term);
 
-        let result = query
-            .send()
-            .await?;
+        let result = query.send().await?;
 
         dbg!(&result);
 
@@ -140,7 +138,10 @@ impl<S> QueryBuilder<S, &EncryptedTable<Dynamo>>
 where
     S: Searchable + Identifiable,
 {
-    pub async fn load<T>(self) -> Result<Vec<T>, QueryError> where T: Decryptable + Identifiable {
+    pub async fn load<T>(self) -> Result<Vec<T>, QueryError>
+    where
+        T: Decryptable + Identifiable,
+    {
         let table = self.backend;
         let query = self.build()?;
 
