@@ -42,18 +42,14 @@ impl Unsealed {
 
     // TODO: Change this to take_unprotected
     pub fn get_plaintext(&self, name: &str) -> TableAttribute {
-        println!("Getting plaintext for {}", name);
-        println!("unprotected: {:?}", self.unprotected);
-        let r = self.unprotected
-            .get(name);
-        println!("Got plaintext for {}: {:?}", name, r);
-        r
+        self.unprotected
+            .get(name)
             .cloned()
             .unwrap_or(TableAttribute::Null)
     }
 
-    pub fn add_protected(&mut self, name: impl Into<String>, plaintext: Plaintext) {
-        self.protected.insert(name, plaintext);
+    pub fn add_protected(&mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) {
+        self.protected.insert(name, plaintext.into());
     }
 
     pub fn add_protected_map(&mut self, name: impl Into<String>, map: HashMap<String, Plaintext>) {
@@ -64,11 +60,11 @@ impl Unsealed {
     /// If the map does not exist, it will be created.
     /// If the map exists, the key-value pair will be updated.
     /// If an attribute called `name` already exists but is not a map, this will panic.
-    pub fn add_protected_map_field(&mut self, name: impl Into<String>, subkey: impl Into<String>, value: Plaintext) {
-        self.protected.insert_and_update_map(name, subkey, value);
+    pub fn add_protected_map_field(&mut self, name: impl Into<String>, subkey: impl Into<String>, value: impl Into<Plaintext>) {
+        self.protected.insert_and_update_map(name, subkey, value.into());
     }
 
-    pub fn add_unprotected(&mut self, name: impl Into<String>, attribute: TableAttribute) {
+    pub fn add_unprotected(&mut self, name: impl Into<String>, attribute: impl Into<TableAttribute>) {
         self.unprotected.insert(name.into(), attribute);
     }
 

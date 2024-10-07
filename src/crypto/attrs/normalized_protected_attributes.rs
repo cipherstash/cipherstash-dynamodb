@@ -1,6 +1,5 @@
-use std::collections::{hash_map, HashMap};
+use std::collections::HashMap;
 use cipherstash_client::encryption::Plaintext;
-use itertools::{Chunk, Chunks, IntoChunks, Itertools};
 use super::flattened_protected_attributes::{
     FlattenedKey, FlattenedProtectedAttribute, FlattenedProtectedAttributes,
 };

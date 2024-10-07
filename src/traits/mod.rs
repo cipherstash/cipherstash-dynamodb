@@ -211,10 +211,10 @@ mod tests {
 
         fn into_unsealed(self) -> Unsealed {
             let mut unsealed = Unsealed::new_with_descriptor(<Self as Identifiable>::type_name());
-            unsealed.add_protected("id", Plaintext::from(self.id));
-            unsealed.add_protected("name", Plaintext::from(self.name));
-            unsealed.add_protected("age", Plaintext::from(self.age));
-            unsealed.add_unprotected("tag", TableAttribute::from(self.tag));
+            unsealed.add_protected("id", self.id);
+            unsealed.add_protected("name", self.name);
+            unsealed.add_protected("age", self.age);
+            unsealed.add_unprotected("tag", self.tag);
             put_attrs(&mut unsealed, self.attrs);
             unsealed
         }
@@ -277,7 +277,6 @@ mod tests {
         };
 
         let unsealed = test.clone().into_unsealed();
-        dbg!(&unsealed);
         assert_eq!(test, Test::from_unsealed(unsealed).into_diagnostic()?);
 
         Ok(())

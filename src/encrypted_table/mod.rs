@@ -1,4 +1,3 @@
-mod dynamo;
 pub mod query;
 mod table_attribute;
 mod table_attributes;
@@ -23,7 +22,7 @@ use cipherstash_client::{
         service_credentials::{ServiceCredentials, ServiceToken},
         Credentials,
     },
-    encryption::{Encryption, Plaintext},
+    encryption::Encryption,
     zero_kms::ZeroKMS,
 };
 use log::info;
@@ -32,8 +31,8 @@ use std::{
     collections::{HashMap, HashSet},
     ops::Deref,
 };
-pub use dynamo::DynamoItem;
 
+/// Index terms are truncated to this length
 const DEFAULT_TERM_SIZE: usize = 12;
 
 pub struct Headless;

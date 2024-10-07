@@ -1,6 +1,6 @@
 use cipherstash_client::{credentials::{service_credentials::ServiceToken, Credentials}, encryption::{Encryption, EncryptionError}, zero_kms::EncryptedRecord};
 use itertools::Itertools;
-use crate::{crypto::{attrs::flattened_protected_attributes::FlattenedKey, SealError}, encrypted_table::{TableAttributes, TableEntry}, traits::TableAttribute};
+use crate::{crypto::{attrs::flattened_protected_attributes::FlattenedKey, SealError}, encrypted_table::TableAttributes, traits::TableAttribute};
 
 use super::FlattenedProtectedAttributes;
 

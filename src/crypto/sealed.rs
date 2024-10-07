@@ -1,15 +1,15 @@
 use crate::{
-    async_map_somes::async_map_somes, crypto::attrs::FlattenedEncryptedAttributes, encrypted_table::TableEntry, traits::{ReadConversionError, TableAttribute, WriteConversionError}, Decryptable
+    crypto::attrs::FlattenedEncryptedAttributes, encrypted_table::TableEntry, traits::{ReadConversionError, WriteConversionError}, Decryptable
 };
 use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
 use cipherstash_client::{
     credentials::{service_credentials::ServiceToken, Credentials},
-    encryption::{Encryption, Plaintext},
+    encryption::Encryption,
 };
 use itertools::Itertools;
-use std::{borrow::Cow, collections::HashMap, ops::Deref};
+use std::{borrow::Cow, collections::HashMap};
 
-use super::{attrs::NormalizedProtectedAttributes, sealer::Sealed, SealError, Unsealed};
+use super::{attrs::NormalizedProtectedAttributes, SealError, Unsealed};
 
 // FIXME: Remove this (only used for debugging)
 #[derive(Debug)]
@@ -61,25 +61,13 @@ impl SealedTableEntry {
         spec: UnsealSpec<'_>,
         cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
     ) -> Result<Vec<Unsealed>, SealError> {
-        //let items = items.as_ref();
 
         let UnsealSpec {
             protected_attributes,
+            // TODO: Why is this here?
             plaintext_attributes,
         } = spec;
 
-
-        // FIXME: The following issues remain:
-        // 1. The pk and sk are not being added to the unsealed
-        // 2. We don't handle the case where protected_attributes is empty
-        // 3. We don't handle the case where plaintext_attributes is empty
-        // 4. The zipped iterator is misaligned
-        // Unsealed item: Unsealed { descriptor: None, protected: {"name": (SmallInt(Some(42)), "/name"), "age": (Utf8Str(Some("value-a")), "/age"), "attrs": (Utf8Str(Some("value-c")), "/attrs")}, unprotected: TableAttributes({"tag": String("sk")}) }
-        // 5. (Minor) The Unsealed is not given a descriptor after decryption
-        // 6. Ciphertexts are unexpectedly large
-        // 7. Determine if pk and sk should be underscored (check the bahaviour in main or tests)
-
-        //let mut plaintext_items: Vec<Vec<Option<&TableAttribute>>> =
         let mut unprotected_items = Vec::with_capacity(items.len());
         let mut protected_items = FlattenedEncryptedAttributes::with_capacity(items.len() * protected_attributes.len());
 

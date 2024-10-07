@@ -7,7 +7,7 @@ use cipherstash_client::encryption::TypeParseError;
 use cipherstash_dynamodb::{
     crypto::Unsealed,
     errors::SealError,
-    traits::{Plaintext, TableAttribute, TryFromPlaintext, TryFromTableAttr},
+    traits::{Plaintext, TryFromPlaintext, TryFromTableAttr},
     Decryptable, Encryptable, EncryptedTable, Identifiable, PkSk,
 };
 use cipherstash_dynamodb_derive::Searchable;
@@ -75,11 +75,11 @@ impl Encryptable for Test {
 
     fn into_unsealed(self) -> Unsealed {
         let mut unsealed = Unsealed::new_with_descriptor(<Self as Identifiable>::type_name());
-        unsealed.add_unprotected("pk", TableAttribute::from(self.pk));
-        unsealed.add_unprotected("sk", TableAttribute::from(self.sk));
-        unsealed.add_protected("name", Plaintext::from(self.name));
-        unsealed.add_protected("age", Plaintext::from(self.age));
-        unsealed.add_unprotected("tag", TableAttribute::from(self.tag));
+        unsealed.add_unprotected("pk", self.pk);
+        unsealed.add_unprotected("sk", self.sk);
+        unsealed.add_protected("name", self.name);
+        unsealed.add_protected("age", self.age);
+        unsealed.add_unprotected("tag", self.tag);
         put_attrs(&mut unsealed, self.attrs);
         unsealed
     }

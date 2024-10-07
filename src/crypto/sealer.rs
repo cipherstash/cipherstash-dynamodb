@@ -412,7 +412,7 @@ impl Sealed {
         mut index_predicate: impl FnMut(&str, &TableAttribute) -> bool,
     ) -> (SealedTableEntry, Vec<SealedTableEntry>) {
         // TODO: Is this normalization necessary? - try removing it
-        let root_attributes = self.attributes.normalize();
+        let root_attributes = self.attributes;
 
         let index_attributes: TableAttributes = root_attributes
             .clone()

@@ -1,5 +1,5 @@
 use super::{
-    flattened_encrypted_attributes::FlattenedEncryptedAttributes, normalized_protected_attributes::NormalizedKey, NormalizedProtectedAttributes
+    flattened_encrypted_attributes::FlattenedEncryptedAttributes, normalized_protected_attributes::NormalizedKey
 };
 use crate::crypto::SealError;
 use cipherstash_client::{
@@ -158,10 +158,6 @@ impl FlattenedKey {
             (None, Some(subkey)) => format!("{}.{}", self.key, subkey),
             (None, None) => self.key.to_string(),
         }
-    }
-
-    pub(crate) fn has_subkey(&self) -> bool {
-        self.subkey.is_some()
     }
 
     /// Consume and return the parts of the key (not including the prefix).
