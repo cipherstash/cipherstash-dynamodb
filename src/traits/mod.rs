@@ -194,10 +194,9 @@ mod tests {
         }
     }
 
-    // TODO: Make this function consume and return the Unsealed
     fn put_attrs(unsealed: &mut Unsealed, attrs: BTreeMap<String, String>) {
         attrs.into_iter().for_each(|(k, v)| {
-            unsealed.add_protected(format!("attrs.{k}"), Plaintext::from(v));
+            unsealed.add_protected_map_field("attrs", k, Plaintext::from(v));
         })
     }
 
@@ -211,8 +210,8 @@ mod tests {
         }
 
         fn into_unsealed(self) -> Unsealed {
-            // FIXME: This should be a "consuming" method
             let mut unsealed = Unsealed::new_with_descriptor(<Self as Identifiable>::type_name());
+            unsealed.add_protected("id", Plaintext::from(self.id));
             unsealed.add_protected("name", Plaintext::from(self.name));
             unsealed.add_protected("age", Plaintext::from(self.age));
             unsealed.add_unprotected("tag", TableAttribute::from(self.tag));
@@ -242,12 +241,11 @@ mod tests {
     impl Decryptable for Test {
         fn from_unsealed(mut unsealed: Unsealed) -> Result<Self, SealError> {
             Ok(Self {
-                // FIXME: How do we handle pk and sk? - especialy if they are encryptedl
-                id: TryFromTableAttr::try_from_table_attr(unsealed.get_plaintext("tag"))?,
+                id: TryFromPlaintext::try_from_optional_plaintext(unsealed.take_protected("id"))?,
                 name: TryFromPlaintext::try_from_optional_plaintext(
                     unsealed.take_protected("name"),
-                ).expect("name conversion failed"),
-                age: TryFromPlaintext::try_from_optional_plaintext(unsealed.take_protected("age")).expect("age conversion failed"),
+                )?,
+                age: TryFromPlaintext::try_from_optional_plaintext(unsealed.take_protected("age"))?,
                 tag: TryFromTableAttr::try_from_table_attr(unsealed.get_plaintext("tag"))?,
                 attrs: get_attrs(&mut unsealed)?,
             })

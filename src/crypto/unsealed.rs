@@ -14,7 +14,6 @@ use std::collections::HashMap;
 /// Wrapper to indicate that a value is NOT encrypted
 pub struct Unsealed {
     /// Protected plaintexts with their descriptors
-    //protected: HashMap<String, (Plaintext, String)>,
     protected: NormalizedProtectedAttributes,
     unprotected: TableAttributes,
 }
@@ -41,9 +40,14 @@ impl Unsealed {
         }
     }
 
+    // TODO: Change this to take_unprotected
     pub fn get_plaintext(&self, name: &str) -> TableAttribute {
-        self.unprotected
-            .get(name)
+        println!("Getting plaintext for {}", name);
+        println!("unprotected: {:?}", self.unprotected);
+        let r = self.unprotected
+            .get(name);
+        println!("Got plaintext for {}: {:?}", name, r);
+        r
             .cloned()
             .unwrap_or(TableAttribute::Null)
     }
@@ -56,14 +60,25 @@ impl Unsealed {
         self.protected.insert_map(name, map);
     }
 
+    /// Insert a new key-value pair into a map stored in the protected attributes, `name`.
+    /// If the map does not exist, it will be created.
+    /// If the map exists, the key-value pair will be updated.
+    /// If an attribute called `name` already exists but is not a map, this will panic.
+    pub fn add_protected_map_field(&mut self, name: impl Into<String>, subkey: impl Into<String>, value: Plaintext) {
+        self.protected.insert_and_update_map(name, subkey, value);
+    }
+
     pub fn add_unprotected(&mut self, name: impl Into<String>, attribute: TableAttribute) {
         self.unprotected.insert(name.into(), attribute);
     }
 
+    /// Removes and returns the protected attribute, `name`.
     pub fn take_protected(&mut self, name: &str) -> Option<Plaintext> {
         self.protected.take(name)
     }
 
+    /// Removes and returns the map stored in the protected attributes, `name`.
+    /// The caller can convert to whatever type they need.
     pub fn take_protected_map(&mut self, name: &str) -> Option<HashMap<String, Plaintext>> {
         self.protected.take_map(name)
     }

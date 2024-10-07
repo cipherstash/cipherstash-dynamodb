@@ -1,3 +1,4 @@
+use aws_sdk_dynamodb::{error::SdkError, operation};
 use miette::Diagnostic;
 use thiserror::Error;
 
@@ -18,8 +19,7 @@ pub use aws_sdk_dynamodb::error::BuildError;
 pub enum PutError {
     #[error("PrimaryKeyError: {0}")]
     PrimaryKeyError(#[from] PrimaryKeyError),
-    #[error("AwsError: {0}")]
-    Aws(String),
+    // TODO: Get rid of this, too?
     #[error("AwsBuildError: {0}")]
     AwsBuildError(#[from] BuildError),
     #[error("Write Conversion Error: {0}")]
@@ -30,6 +30,9 @@ pub enum PutError {
     Crypto(#[from] CryptoError),
     #[error("Encryption Error: {0}")]
     Encryption(#[from] EncryptionError),
+
+    #[error(transparent)]
+    DynamoError(#[from] SdkError<operation::transact_write_items::TransactWriteItemsError>),
 }
 
 /// Error returned by `EncryptedTable::get` when retrieving and decrypting records from DynamoDB
@@ -80,11 +83,18 @@ pub enum QueryError {
     EncryptionError(#[from] EncryptionError),
     #[error("Decrypt Error: {0}")]
     DecryptError(#[from] DecryptError),
-    #[error("AwsError: {0}")]
-    AwsError(String),
     #[error("{0}")]
     Other(String),
+
+    // TODO: Remove this (and repeat for all the operations)
+    //#[error("AwsError: {0}")]
+    //AwsError(String),
+
+    #[error(transparent)]
+    DynamoError(#[from] SdkError<operation::query::QueryError>),
 }
+
+pub trait DynamoError: std::error::Error + Sized {}
 
 /// Error returned by `EncryptedTable::init` when connecting to CipherStash services
 #[derive(Error, Debug, Diagnostic)]
@@ -106,6 +116,6 @@ pub enum Error {
     GetError(#[from] GetError),
     #[error("DeleteError: {0}")]
     DeleteError(#[from] DeleteError),
-    #[error("QueryError: {0}")]
+    #[error(transparent)]
     QueryError(#[from] QueryError),
 }

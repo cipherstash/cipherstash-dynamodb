@@ -121,7 +121,6 @@ impl<'a> RecordsWithTerms<'a> {
 struct RecordWithTerms<'a> {
     pksk: PrimaryKeyParts,
     unsealed: Unsealed,
-    // TODO: What if we move the terms into the unsealed struct - and then into the NormalizedProtectedAttributes?
     terms: Vec<Term>,
     // FIXME: Don't use a Vec here - too many copies
     protected_attributes: Vec<Cow<'a, str>>,
@@ -409,6 +408,7 @@ impl Sealed {
         self,
         mut index_predicate: impl FnMut(&str, &TableAttribute) -> bool,
     ) -> (SealedTableEntry, Vec<SealedTableEntry>) {
+        // TODO: Is this normalization necessary? - try removing it
         let root_attributes = self.attributes.normalize();
 
         let index_attributes: TableAttributes = root_attributes

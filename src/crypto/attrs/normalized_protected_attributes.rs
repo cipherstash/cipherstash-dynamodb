@@ -41,7 +41,7 @@ impl NormalizedProtectedAttributes {
 
     /// Insert a new key-value pair into the map.
     /// If the value doesn't exist, create a new map and insert the key-value pair.
-    /// If the value is a scalar, panic.
+    /// If the value already exists and is a scalar, panic.
     pub fn insert_and_update_map(
         &mut self,
         key: impl Into<String>,
@@ -82,25 +82,6 @@ impl NormalizedProtectedAttributes {
 
         FlattenedProtectedAttributes(inner)
     }
-
-    pub(crate) fn chunks(self, size: usize) -> AttrChunks<hash_map::IntoIter<NormalizedKey, NormalizedValue>> {
-        AttrChunks(self.values.into_iter().chunks(size))
-    }
-}
-
-pub(crate) struct AttrChunks<I>(IntoChunks<I>) where I: Iterator<Item = (NormalizedKey, NormalizedValue)>;
-
-impl<'a, I> IntoIterator for &'a AttrChunks<I>
-where
-    I: Iterator<Item = (NormalizedKey, NormalizedValue)>,
-    I::Item: 'a,
-{
-    type Item = Chunk<'a, I>;
-    type IntoIter = Chunks<'a, I>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
 }
 
 /// Allow a list of key-value pairs to be collected into a [NormalizedProtectedAttributes].
@@ -116,23 +97,42 @@ impl FromIterator<FlattenedProtectedAttribute> for NormalizedProtectedAttributes
         iter
             .into_iter()
             .fold(Self::new(), |mut acc, fpa| {
-                let (plaintext, key, subkey) = fpa.into_parts();
-                if let Some(subkey) = subkey {
-                    // TODO: What do we do with prefix? It may not be needed for going from flattened to normalized
-                    acc.insert_and_update_map(key, subkey, plaintext);
-                } else {
-                    acc.insert(key, plaintext);
+                match fpa.normalize_into_parts() {
+                    (plaintext, key, Some(subkey)) => {
+                        acc.insert_and_update_map(key, subkey, plaintext);
+                    }
+                    (plaintext, key, None) => {
+                        acc.insert(key, plaintext);
+                    }
                 }
-                acc
+                acc 
             })
             .into()
     }
 }
 
+/// Normalized keys are effectively just strings but wrapping them in an enum allows us to
+/// differentiate between scalar and map keys without checking the value.
 #[derive(PartialEq, Debug, Hash, Eq)]
 pub(crate) enum NormalizedKey {
     Scalar(String),
     Map(String),
+}
+
+impl NormalizedKey {
+    pub(super) fn new_scalar(key: impl Into<String>) -> Self {
+        Self::Scalar(key.into())
+    }
+
+    pub(super) fn new_map(key: impl Into<String>) -> Self {
+        Self::Map(key.into())
+    }
+
+    /// Converts the key into a [FlattenedKey].
+    fn flatten(self, prefix: Option<String>) -> FlattenedKey {
+        let key: String = String::from(self);
+        FlattenedKey::new(prefix, key)
+    }
 }
 
 impl From<NormalizedKey> for String {
@@ -157,7 +157,7 @@ impl NormalizedValue {
         key: NormalizedKey,
         prefix: Option<String>,
     ) -> Vec<FlattenedProtectedAttribute> {
-        let key = FlattenedKey::new(prefix, key);
+        let key = key.flatten(prefix);
 
         match self {
             Self::Scalar(plaintext) => vec![FlattenedProtectedAttribute::new(plaintext, key)],

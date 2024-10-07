@@ -1,5 +1,6 @@
 use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Identifiable, Searchable};
 use itertools::Itertools;
+use miette::IntoDiagnostic;
 use serial_test::serial;
 use std::future::Future;
 
@@ -16,6 +17,8 @@ pub struct User {
 
     #[cipherstash(query = "prefix", compound = "pk#sk")]
     #[cipherstash(query = "prefix")]
+    // TODO: also test if the sort key is encrypted
+    // TODO: Can we add some unit tests!?
     #[cipherstash(plaintext)]
     #[sort_key]
     pub sk: String,
@@ -34,7 +37,11 @@ impl User {
     }
 }
 
-async fn run_test<F: Future<Output = ()>>(mut f: impl FnMut(EncryptedTable) -> F) {
+type TestResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
+
+async fn run_test<F>(mut f: impl FnMut(EncryptedTable) -> F) -> TestResult
+where
+    F: Future<Output = TestResult> {
     let config = aws_config::from_env()
         .endpoint_url("http://localhost:8000")
         .load()
@@ -48,55 +55,56 @@ async fn run_test<F: Future<Output = ()>>(mut f: impl FnMut(EncryptedTable) -> F
 
     let table = EncryptedTable::init(client, table_name)
         .await
-        .expect("Failed to init table");
+        .into_diagnostic()?;
 
     table
         .put(User::new("dan@coderdan.co", "Dan Draper", "blue"))
         .await
-        .expect("Failed to insert Dan");
+        .into_diagnostic()?;
 
     table
         .put(User::new("jane@smith.org", "Jane Smith", "red"))
         .await
-        .expect("Failed to insert Jane");
+        .into_diagnostic()?;
 
     table
         .put(User::new("daniel@example.com", "Daniel Johnson", "green"))
         .await
-        .expect("Failed to insert Daniel");
+        .into_diagnostic()?;
 
-    f(table).await;
+    f(table).await
 }
 
 #[tokio::test]
 #[serial]
-async fn test_query_single_exact() {
+async fn test_query_single_exact() -> TestResult {
     run_test(|table| async move {
         let res: Vec<User> = table
             .query()
             .eq("pk", "dan@coderdan.co")
             .send()
             .await
-            .expect("Failed to query");
+            .into_diagnostic()?;
 
         assert_eq!(
             res,
             vec![User::new("dan@coderdan.co", "Dan Draper", "blue")]
         );
+
+        Ok(())
     })
-    .await;
+    .await
 }
 
 #[tokio::test]
 #[serial]
-async fn test_query_single_prefix() {
+async fn test_query_single_prefix() -> TestResult {
     run_test(|table| async move {
         let res: Vec<User> = table
             .query()
             .starts_with("sk", "Dan")
             .send()
-            .await
-            .expect("Failed to query")
+            .await?
             .into_iter()
             .sorted()
             .collect_vec();
@@ -108,54 +116,60 @@ async fn test_query_single_prefix() {
                 User::new("daniel@example.com", "Daniel Johnson", "green")
             ]
         );
+
+        Ok(())
     })
-    .await;
+    .await
 }
 
 #[tokio::test]
 #[serial]
-async fn test_query_compound() {
+async fn test_query_compound() -> TestResult{
     run_test(|table| async move {
         let res: Vec<User> = table
             .query()
             .starts_with("sk", "Dan")
             .eq("pk", "dan@coderdan.co")
             .send()
-            .await
-            .expect("Failed to query");
+            .await?;
 
         assert_eq!(
             res,
             vec![User::new("dan@coderdan.co", "Dan Draper", "blue")]
         );
+
+        Ok(())
     })
-    .await;
+    .await
 }
 
 #[tokio::test]
 #[serial]
-async fn test_get_by_partition_key() {
+async fn test_get_by_partition_key() -> TestResult{
     run_test(|table| async move {
         let res: Option<User> = table
             .get(("dan@coderdan.co", "Dan Draper"))
-            .await
-            .expect("Failed to send");
+            .await?;
+
         assert_eq!(
             res,
             Some(User::new("dan@coderdan.co", "Dan Draper", "blue"))
         );
+
+        Ok(())
     })
-    .await;
+    .await
 }
 
 #[tokio::test]
 #[serial]
-async fn test_delete() {
+// FIXME: These tests would be better if the run_test function returned a diagnostic result
+async fn test_delete() -> TestResult {
     run_test(|table| async move {
         table
             .delete::<User>(("dan@coderdan.co", "Dan Draper"))
             .await
-            .expect("Failed to send");
+            .into_diagnostic()?;
 
         let res = table
             .get::<User>(("dan@coderdan.co", "Dan Draper"))
@@ -189,7 +203,9 @@ async fn test_delete() {
             .send()
             .await
             .expect("Failed to send");
-        assert_eq!(res, vec![])
+        assert_eq!(res, vec![]);
+
+        Ok(())
     })
-    .await;
+    .await
 }

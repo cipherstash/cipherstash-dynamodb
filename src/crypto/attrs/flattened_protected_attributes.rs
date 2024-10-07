@@ -1,5 +1,5 @@
 use super::{
-    flattened_encrypted_attributes::FlattenedEncryptedAttributes, NormalizedProtectedAttributes,
+    flattened_encrypted_attributes::FlattenedEncryptedAttributes, normalized_protected_attributes::NormalizedKey, NormalizedProtectedAttributes
 };
 use crate::crypto::SealError;
 use cipherstash_client::{
@@ -20,22 +20,6 @@ impl FlattenedProtectedAttributes {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.0.is_empty()
-    }
-
-    // TODO: Is this needed now that we have FromIterator?
-    pub(crate) fn normalize(self) -> NormalizedProtectedAttributes {
-        self.0
-            .into_iter()
-            .fold(NormalizedProtectedAttributes::new(), |mut acc, fpa| {
-                if fpa.has_subkey() {
-                    // TODO: What do we do with prefix? It may not be needed for going from flattened to normalized
-                    acc.insert_and_update_map(fpa.key.key, fpa.key.subkey.unwrap(), fpa.plaintext);
-                } else {
-                    acc.insert(fpa.key.key, fpa.plaintext);
-                }
-                acc
-            })
-            .into()
     }
 
     pub(crate) fn into_iter(self) -> impl Iterator<Item = FlattenedProtectedAttribute> {
@@ -97,13 +81,10 @@ impl FlattenedProtectedAttribute {
         }
     }
 
-    pub(crate) fn has_subkey(&self) -> bool {
-        self.key.has_subkey()
-    }
-
     /// Consume and return the [Plaintext], key and subkey (if one is set) of the attribute.
-    pub(crate) fn into_parts(self) -> (Plaintext, String, Option<String>) {
-        (self.plaintext, self.key.key, self.key.subkey)
+    pub(crate) fn normalize_into_parts(self) -> (Plaintext, NormalizedKey, Option<String>) {
+        let (normalized, subkey) = self.key.normalize();
+        (self.plaintext, normalized, subkey)
     }
 
     fn descriptor(&self) -> String {
@@ -138,6 +119,17 @@ impl FlattenedKey {
             prefix,
             key: key.into(),
             subkey: None,
+        }
+    }
+
+    /// Converts this into a [NormalizedKey] based on whether it has a subkey or not.
+    /// If it has a subkey, it is a map, otherwise it is a scalar.
+    /// The subkey is returned along with the normalized key (if it exists).
+    /// Prefix is discarded as it is not needed after decryption.
+    pub(super) fn normalize(self) -> (NormalizedKey, Option<String>) {
+        match self.subkey {
+            Some(_) => (NormalizedKey::new_map(self.key), self.subkey),
+            None => (NormalizedKey::new_scalar(self.key), None),
         }
     }
 

@@ -77,12 +77,13 @@ impl PreparedQuery {
 
         let result = query
             .send()
-            .await
-            .map_err(|e| QueryError::AwsError(format!("{e:?}")))?;
+            .await?;
+
+        dbg!(&result);
 
         let items = result
             .items
-            .ok_or_else(|| QueryError::AwsError("Expected items entry on aws response".into()))?;
+            .ok_or_else(|| QueryError::Other("Expected items entry on aws response".into()))?;
 
         Ok(items)
     }

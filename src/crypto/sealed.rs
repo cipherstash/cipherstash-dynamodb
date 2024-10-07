@@ -83,8 +83,6 @@ impl SealedTableEntry {
         let mut unprotected_items = Vec::with_capacity(items.len());
         let mut protected_items = FlattenedEncryptedAttributes::with_capacity(items.len() * protected_attributes.len());
 
-        println!("---- protected count: {}", protected_attributes.len());
-
         for item in items.into_iter() {
             let (protected, unprotected) = item
                 .into_inner()
@@ -96,13 +94,13 @@ impl SealedTableEntry {
         }
 
         dbg!(&unprotected_items);
-
-        println!("---- protected items empty?: {:?}", protected_items.is_empty());
+        dbg!(&protected_items);
 
         if protected_items.is_empty() {
             unprotected_items
                 .into_iter()
                 .map(|unprotected| {
+                    // TODO: Create a new_from_unprotected method
                     Ok(Unsealed::new_from_parts(NormalizedProtectedAttributes::new(), unprotected))
                 })
                 .collect()

@@ -41,7 +41,7 @@ pub enum SealError {
     #[error(transparent)]
     WriteConversionError(#[from] WriteConversionError),
     // TODO: Does TypeParseError correctly redact the plaintext value?
-    #[error("Failed to parse type for encryption: {0}")]
+    #[error("TypeParseError: {0}")]
     TypeParseError(#[from] TypeParseError),
     #[error("Missing attribute: {0}")]
     MissingAttribute(String),

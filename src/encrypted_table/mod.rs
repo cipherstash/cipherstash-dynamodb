@@ -288,6 +288,7 @@ impl<D> EncryptedTable<D> {
         spec: UnsealSpec<'_>,
     ) -> Result<Vec<Unsealed>, DecryptError> {
         let table_entries = SealedTableEntry::vec_from(items)?;
+        dbg!(&table_entries);
         let results = SealedTableEntry::unseal_all(table_entries, spec, &self.cipher).await?;
         Ok(results)
     }
@@ -518,8 +519,7 @@ impl EncryptedTable<Dynamo> {
                 .transact_write_items()
                 .set_transact_items(Some(items.to_vec()))
                 .send()
-                .await
-                .map_err(|e| PutError::Aws(format!("{e:?}")))?;
+                .await?;
         }
 
         Ok(())

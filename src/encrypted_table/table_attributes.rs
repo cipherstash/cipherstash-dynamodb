@@ -32,8 +32,11 @@ impl TableAttributes {
         self
     }
 
+    // TODO: Test, docs
+    // TODO: Remove this logic from the NormalisedKey
     pub(crate) fn insert(&mut self, key: impl Into<String>, value: impl Into<TableAttribute>) {
-        self.0.insert(key.into(), value.into());
+        let key: String = key.into();
+        self.0.insert(to_inner_pksk(key), value.into());
     }
 
     // TODO: Proper error here
@@ -96,14 +99,16 @@ impl TableAttributes {
             .into()
     }
 
+    // TODO: Add unit tests for this
     /// Partition the attributes into protected and unprotected attributes
     /// given the list of protected keys.
     pub(crate) fn partition(self, protected_keys: &[Cow<'_, str>]) -> (Self, Self) {
         println!("Protected keys: {:?}", protected_keys);
         let (protected, unprotected): (HashMap<_, _>, HashMap<_, _>) =
             self.0.into_iter().partition(|(k, _)| {
-                println!("Checking if {} is in protected_keys", k);
-                let r = protected_keys.iter().any(|key| match_key(k, key));
+                let check = from_inner_pksk_ref(k);
+                println!("Checking if {} is in protected_keys", check);
+                let r = protected_keys.iter().any(|key| match_key(check, key));
                 println!("Result: {}", r);
                 r
             });
@@ -111,8 +116,9 @@ impl TableAttributes {
         (protected.into(), unprotected.into())
     }
 
+    // TODO: Doc, test
     pub(crate) fn get(&self, key: &str) -> Option<&TableAttribute> {
-        self.0.get(key)
+        self.0.get(to_inner_pksk_ref(key))
     }
 }
 
@@ -137,8 +143,9 @@ impl Default for TableAttributes {
     }
 }
 
+// TODO: This may no longer be required - remove and test
 // TODO: Make a type for keys that can be namespaced and prefixed
-// and implement PartialEq for it
+// and implement PartialEq for it - its the same as FlattenedKey
 fn match_key(key: &str, other: &Cow<str>) -> bool {
     let namespaced_key = match key.split_once("/") {
         None => key,
@@ -149,6 +156,33 @@ fn match_key(key: &str, other: &Cow<str>) -> bool {
         Some((key, _)) => key,
     };
     key == other.as_ref()
+}
+
+#[inline]
+fn to_inner_pksk(key: String) -> String {
+    match key.as_str() {
+        "pk" => "__pk".into(),
+        "sk" => "__sk".into(),
+        _ => key,
+    }
+}
+
+#[inline]
+fn to_inner_pksk_ref(key: &str) -> &str {
+    match key {
+        "pk" => "__pk",
+        "sk" => "__sk",
+        _ => key,
+    }
+}
+
+#[inline]
+fn from_inner_pksk_ref(key: &str) -> &str {
+    match key {
+        "__pk" => "pk",
+        "__sk" => "sk",
+        _ => key,
+    }
 }
 
 #[cfg(test)]
