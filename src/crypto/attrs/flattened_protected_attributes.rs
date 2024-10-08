@@ -11,7 +11,7 @@ use itertools::Itertools;
 
 // TODO: This thing is confusingly named - it holds unencrypted attributes that are intended for encryption
 /// Describes a set of flattened protected attributes intended for encryption.
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq)]
 pub(crate) struct FlattenedProtectedAttributes(pub(super) Vec<FlattenedProtectedAttribute>);
 
 impl FlattenedProtectedAttributes {
@@ -68,8 +68,7 @@ impl FromIterator<(Plaintext, String)> for FlattenedProtectedAttributes {
 /// Describes a flattened protected attribute intended for encryption.
 /// It is composed of a [Plaintext] and a [FlattenedKey].
 ///
-// TODO: Only implement Debug in tests
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq)]
 pub(crate) struct FlattenedProtectedAttribute {
     plaintext: Plaintext,
     key: FlattenedAttrName,
@@ -110,8 +109,7 @@ impl From<FlattenedProtectedAttribute> for BytesWithDescriptor {
 ///
 /// The key is composed of a prefix, a key, and an optional subkey.
 /// A Map would have a key and a subkey, while a scalar would only have a key.
-// TODO: Only implement Debug in tests
-#[derive(PartialEq, Hash, Eq, Clone, Debug)]
+#[derive(PartialEq, Hash, Eq, Clone)]
 pub(super) struct FlattenedAttrName {
     // TODO: Use a Cow to avoid copies during decryption
     // We may also never set this to None in which can we can remove the Option
@@ -212,6 +210,26 @@ impl From<(&str, &str)> for FlattenedAttrName {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fmt::Debug;
+
+    impl Debug for FlattenedAttrName {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("FlattenedAttrName")
+                .field("prefix", &self.prefix)
+                .field("name", &self.name)
+                .field("subkey", &self.subkey)
+                .finish()
+        }
+    }
+
+    impl Debug for FlattenedProtectedAttribute {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("FlattenedProtectedAttribute")
+                .field("plaintext", &self.plaintext)
+                .field("key", &self.key)
+                .finish()
+        }
+    }
 
     #[test]
     fn test_flattened_key_from_string() {

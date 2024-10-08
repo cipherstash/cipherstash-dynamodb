@@ -2,7 +2,10 @@ use super::flattened_protected_attributes::{
     FlattenedAttrName, FlattenedProtectedAttribute, FlattenedProtectedAttributes,
 };
 use cipherstash_client::encryption::Plaintext;
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    hash::{Hash, Hasher},
+};
 
 pub(crate) struct NormalizedProtectedAttributes {
     values: HashMap<NormalizedKey, NormalizedValue>,
@@ -110,10 +113,27 @@ impl FromIterator<FlattenedProtectedAttribute> for NormalizedProtectedAttributes
 
 /// Normalized keys are effectively just strings but wrapping them in an enum allows us to
 /// differentiate between scalar and map keys without checking the value.
-#[derive(PartialEq, Debug, Hash, Eq)]
 pub(crate) enum NormalizedKey {
     Scalar(String),
     Map(String),
+}
+
+impl PartialEq for NormalizedKey {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Scalar(a) | Self::Map(a), Self::Scalar(b) | Self::Map(b)) => a == b,
+        }
+    }
+}
+
+impl Eq for NormalizedKey {}
+
+impl Hash for NormalizedKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            NormalizedKey::Scalar(s) | NormalizedKey::Map(s) => s.hash(state),
+        }
+    }
 }
 
 impl NormalizedKey {
@@ -140,7 +160,6 @@ impl From<NormalizedKey> for String {
     }
 }
 
-// TODO: Don't debug or only derive in tests
 #[derive(PartialEq, Debug)]
 pub(crate) enum NormalizedValue {
     Scalar(Plaintext),
@@ -198,6 +217,17 @@ impl NormalizedValue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fmt::Debug;
+
+    // Only debug in tests
+    impl Debug for NormalizedKey {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                NormalizedKey::Scalar(s) => write!(f, "Scalar({})", s),
+                NormalizedKey::Map(s) => write!(f, "Map({})", s),
+            }
+        }
+    }
 
     #[test]
     fn test_normalized_key() {
@@ -206,30 +236,6 @@ mod tests {
 
         assert_eq!(String::from(scalar), "scalar");
         assert_eq!(String::from(map), "map");
-    }
-
-    #[test]
-    fn test_normalized_key_partial_eq() {
-        assert_eq!(
-            NormalizedKey::Scalar("a".to_string()),
-            NormalizedKey::Scalar("a".to_string())
-        );
-        assert_ne!(
-            NormalizedKey::Scalar("a".to_string()),
-            NormalizedKey::Scalar("b".to_string())
-        );
-        assert_eq!(
-            NormalizedKey::Map("a".to_string()),
-            NormalizedKey::Map("a".to_string())
-        );
-        assert_ne!(
-            NormalizedKey::Map("a".to_string()),
-            NormalizedKey::Map("b".to_string())
-        );
-        assert_ne!(
-            NormalizedKey::Scalar("a".to_string()),
-            NormalizedKey::Map("a".to_string())
-        );
     }
 
     #[test]

@@ -246,7 +246,7 @@ mod tests {
                     unsealed.take_protected("name"),
                 )?,
                 age: TryFromPlaintext::try_from_optional_plaintext(unsealed.take_protected("age"))?,
-                tag: TryFromTableAttr::try_from_table_attr(unsealed.get_plaintext("tag"))?,
+                tag: TryFromTableAttr::try_from_table_attr(unsealed.take_unprotected("tag"))?,
                 attrs: get_attrs(&mut unsealed)?,
             })
         }

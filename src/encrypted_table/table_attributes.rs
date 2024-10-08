@@ -46,6 +46,10 @@ impl TableAttributes {
             .try_insert_map(subkey.into(), value.into())
     }
 
+    pub(crate) fn remove(&mut self, name: impl Into<AttributeName>) -> Option<TableAttribute> {
+        self.0.remove(&name.into())
+    }
+
     // TODO: Add unit tests for this
     /// Partition the attributes into protected and unprotected attributes
     /// given the list of protected keys.
