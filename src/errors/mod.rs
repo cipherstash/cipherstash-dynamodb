@@ -70,7 +70,7 @@ pub enum DecryptError {
     SealError(#[from] SealError),
 }
 
-/// Error returned by [`EncryptedTable::query`] when indexing, retrieving and decrypting records from DynamoDB
+/// Error returned by [`crate::EncryptedTable::query`] when indexing, retrieving and decrypting records from DynamoDB
 #[derive(Error, Debug, Diagnostic)]
 pub enum QueryError {
     #[error("PrimaryKeyError: {0}")]
@@ -86,9 +86,6 @@ pub enum QueryError {
     #[error("{0}")]
     Other(String),
 
-    // TODO: Remove this (and repeat for all the operations)
-    //#[error("AwsError: {0}")]
-    //AwsError(String),
     #[error(transparent)]
     DynamoError(#[from] SdkError<operation::query::QueryError>),
 }
