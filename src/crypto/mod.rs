@@ -1,10 +1,8 @@
+mod attrs;
 mod b64_encode;
 mod sealed;
 mod sealer;
 mod unsealed;
-
-use std::borrow::Cow;
-
 use crate::{
     traits::{PrimaryKeyError, PrimaryKeyParts, ReadConversionError, WriteConversionError},
     Identifiable, IndexType, PrimaryKey,
@@ -15,9 +13,13 @@ use cipherstash_client::{
         compound_indexer::{CompoundIndex, ExactIndex},
         Encryption, EncryptionError, Plaintext, TypeParseError,
     },
+    vitur_client::DecryptError,
 };
+use miette::Diagnostic;
+use std::borrow::Cow;
 use thiserror::Error;
 
+// Re-exports
 pub use b64_encode::*;
 pub use sealed::{SealedTableEntry, UnsealSpec};
 pub use sealer::{Sealer, UnsealedIndex};
@@ -28,18 +30,15 @@ pub use unsealed::Unsealed;
 /// delete all index terms for a particular record.
 const MAX_TERMS_PER_INDEX: usize = 25;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Diagnostic)]
 pub enum SealError {
     #[error("Error when creating primary key: {0}")]
     PrimaryKeyError(#[from] PrimaryKeyError),
-    #[error("Failed to encrypt partition key")]
-    CryptoError(#[from] EncryptionError),
-    #[error("Failed to convert attribute: {0} from internal representation")]
+    #[error("ReadConversionError: {0}")]
     ReadConversionError(#[from] ReadConversionError),
-    #[error("Failed to convert attribute: {0} to internal representation")]
+    #[error("WriteConversionError: {0}")]
     WriteConversionError(#[from] WriteConversionError),
-    // TODO: Does TypeParseError correctly redact the plaintext value?
-    #[error("Failed to parse type for encryption: {0}")]
+    #[error("TypeParseError: {0}")]
     TypeParseError(#[from] TypeParseError),
     #[error("Missing attribute: {0}")]
     MissingAttribute(String),
@@ -47,6 +46,13 @@ pub enum SealError {
     InvalidCiphertext(String),
     #[error("Assertion failed: {0}")]
     AssertionFailed(String),
+
+    // Note that we don't expose the specific error type here
+    // so as to avoid leaking any information
+    #[error("Encryption failed")]
+    EncryptionError(#[from] EncryptionError),
+    #[error("Decryption failed")]
+    DecryptionError(#[from] DecryptError),
 }
 
 #[derive(Error, Debug)]

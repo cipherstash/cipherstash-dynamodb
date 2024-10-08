@@ -1,8 +1,14 @@
+mod attribute_name;
 pub mod query;
+mod table_attribute;
+mod table_attributes;
 mod table_entry;
 pub use self::{
+    attribute_name::AttributeName,
     query::QueryBuilder,
-    table_entry::{TableAttribute, TableEntry, TryFromTableAttr},
+    table_attribute::{TableAttribute, TryFromTableAttr},
+    table_attributes::TableAttributes,
+    table_entry::TableEntry,
 };
 use crate::{
     crypto::*,
@@ -18,7 +24,7 @@ use cipherstash_client::{
         service_credentials::{ServiceCredentials, ServiceToken},
         Credentials,
     },
-    encryption::{Encryption, Plaintext},
+    encryption::Encryption,
     zero_kms::ZeroKMS,
 };
 use log::info;
@@ -27,6 +33,9 @@ use std::{
     collections::{HashMap, HashSet},
     ops::Deref,
 };
+
+/// Index terms are truncated to this length
+const DEFAULT_TERM_SIZE: usize = 12;
 
 pub struct Headless;
 
@@ -151,28 +160,6 @@ impl PreparedRecord {
         }
     }
 
-    /// Get all the [`Plaintext`] protected attributes from the [`PreparedRecord`]
-    pub fn protected(&self) -> impl Iterator<Item = (&str, &Plaintext)> {
-        self.sealer
-            .unsealed
-            .protected()
-            .iter()
-            .map(|(key, (plaintext, _descriptor))| (key.as_str(), plaintext))
-    }
-
-    /// Get all the unprotected attributes from the [`PreparedRecord`]
-    pub fn unprotected(&self) -> impl Iterator<Item = (&str, &TableAttribute)> {
-        self.sealer
-            .unsealed
-            .unprotected()
-            .iter()
-            .map(|(key, attr)| (key.as_str(), attr))
-    }
-
-    pub fn unsealed_indexes(&self) -> &[UnsealedIndex] {
-        &self.sealer.unsealed_indexes
-    }
-
     pub fn prepare_record<R>(record: R) -> Result<Self, SealError>
     where
         R: Searchable + Identifiable,
@@ -186,6 +173,7 @@ impl PreparedRecord {
         let protected_indexes = R::protected_indexes();
         let protected_attributes = R::protected_attributes();
 
+        // Get the CompositePlaintext, ComposableIndex, name and type for each index
         let unsealed_indexes = protected_indexes
             .iter()
             .map(|(index_name, index_type)| {
@@ -308,10 +296,13 @@ impl<D> EncryptedTable<D> {
         Ok(result)
     }
 
-    pub async fn decrypt_all<T: Decryptable>(
+    pub async fn decrypt_all<T>(
         &self,
         items: impl IntoIterator<Item = HashMap<String, AttributeValue>>,
-    ) -> Result<Vec<T>, DecryptError> {
+    ) -> Result<Vec<T>, DecryptError>
+    where
+        T: Decryptable + Identifiable,
+    {
         let items = self
             .unseal_all(items, UnsealSpec::new_for_decryptable::<T>())
             .await?;
@@ -322,13 +313,13 @@ impl<D> EncryptedTable<D> {
             .collect::<Result<Vec<_>, _>>()?)
     }
 
-    pub async fn decrypt<T: Decryptable>(
-        &self,
-        item: HashMap<String, AttributeValue>,
-    ) -> Result<T, DecryptError> {
-        let item = self
-            .unseal(item, UnsealSpec::new_for_decryptable::<T>())
-            .await?;
+    pub async fn decrypt<T>(&self, item: HashMap<String, AttributeValue>) -> Result<T, DecryptError>
+    where
+        T: Decryptable + Identifiable,
+    {
+        let uspec = UnsealSpec::new_for_decryptable::<T>();
+        let item = self.unseal(item, uspec).await?;
+
         Ok(item.into_value()?)
     }
 
@@ -365,7 +356,8 @@ impl<D> EncryptedTable<D> {
     pub async fn create_put_patch(
         &self,
         record: PreparedRecord,
-        index_predicate: impl FnMut(&str, &TableAttribute) -> bool,
+        // TODO: Make sure the index_predicate is used correctly
+        index_predicate: impl FnMut(&AttributeName, &TableAttribute) -> bool,
     ) -> Result<DynamoRecordPatch, PutError> {
         let mut seen_sk = HashSet::new();
 
@@ -375,7 +367,9 @@ impl<D> EncryptedTable<D> {
             sealer,
         } = record;
 
-        let sealed = sealer.seal(protected_attributes, &self.cipher, 12).await?;
+        let sealed = sealer
+            .seal(protected_attributes, &self.cipher, DEFAULT_TERM_SIZE)
+            .await?;
 
         let mut put_records = Vec::with_capacity(sealed.len());
 
@@ -518,8 +512,7 @@ impl EncryptedTable<Dynamo> {
                 .transact_write_items()
                 .set_transact_items(Some(items.to_vec()))
                 .send()
-                .await
-                .map_err(|e| PutError::Aws(format!("{e:?}")))?;
+                .await?;
         }
 
         Ok(())

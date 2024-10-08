@@ -21,6 +21,4 @@ pub use cipherstash_dynamodb_derive::{Decryptable, Encryptable, Identifiable, Se
 // Re-exports
 pub use cipherstash_client::encryption;
 
-mod async_map_somes;
-
 pub type Key = [u8; 32];

@@ -23,19 +23,21 @@ itertools = "0.11.0"
 thiserror = "1.0.50"
 base64 = "0.22.1"
 hex = "0.4.3"
+tracing = { version = "0.1", features = ["log"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"]}
+miette = "7.2.0"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
 serial_test = "2.0.0"
 trybuild = "1.0.85"
-tracing = { version = "0.1", features = ["log"] }
-tracing-subscriber = { version = "0.3", default-features = false, features = [
-    "fmt",
-] }
 aws-config = { version = "1.0.1", features = ["behavior-version-latest"] }
 env_logger = "0.10.0"
 serde_dynamo = { version = "4", features = ["aws-sdk-dynamodb+1"] }
 serde_json = "1.0.117"
+tracing-test = "0.2.5"
+# So we can get backtraces in tests
+miette = { version = "7.2.0", features = ["fancy"] }
 
 [features]
 default = ["tokio"]

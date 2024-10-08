@@ -10,8 +10,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .without_time()
         .init();
 
-    env_logger::init();
-
     let config = aws_config::from_env()
         .endpoint_url("http://localhost:8000")
         .load()

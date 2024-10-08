@@ -1,7 +1,7 @@
 use super::{index_type::IndexType, AttributeMode, Settings};
 use proc_macro2::{Ident, Span};
 use std::collections::HashMap;
-use syn::{Data, DeriveInput, Fields, LitStr};
+use syn::{Data, DeriveInput, ExprPath, Fields, LitStr};
 
 enum SortKeyPrefix {
     Default,
@@ -19,7 +19,7 @@ impl SortKeyPrefix {
     }
 }
 
-const RESERVED_FIELD_NAMES: &'static [&'static str] = &["term"];
+const RESERVED_FIELD_NAMES: &[&str] = &["term"];
 
 pub(crate) struct SettingsBuilder {
     ident: Ident,
@@ -31,6 +31,8 @@ pub(crate) struct SettingsBuilder {
     unprotected_attributes: Vec<String>,
     skipped_attributes: Vec<String>,
     indexes: Vec<IndexType>,
+    encrypt_handlers: HashMap<String, ExprPath>,
+    decrypt_handlers: HashMap<String, ExprPath>,
 }
 
 impl SettingsBuilder {
@@ -58,6 +60,8 @@ impl SettingsBuilder {
             unprotected_attributes: Vec::new(),
             skipped_attributes: Vec::new(),
             indexes: Vec::new(),
+            encrypt_handlers: HashMap::new(),
+            decrypt_handlers: HashMap::new(),
         }
     }
 
@@ -158,28 +162,25 @@ impl SettingsBuilder {
                         let has_partition_key_attr = field
                             .attrs
                             .iter()
-                            .find(|x| x.path().is_ident("partition_key"))
-                            .is_some();
+                            .any(|x| x.path().is_ident("partition_key"));
 
                         if !has_partition_key_attr {
                             return Err(syn::Error::new_spanned(
                                 field,
-                                format!("field named 'pk' must be annotated with #[partition_key]"),
+                                "field named 'pk' must be annotated with #[partition_key]"
+                                    .to_string(),
                             ));
                         }
                     }
 
                     if field_name == "sk" {
-                        let has_partition_key_attr = field
-                            .attrs
-                            .iter()
-                            .find(|x| x.path().is_ident("sort_key"))
-                            .is_some();
+                        let has_partition_key_attr =
+                            field.attrs.iter().any(|x| x.path().is_ident("sort_key"));
 
                         if !has_partition_key_attr {
                             return Err(syn::Error::new_spanned(
                                 field,
-                                format!("field named 'sk' must be annotated with #[sort_key]"),
+                                "field named 'sk' must be annotated with #[sort_key]".to_string(),
                             ));
                         }
                     }
@@ -288,6 +289,18 @@ impl SettingsBuilder {
 
                                     Ok(())
                                 }
+                                Some("encryptable_with") => {
+                                    let value = meta.value()?;
+                                    let handler = value.parse::<ExprPath>()?;
+                                    self.encrypt_handlers.insert(field_name.clone(), handler);
+                                    Ok(())
+                                }
+                                Some("decryptable_with") => {
+                                    let value = meta.value()?;
+                                    let handler = value.parse::<ExprPath>()?;
+                                    self.decrypt_handlers.insert(field_name.clone(), handler);
+                                    Ok(())
+                                }
                                 _ => Err(meta.error("unsupported field attribute")),
                             }
                         })?;
@@ -308,7 +321,10 @@ impl SettingsBuilder {
                                 }
 
                                 (None, Some((compound_index_name, span))) => {
-                                    return Err(syn::Error::new(span,  format!("Compound attribute was specified but no query options were. Specify how this field should be queried with the attribute #[cipherstash(query = <option>, compound = \"{compound_index_name}\")]")));
+                                    return Err(syn::Error::new(
+                                        span,
+                                        format!("Compound attribute was specified but no query options were. Specify how this field should be queried with the attribute #[cipherstash(query = <option>, compound = \"{compound_index_name}\")]"))
+                                    );
                                 }
 
                                 (None, None) => {}
@@ -345,6 +361,8 @@ impl SettingsBuilder {
             unprotected_attributes,
             skipped_attributes,
             indexes,
+            encrypt_handlers,
+            decrypt_handlers,
         } = self;
 
         let sort_key_prefix = sort_key_prefix.into_prefix(&type_name);
@@ -359,6 +377,8 @@ impl SettingsBuilder {
             unprotected_attributes,
             skipped_attributes,
             indexes,
+            encrypt_handlers,
+            decrypt_handlers,
         })
     }
 

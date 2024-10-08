@@ -12,6 +12,7 @@ pub use cipherstash_client::{
 };
 
 mod primary_key;
+use miette::Diagnostic;
 pub use primary_key::*;
 
 use std::{
@@ -55,7 +56,7 @@ impl Display for IndexType {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Diagnostic)]
 pub enum ReadConversionError {
     #[error("Missing attribute: {0}")]
     NoSuchAttribute(String),
@@ -119,6 +120,8 @@ pub trait Searchable: Encryptable {
         None
     }
 
+    // TODO: Make a type to represent the result of this function
+    /// Returns of indexes with their name and type.
     fn protected_indexes() -> Cow<'static, [(Cow<'static, str>, IndexType)]> {
         Cow::Borrowed(&[])
     }
@@ -144,4 +147,138 @@ pub trait Decryptable: Sized {
     ///
     /// Must be equal to or a subset of protected_attributes on the [`Encryptable`] type.
     fn plaintext_attributes() -> Cow<'static, [Cow<'static, str>]>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use miette::IntoDiagnostic;
+    use std::collections::BTreeMap;
+
+    fn make_btree_map() -> BTreeMap<String, String> {
+        let mut map = BTreeMap::new();
+        map.insert("a".to_string(), "value-a".to_string());
+        map.insert("b".to_string(), "value-b".to_string());
+        map.insert("c".to_string(), "value-c".to_string());
+        map
+    }
+
+    #[derive(Debug, Clone, PartialEq)]
+    struct Test {
+        pub id: String,
+        pub name: String,
+        pub age: i16,
+        pub tag: String,
+        pub attrs: BTreeMap<String, String>,
+    }
+
+    impl Identifiable for Test {
+        type PrimaryKey = Pk;
+
+        fn get_primary_key(&self) -> Self::PrimaryKey {
+            Pk(self.id.to_string())
+        }
+        #[inline]
+        fn type_name() -> Cow<'static, str> {
+            std::borrow::Cow::Borrowed("test")
+        }
+        #[inline]
+        fn sort_key_prefix() -> Option<Cow<'static, str>> {
+            None
+        }
+        fn is_pk_encrypted() -> bool {
+            true
+        }
+        fn is_sk_encrypted() -> bool {
+            false
+        }
+    }
+
+    fn put_attrs(unsealed: &mut Unsealed, attrs: BTreeMap<String, String>) {
+        attrs.into_iter().for_each(|(k, v)| {
+            unsealed.add_protected_map_field("attrs", k, Plaintext::from(v));
+        })
+    }
+
+    impl Encryptable for Test {
+        fn protected_attributes() -> Cow<'static, [Cow<'static, str>]> {
+            Cow::Borrowed(&[Cow::Borrowed("name")])
+        }
+
+        fn plaintext_attributes() -> Cow<'static, [Cow<'static, str>]> {
+            Cow::Borrowed(&[Cow::Borrowed("age")])
+        }
+
+        fn into_unsealed(self) -> Unsealed {
+            let mut unsealed = Unsealed::new_with_descriptor(<Self as Identifiable>::type_name());
+            unsealed.add_protected("id", self.id);
+            unsealed.add_protected("name", self.name);
+            unsealed.add_protected("age", self.age);
+            unsealed.add_unprotected("tag", self.tag);
+            put_attrs(&mut unsealed, self.attrs);
+            unsealed
+        }
+    }
+
+    // TODO: Make this return an error that we we can expose to users
+    fn get_attrs<T>(unsealed: &mut Unsealed) -> Result<T, SealError>
+    where
+        T: FromIterator<(String, String)>,
+    {
+        unsealed
+            .take_protected_map("attrs")
+            .ok_or(SealError::MissingAttribute("attrs".to_string()))?
+            .into_iter()
+            .map(|(k, v)| {
+                TryFromPlaintext::try_from_plaintext(v)
+                    .map(|v| (k, v))
+                    .map_err(SealError::from)
+            })
+            .collect()
+    }
+
+    // TODO: Test this with struct fields called pk and sk
+    impl Decryptable for Test {
+        fn from_unsealed(mut unsealed: Unsealed) -> Result<Self, SealError> {
+            Ok(Self {
+                id: TryFromPlaintext::try_from_optional_plaintext(unsealed.take_protected("id"))?,
+                name: TryFromPlaintext::try_from_optional_plaintext(
+                    unsealed.take_protected("name"),
+                )?,
+                age: TryFromPlaintext::try_from_optional_plaintext(unsealed.take_protected("age"))?,
+                tag: TryFromTableAttr::try_from_table_attr(unsealed.take_unprotected("tag"))?,
+                attrs: get_attrs(&mut unsealed)?,
+            })
+        }
+
+        // FIXME: create a card: this API is brittle because this function must match the from_unsealed function behavior
+        // The same is true between this and the Encryptable trait
+        fn protected_attributes() -> Cow<'static, [Cow<'static, str>]> {
+            Cow::Borrowed(&[
+                Cow::Borrowed("name"),
+                Cow::Borrowed("age"),
+                Cow::Borrowed("attrs"),
+            ])
+        }
+
+        fn plaintext_attributes() -> Cow<'static, [Cow<'static, str>]> {
+            Cow::Borrowed(&[Cow::Borrowed("tag")])
+        }
+    }
+
+    #[test]
+    fn test_encryptable() -> Result<(), Box<dyn std::error::Error>> {
+        let test = Test {
+            id: "id-100".to_string(),
+            name: "name".to_string(),
+            tag: "tag".to_string(),
+            age: 42,
+            attrs: make_btree_map(),
+        };
+
+        let unsealed = test.clone().into_unsealed();
+        assert_eq!(test, Test::from_unsealed(unsealed).into_diagnostic()?);
+
+        Ok(())
+    }
 }

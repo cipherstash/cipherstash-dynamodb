@@ -1,5 +1,6 @@
 use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Identifiable, Searchable};
 use itertools::Itertools;
+use miette::IntoDiagnostic;
 use serial_test::serial;
 use std::future::Future;
 
@@ -226,7 +227,7 @@ async fn test_delete() {
 
 #[tokio::test]
 #[serial]
-async fn test_insert_retrieve_public() {
+async fn test_insert_retrieve_nothing_encrypted() -> Result<(), Box<dyn std::error::Error>> {
     let config = aws_config::from_env()
         .endpoint_url("http://localhost:8000")
         .load()
@@ -240,15 +241,17 @@ async fn test_insert_retrieve_public() {
 
     let table = EncryptedTable::init(client, table_name)
         .await
-        .expect("Failed to init table");
+        .into_diagnostic()?;
 
     table
         .put(PublicUser::new("dan@coderdan.co", "Dan Draper", "blue"))
         .await
-        .expect("Failed to insert Dan");
+        .into_diagnostic()?;
 
     table
         .get::<PublicUser>("dan@coderdan.co")
         .await
-        .expect("Failed to get Dan");
+        .into_diagnostic()?;
+
+    Ok(())
 }

@@ -75,16 +75,11 @@ impl PreparedQuery {
             .key_condition_expression("term = :term")
             .expression_attribute_values(":term", term);
 
-        let result = query
+        query
             .send()
-            .await
-            .map_err(|e| QueryError::AwsError(format!("{e:?}")))?;
-
-        let items = result
+            .await?
             .items
-            .ok_or_else(|| QueryError::AwsError("Expected items entry on aws response".into()))?;
-
-        Ok(items)
+            .ok_or_else(|| QueryError::Other("Expected items entry on aws response".into()))
     }
 }
 
@@ -139,7 +134,10 @@ impl<S> QueryBuilder<S, &EncryptedTable<Dynamo>>
 where
     S: Searchable + Identifiable,
 {
-    pub async fn load<T: Decryptable>(self) -> Result<Vec<T>, QueryError> {
+    pub async fn load<T>(self) -> Result<Vec<T>, QueryError>
+    where
+        T: Decryptable + Identifiable,
+    {
         let table = self.backend;
         let query = self.build()?;
 

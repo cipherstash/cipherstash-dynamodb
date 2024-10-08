@@ -1,5 +1,5 @@
 use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Identifiable, Searchable};
-
+use miette::IntoDiagnostic;
 mod common;
 
 #[derive(Debug, Clone, PartialEq, Identifiable, Encryptable, Decryptable, Searchable)]
@@ -124,7 +124,7 @@ struct Crazy {
 }
 
 #[tokio::test]
-async fn test_round_trip() {
+async fn test_round_trip() -> Result<(), Box<dyn std::error::Error>> {
     let config = aws_config::from_env()
         .endpoint_url("http://localhost:8000")
         .load()
@@ -207,13 +207,15 @@ async fn test_round_trip() {
         pt_k_none: None,
     };
 
-    table.put(r.clone()).await.expect("Failed to insert record");
+    table.put(r.clone()).await.into_diagnostic()?;
 
     let s: Crazy = table
         .get(("dan@coderdan.co", "Dan"))
         .await
-        .expect("Failed to get record")
+        .into_diagnostic()?
         .unwrap();
 
     assert_eq!(s, r);
+
+    Ok(())
 }
