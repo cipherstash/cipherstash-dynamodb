@@ -770,7 +770,7 @@ dependencies = [
 
 [[package]]
 name = "cipherstash-dynamodb-derive"
-version = "0.7.1"
+version = "0.8.0"
 dependencies = [
  "itertools",
  "paste",
