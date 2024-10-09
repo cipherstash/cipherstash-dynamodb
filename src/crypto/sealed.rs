@@ -70,7 +70,7 @@ impl SealedTableEntry {
     ///
     /// This should be used over [`Sealed::unseal`] when multiple values need to be unsealed.
     pub(crate) async fn unseal_all(
-        items: Vec<SealedTableEntry>,
+        items: Vec<Self>,
         spec: UnsealSpec<'_>,
         cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
     ) -> Result<Vec<Unsealed>, SealError> {
@@ -78,6 +78,11 @@ impl SealedTableEntry {
             protected_attributes,
             sort_key_prefix,
         } = spec;
+
+        let items_len = items.len();
+        if items_len == 0 {
+            return Ok(Vec::new());
+        }
 
         let mut protected_items = {
             let capacity = items.len() * protected_attributes.len();
@@ -98,16 +103,16 @@ impl SealedTableEntry {
         if protected_items.is_empty() {
             unprotected_items
                 .into_iter()
-                .map(|unprotected| {
-                    // TODO: Create a new_from_unprotected method
-                    Ok(Unsealed::new_from_parts(
-                        NormalizedProtectedAttributes::new(),
-                        unprotected,
-                    ))
-                })
+                .map(|unprotected| Ok(Unsealed::new_from_unprotected(unprotected)))
                 .collect()
         } else {
-            let chunk_size = protected_items.len() / unprotected_items.len();
+            let chunk_size =
+                protected_items
+                    .len()
+                    .checked_div(items_len)
+                    .ok_or(SealError::AssertionFailed(
+                        "Division by zero when calculating chunk size".to_string(),
+                    ))?;
 
             protected_items
                 .decrypt_all(cipher)
@@ -197,5 +202,54 @@ impl TryFrom<SealedTableEntry> for HashMap<String, AttributeValue> {
         });
 
         Ok(map)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SealedTableEntry;
+    use cipherstash_client::{
+        credentials::{auto_refresh::AutoRefresh, service_credentials::ServiceCredentials},
+        encryption::Encryption,
+        ConsoleConfig, ZeroKMS, ZeroKMSConfig,
+    };
+    use miette::IntoDiagnostic;
+    use std::borrow::Cow;
+
+    type Cipher = Encryption<AutoRefresh<ServiceCredentials>>;
+
+    // FIXME: Use the test cipher from CipherStash Client when that's ready
+    async fn get_cipher() -> Result<Cipher, Box<dyn std::error::Error>> {
+        let console_config = ConsoleConfig::builder().with_env().build()?;
+        let zero_kms_config = ZeroKMSConfig::builder()
+            .decryption_log(true)
+            .with_env()
+            .console_config(&console_config)
+            .build_with_client_key()?;
+
+        let zero_kms_client = ZeroKMS::new_with_client_key(
+            &zero_kms_config.base_url(),
+            AutoRefresh::new(zero_kms_config.credentials()),
+            zero_kms_config.decryption_log_path().as_deref(),
+            zero_kms_config.client_key(),
+        );
+
+        let config = zero_kms_client.load_dataset_config().await?;
+        Ok(Encryption::new(config.index_root_key, zero_kms_client))
+    }
+
+    #[tokio::test]
+    async fn test_unseal_all_empty() -> Result<(), Box<dyn std::error::Error>> {
+        let spec = super::UnsealSpec {
+            protected_attributes: Cow::Borrowed(&[]),
+            sort_key_prefix: "test".to_string(),
+        };
+        let cipher = get_cipher().await?;
+        let results = SealedTableEntry::unseal_all(vec![], spec, &cipher)
+            .await
+            .into_diagnostic()?;
+        assert!(results.is_empty());
+
+        Ok(())
     }
 }
