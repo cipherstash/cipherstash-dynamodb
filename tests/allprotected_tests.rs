@@ -56,15 +56,23 @@ async fn run_test<F: Future<Output = ()>>(mut f: impl FnMut(EncryptedTable) -> F
         .await
         .expect("Failed to insert Dan");
 
-    /*table
-        .put(User::new("jane@smith.org", "Jane Smith", NaiveDate::from_ymd_opt(1990, 2, 20).unwrap()))
+    table
+        .put(User::new(
+            "jane@smith.org",
+            "Jane Smith",
+            NaiveDate::from_ymd_opt(1990, 2, 20).unwrap(),
+        ))
         .await
         .expect("Failed to insert Jane");
 
     table
-        .put(User::new("daniel@example.com", "Daniel Johnson", NaiveDate::from_ymd_opt(1980, 3, 30).unwrap()))
+        .put(User::new(
+            "daniel@example.com",
+            "Daniel Johnson",
+            NaiveDate::from_ymd_opt(1980, 3, 30).unwrap(),
+        ))
         .await
-        .expect("Failed to insert Daniel");*/
+        .expect("Failed to insert Daniel");
 
     f(table).await;
 }

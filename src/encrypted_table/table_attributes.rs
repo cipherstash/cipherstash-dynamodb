@@ -16,7 +16,6 @@ impl TableAttributes {
 
     /// Merge this table attributes with another set of table attributes.
     pub(crate) fn merge(mut self, other: Self) -> Self {
-        println!("Merging table attributes: {:?} with {:?}", self, other);
         self.0.extend(other.0);
         self
     }
@@ -30,10 +29,6 @@ impl TableAttributes {
     ) {
         let name: AttributeName = name.into();
         let attr: TableAttribute = value.into();
-        println!(
-            "Inserting into table attributes: {:?} with {:?}",
-            name, attr
-        );
         self.0.insert(name, attr);
     }
 
