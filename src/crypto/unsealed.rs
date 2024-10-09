@@ -40,6 +40,24 @@ impl Unsealed {
         }
     }
 
+    /// Create a new Unsealed from the protected and unprotected attributes.
+    pub(crate) fn new_from_parts(
+        protected: NormalizedProtectedAttributes,
+        unprotected: TableAttributes,
+    ) -> Self {
+        let mut unsealed = Self::new();
+        unsealed.protected = protected;
+        unsealed.unprotected = unprotected;
+        unsealed
+    }
+
+    /// Create a new Unsealed from the protected and unprotected attributes.
+    pub(crate) fn new_from_unprotected(unprotected: TableAttributes) -> Self {
+        let mut unsealed = Self::new();
+        unsealed.unprotected = unprotected;
+        unsealed
+    }
+
     #[deprecated(since = "0.7.3", note = "Use `Unsealed::take_unprotected` instead")]
     pub fn get_plaintext(&self, name: impl Into<AttributeName>) -> TableAttribute {
         self.unprotected
@@ -105,17 +123,6 @@ impl Unsealed {
     /// Flatten the protected attributes and returns them along with the unprotected attributes.
     pub(crate) fn flatten_into_parts(self) -> (FlattenedProtectedAttributes, TableAttributes) {
         (self.protected.flatten(), self.unprotected)
-    }
-
-    /// Create a new Unsealed from the protected and unprotected attributes.
-    pub(crate) fn new_from_parts(
-        protected: NormalizedProtectedAttributes,
-        unprotected: TableAttributes,
-    ) -> Self {
-        let mut unsealed = Self::new();
-        unsealed.protected = protected;
-        unsealed.unprotected = unprotected;
-        unsealed
     }
 
     /// Convert `self` into `T` using the attributes stored in `self`.

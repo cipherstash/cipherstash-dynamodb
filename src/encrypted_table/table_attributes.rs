@@ -4,7 +4,7 @@ use std::{
     collections::{hash_map::IntoIter, HashMap},
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 /// Represents a collection of attributes for a table entry.
 /// Attributes are stored as a map of `String` to `TableAttribute`.
 pub struct TableAttributes(HashMap<AttributeName, TableAttribute>);
@@ -16,6 +16,7 @@ impl TableAttributes {
 
     /// Merge this table attributes with another set of table attributes.
     pub(crate) fn merge(mut self, other: Self) -> Self {
+        println!("Merging table attributes: {:?} with {:?}", self, other);
         self.0.extend(other.0);
         self
     }
@@ -28,7 +29,12 @@ impl TableAttributes {
         value: impl Into<TableAttribute>,
     ) {
         let name: AttributeName = name.into();
-        self.0.insert(name, value.into());
+        let attr: TableAttribute = value.into();
+        println!(
+            "Inserting into table attributes: {:?} with {:?}",
+            name, attr
+        );
+        self.0.insert(name, attr);
     }
 
     /// Attempts to insert a value into a map with key `subkey` where the map is stored at `key`.
@@ -57,7 +63,6 @@ impl TableAttributes {
         let (protected, unprotected): (HashMap<_, _>, HashMap<_, _>) =
             self.0.into_iter().partition(|(k, _)| {
                 let check = k.as_external_name();
-                //protected_keys.iter().any(|key| match_key(check, key))
                 protected_keys.iter().any(|key| check == key)
             });
 
