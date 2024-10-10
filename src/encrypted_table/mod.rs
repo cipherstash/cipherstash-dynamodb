@@ -18,7 +18,9 @@ use crate::{
 };
 use aws_sdk_dynamodb::types::{AttributeValue, Delete, Put, TransactWriteItem};
 use cipherstash_client::{
-    config::{console_config::ConsoleConfig, zero_kms_config::ZeroKMSConfig},
+    config::{
+        console_config::ConsoleConfig, cts_config::CtsConfig, zero_kms_config::ZeroKMSConfig,
+    },
     credentials::{
         auto_refresh::AutoRefresh,
         service_credentials::{ServiceCredentials, ServiceToken},
@@ -66,11 +68,16 @@ impl<D> EncryptedTable<D> {
 impl EncryptedTable<Headless> {
     pub async fn init_headless() -> Result<Self, InitError> {
         info!("Initializing...");
+
         let console_config = ConsoleConfig::builder().with_env().build()?;
+
+        let cts_config = CtsConfig::builder().with_env().build()?;
+
         let zero_kms_config = ZeroKMSConfig::builder()
             .decryption_log(true)
             .with_env()
             .console_config(&console_config)
+            .cts_config(&cts_config)
             .build_with_client_key()?;
 
         let zero_kms_client = ZeroKMS::new_with_client_key(
