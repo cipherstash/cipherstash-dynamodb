@@ -3,7 +3,7 @@ use super::{
     SealedTableEntry, Unsealed, MAX_TERMS_PER_INDEX,
 };
 use crate::{
-    encrypted_table::{AttributeName, TableAttribute, TableAttributes, TableEntry},
+    encrypted_table::{AttributeName, Cipher, TableAttribute, TableAttributes, TableEntry},
     traits::PrimaryKeyParts,
     IndexType,
 };
@@ -55,7 +55,7 @@ impl RecordsWithTerms {
 
     async fn encrypt(
         self,
-        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+        cipher: &Cipher,
     ) -> Result<Vec<Sealed>, SealError> {
         let num_records = self.records.len();
         let mut pksks = Vec::with_capacity(num_records);
@@ -136,7 +136,7 @@ impl Sealer {
     fn index_all_terms<'a>(
         records: impl IntoIterator<Item = Sealer>,
         protected_attributes: impl AsRef<[Cow<'a, str>]>,
-        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+        cipher: &Cipher,
         term_length: usize,
     ) -> Result<RecordsWithTerms, SealError> {
         let protected_attributes = protected_attributes.as_ref();
@@ -213,7 +213,7 @@ impl Sealer {
     pub(crate) async fn seal_all<'a>(
         records: impl IntoIterator<Item = Sealer>,
         protected_attributes: impl AsRef<[Cow<'a, str>]>,
-        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+        cipher: &Cipher,
         term_length: usize,
     ) -> Result<Vec<Sealed>, SealError> {
         Self::index_all_terms(records, protected_attributes, cipher, term_length)?
@@ -224,7 +224,7 @@ impl Sealer {
     pub(crate) async fn seal<'a>(
         self,
         protected_attributes: impl AsRef<[Cow<'a, str>]>,
-        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+        cipher: &Cipher,
         term_length: usize,
     ) -> Result<Sealed, SealError> {
         let mut vec = Self::seal_all([self], protected_attributes, cipher, term_length).await?;
@@ -241,7 +241,6 @@ impl Sealer {
     }
 }
 
-// FIXME: Remove this (only used for debugging)
 #[derive(Debug)]
 struct Term {
     sk: String,

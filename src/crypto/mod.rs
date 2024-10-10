@@ -4,8 +4,7 @@ mod sealed;
 mod sealer;
 mod unsealed;
 use crate::{
-    traits::{PrimaryKeyError, PrimaryKeyParts, ReadConversionError, WriteConversionError},
-    Identifiable, IndexType, PrimaryKey,
+    encrypted_table::Cipher, traits::{PrimaryKeyError, PrimaryKeyParts, ReadConversionError, WriteConversionError}, Identifiable, IndexType, PrimaryKey
 };
 use cipherstash_client::{
     credentials::{service_credentials::ServiceToken, Credentials},
@@ -99,7 +98,7 @@ pub(crate) fn all_index_keys<'a>(
 pub fn hmac(
     value: &str,
     salt: Option<&str>,
-    cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+    cipher: &Cipher,
 ) -> Result<Vec<u8>, EncryptionError> {
     let plaintext = Plaintext::Utf8Str(Some(value.to_string()));
     let index = CompoundIndex::new(ExactIndex::new(vec![]));

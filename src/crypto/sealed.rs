@@ -1,14 +1,10 @@
 use crate::{
     crypto::attrs::FlattenedEncryptedAttributes,
-    encrypted_table::TableEntry,
+    encrypted_table::{Cipher, TableEntry},
     traits::{ReadConversionError, WriteConversionError},
     Decryptable, Identifiable,
 };
 use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
-use cipherstash_client::{
-    credentials::{service_credentials::ServiceToken, Credentials},
-    encryption::Encryption,
-};
 use itertools::Itertools;
 use std::{borrow::Cow, collections::HashMap};
 
@@ -72,7 +68,7 @@ impl SealedTableEntry {
     pub(crate) async fn unseal_all(
         items: Vec<Self>,
         spec: UnsealSpec<'_>,
-        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+        cipher: &Cipher,
     ) -> Result<Vec<Unsealed>, SealError> {
         let UnsealSpec {
             protected_attributes,
@@ -134,7 +130,7 @@ impl SealedTableEntry {
     pub(crate) async fn unseal(
         self,
         spec: UnsealSpec<'_>,
-        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+        cipher: &Cipher,
     ) -> Result<Unsealed, SealError> {
         let mut vec = Self::unseal_all(vec![self], spec, cipher).await?;
 
@@ -207,16 +203,14 @@ impl TryFrom<SealedTableEntry> for HashMap<String, AttributeValue> {
 
 #[cfg(test)]
 mod tests {
+    use crate::encrypted_table::Cipher;
+
     use super::SealedTableEntry;
     use cipherstash_client::{
-        credentials::{auto_refresh::AutoRefresh, service_credentials::ServiceCredentials},
-        encryption::Encryption,
-        ConsoleConfig, ZeroKMS, ZeroKMSConfig,
+        credentials::auto_refresh::AutoRefresh, ConsoleConfig, ZeroKMS, ZeroKMSConfig
     };
     use miette::IntoDiagnostic;
     use std::borrow::Cow;
-
-    type Cipher = Encryption<AutoRefresh<ServiceCredentials>>;
 
     // FIXME: Use the test cipher from CipherStash Client when that's ready
     async fn get_cipher() -> Result<Cipher, Box<dyn std::error::Error>> {
@@ -227,15 +221,14 @@ mod tests {
             .console_config(&console_config)
             .build_with_client_key()?;
 
-        let zero_kms_client = ZeroKMS::new_with_client_key(
+        let cipher = ZeroKMS::new_with_client_key(
             &zero_kms_config.base_url(),
             AutoRefresh::new(zero_kms_config.credentials()),
             zero_kms_config.decryption_log_path().as_deref(),
             zero_kms_config.client_key(),
         );
 
-        let config = zero_kms_client.load_dataset_config().await?;
-        Ok(Encryption::new(config.index_root_key, zero_kms_client))
+        Ok(cipher)
     }
 
     #[tokio::test]

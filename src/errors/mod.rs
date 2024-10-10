@@ -9,7 +9,7 @@ pub use crate::{
 };
 
 pub use cipherstash_client::{
-    config::errors::ConfigError, encryption::EncryptionError, zero_kms::errors::LoadConfigError,
+    config::errors::ConfigError, encryption::EncryptionError, zerokms::errors::LoadConfigError,
 };
 
 pub use aws_sdk_dynamodb::error::BuildError;

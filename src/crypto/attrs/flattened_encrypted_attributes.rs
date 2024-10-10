@@ -1,6 +1,6 @@
 use crate::{
     crypto::{attrs::flattened_protected_attributes::FlattenedAttrName, SealError},
-    encrypted_table::TableAttributes,
+    encrypted_table::{Cipher, TableAttributes},
     traits::TableAttribute,
 };
 use cipherstash_client::{
@@ -36,7 +36,7 @@ impl FlattenedEncryptedAttributes {
     /// Decrypt self, returning a [FlattenedProtectedAttributes].
     pub(crate) async fn decrypt_all(
         self,
-        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+        cipher: &Cipher,
     ) -> Result<FlattenedProtectedAttributes, SealError> {
         let descriptors = self
             .attrs

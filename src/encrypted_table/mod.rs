@@ -25,7 +25,7 @@ use cipherstash_client::{
         Credentials,
     },
     encryption::Encryption,
-    zero_kms::ZeroKMS,
+    zerokms::{ZeroKMS, ZeroKMSWithClientKey},
 };
 use log::info;
 use std::{
@@ -52,14 +52,18 @@ impl Deref for Dynamo {
     }
 }
 
+pub type Cipher = ZeroKMSWithClientKey<AutoRefresh<ServiceCredentials>>;
+
 pub struct EncryptedTable<D = Dynamo> {
     db: D,
-    cipher: Box<Encryption<AutoRefresh<ServiceCredentials>>>,
+    cipher: Cipher,
+    // FIXME: This is temporary
+    dataset_root_key: [u8; 32],
 }
 
 impl<D> EncryptedTable<D> {
-    pub fn cipher(&self) -> &Encryption<impl Credentials<Token = ServiceToken>> {
-        self.cipher.as_ref()
+    pub fn cipher(&self) -> &Cipher {
+        &self.cipher
     }
 }
 
@@ -73,26 +77,27 @@ impl EncryptedTable<Headless> {
             .console_config(&console_config)
             .build_with_client_key()?;
 
-        let zero_kms_client = ZeroKMS::new_with_client_key(
+        let cipher = ZeroKMS::new_with_client_key(
             &zero_kms_config.base_url(),
             AutoRefresh::new(zero_kms_config.credentials()),
             zero_kms_config.decryption_log_path().as_deref(),
             zero_kms_config.client_key(),
         );
 
-        info!("Fetching dataset config...");
+        /*info!("Fetching dataset config...");
         let dataset_config = zero_kms_client.load_dataset_config().await?;
 
         let cipher = Box::new(Encryption::new(
             dataset_config.index_root_key,
             zero_kms_client,
-        ));
+        ));*/
 
         info!("Ready!");
 
         Ok(Self {
             db: Headless,
             cipher,
+            dataset_root_key: [0; 32], // TODO
         })
     }
 }
@@ -442,6 +447,8 @@ impl EncryptedTable<Dynamo> {
                 db,
             },
             cipher: table.cipher,
+            // FIXME: This is temporary
+            dataset_root_key: table.dataset_root_key,
         })
     }
 
