@@ -1,6 +1,5 @@
 use super::{
-    attrs::FlattenedProtectedAttributes, b64_encode, format_term_key, hmac, SealError,
-    SealedTableEntry, Unsealed, MAX_TERMS_PER_INDEX,
+    attrs::FlattenedProtectedAttributes, b64_encode, compound_prf, format_term_key, prf, SealError, SealedTableEntry, Unsealed, MAX_TERMS_PER_INDEX
 };
 use crate::{
     encrypted_table::{AttributeName, Cipher, TableAttribute, TableAttributes, TableEntry},
@@ -149,11 +148,11 @@ impl Sealer {
                 let mut sk = sealer.sk;
 
                 if sealer.is_pk_encrypted {
-                    pk = b64_encode(hmac(&pk, None, cipher)?);
+                    pk = b64_encode(prf(&pk, None, cipher, Default::default())?);
                 }
 
                 if sealer.is_sk_encrypted {
-                    sk = b64_encode(hmac(&sk, Some(pk.as_str()), cipher)?);
+                    sk = b64_encode(prf(&sk, Some(pk.as_str()), cipher, Default::default())?);
                 }
 
                 let type_name = &sealer.type_name;
@@ -163,12 +162,8 @@ impl Sealer {
                     .unsealed_indexes
                     .into_iter()
                     .map(|(attr, index, index_name, index_type)| {
-                        let term = cipher.compound_index(
-                            &CompoundIndex::new(index),
-                            attr,
-                            Some(format!("{}#{}", type_name, index_name)),
-                            term_length,
-                        )?;
+                        let info = format!("{}#{}", type_name, index_name);
+                        let term = compound_prf(index, attr, info, Default::default())?;
 
                         Ok::<_, SealError>((index_name, index_type, term))
                     })
@@ -190,10 +185,11 @@ impl Sealer {
                     .into_iter()
                     .enumerate()
                     .map(|(i, (index_name, index_type, value))| {
-                        let sk = b64_encode(hmac(
+                        let sk = b64_encode(prf(
                             &format_term_key(sk.as_str(), &index_name, index_type, i),
                             Some(pk.as_str()),
                             cipher,
+                            Default::default(),
                         )?);
 
                         Ok::<_, SealError>(Term { sk, value })

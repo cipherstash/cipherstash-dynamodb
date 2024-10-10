@@ -4,8 +4,7 @@ use super::{
 };
 use crate::{crypto::SealError, encrypted_table::{AttributeName, Cipher}};
 use cipherstash_client::{
-    credentials::{service_credentials::ServiceToken, Credentials},
-    encryption::{BytesWithDescriptor, Encryption, Plaintext},
+    encryption::{BytesWithDescriptor, Plaintext}, zerokms::EncryptPayload,
 };
 use itertools::Itertools;
 
@@ -36,9 +35,13 @@ impl FlattenedProtectedAttributes {
         chunk_into: usize,
     ) -> Result<Vec<FlattenedEncryptedAttributes>, SealError> {
         let chunk_size = self.0.len() / chunk_into;
+        let payloads: Vec<BytesWithDescriptor> = self.0.into_iter().map(Into::into).collect();
 
         cipher
-            .encrypt(self.0.into_iter())
+            .encrypt(
+                payloads.iter().map(EncryptPayload::from),
+                None, // TODO: Add DatasetID
+            )
             .await?
             .into_iter()
             .chunks(chunk_size)

@@ -21,10 +21,8 @@ use cipherstash_client::{
     config::{console_config::ConsoleConfig, zero_kms_config::ZeroKMSConfig},
     credentials::{
         auto_refresh::AutoRefresh,
-        service_credentials::{ServiceCredentials, ServiceToken},
-        Credentials,
+        service_credentials::ServiceCredentials,
     },
-    encryption::Encryption,
     zerokms::{ZeroKMS, ZeroKMSWithClientKey},
 };
 use log::info;
@@ -281,7 +279,7 @@ impl<D> EncryptedTable<D> {
         QueryBuilder::with_backend(self)
     }
 
-    pub async fn unseal_all(
+    async fn unseal_all(
         &self,
         items: impl IntoIterator<Item = HashMap<String, AttributeValue>>,
         spec: UnsealSpec<'_>,
@@ -291,11 +289,11 @@ impl<D> EncryptedTable<D> {
         Ok(results)
     }
 
-    pub async fn unseal(
+    async fn unseal(
         &self,
         item: HashMap<String, AttributeValue>,
         spec: UnsealSpec<'_>,
-    ) -> Result<Unsealed, DecryptError> {
+    ) -> Result<Unsealed, SealError> {
         let table_entry = SealedTableEntry::try_from(item)?;
         let result = table_entry.unseal(spec, &self.cipher).await?;
         Ok(result)
@@ -336,7 +334,7 @@ impl<D> EncryptedTable<D> {
 
         let delete_records = all_index_keys(&sk, delete.protected_indexes)
             .into_iter()
-            .map(|x| Ok::<_, DeleteError>(b64_encode(hmac(&x, Some(pk.as_str()), &self.cipher)?)))
+            .map(|x| Ok::<_, DeleteError>(b64_encode(prf(&x, Some(pk.as_str()), &self.cipher, Default::default())?))) // FIXME
             .chain([Ok(sk)])
             .map(|sk| {
                 let sk = sk?;
@@ -365,6 +363,9 @@ impl<D> EncryptedTable<D> {
         index_predicate: impl FnMut(&AttributeName, &TableAttribute) -> bool,
     ) -> Result<DynamoRecordPatch, PutError> {
         let mut seen_sk = HashSet::new();
+
+        // TODO: Create a wrapper around Cipher, that fetches the root key and is zeroized when dropped
+
 
         let PreparedRecord {
             protected_attributes,
@@ -395,7 +396,8 @@ impl<D> EncryptedTable<D> {
         }
 
         for index_sk in all_index_keys(&sk, protected_indexes) {
-            let index_sk = b64_encode(hmac(&index_sk, Some(pk.as_str()), &self.cipher)?);
+            // FIXME
+            let index_sk = b64_encode(prf(&index_sk, Some(pk.as_str()), &self.cipher, Default::default())?);
 
             // If the current put has an index with the specified key then don't delete it.
             if seen_sk.contains(&index_sk) {
@@ -423,11 +425,13 @@ impl<D> EncryptedTable<D> {
         let PrimaryKeyParts { mut pk, mut sk } = prepared_primary_key.primary_key_parts;
 
         if prepared_primary_key.is_pk_encrypted {
-            pk = b64_encode(hmac(&pk, None, &self.cipher)?);
+            // FIXME
+            pk = b64_encode(prf(&pk, None, &self.cipher, Default::default())?);
         }
 
         if prepared_primary_key.is_sk_encrypted {
-            sk = b64_encode(hmac(&sk, Some(pk.as_str()), &self.cipher)?);
+            // FIXME:
+            sk = b64_encode(prf(&sk, Some(pk.as_str()), &self.cipher, Default::default())?);
         }
 
         Ok(PrimaryKeyParts { pk, sk })

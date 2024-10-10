@@ -5,8 +5,8 @@ use crate::{
 };
 use cipherstash_client::{
     credentials::{service_credentials::ServiceToken, Credentials},
-    encryption::{Encryption, EncryptionError},
-    zero_kms::EncryptedRecord,
+    encryption::{Encryption, EncryptionError, Plaintext},
+    zerokms::EncryptedRecord,
 };
 use itertools::Itertools;
 
@@ -47,8 +47,13 @@ impl FlattenedEncryptedAttributes {
         cipher
             .decrypt(self.attrs.into_iter())
             .await
-            .map(|records| records.into_iter().zip(descriptors.into_iter()).collect())
-            .map_err(SealError::from)
+            .map(|records| records
+                .into_iter()
+                // FIXME: We should change the decrypt method to return a plaintext and/or make a Plaintext::from_bytes method which consumes the bytes
+                .map(|bytes| Plaintext::from_slice(&bytes).unwrap())
+                .zip(descriptors.into_iter()).collect())
+            // FIXME: EncryptedRecord should return an error exposed in cipherstash_client
+            .map_err(|_| SealError::AssertionFailed("FIXME".to_string()))
     }
 
     /// Denormalize the encrypted records into a TableAttributes.
@@ -61,7 +66,8 @@ impl FlattenedEncryptedAttributes {
                 record
                     .to_vec()
                     .map(|data| (FlattenedAttrName::parse(&record.descriptor), data))
-                    .map_err(EncryptionError::from)
+                    // FIXME: EncryptedRecord should return an error exposed in cipherstash_client
+                    .map_err(|_| SealError::AssertionFailed("FIXME".to_string()))
             })
             .fold_ok(
                 Ok(TableAttributes::new()),

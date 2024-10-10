@@ -15,7 +15,7 @@ use crate::{
 };
 use cipherstash_client::encryption::{compound_indexer::CompoundIndex, IndexTerm};
 
-use super::{Dynamo, EncryptedTable, QueryError};
+use super::{query_compound_prf, Cipher, Dynamo, EncryptedTable, QueryError};
 
 pub struct QueryBuilder<S, B = ()> {
     parts: Vec<(String, SingleIndex, Plaintext)>,
@@ -33,7 +33,7 @@ pub struct PreparedQuery {
 impl PreparedQuery {
     pub async fn encrypt(
         self,
-        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+        cipher: &Cipher,
     ) -> Result<AttributeValue, QueryError> {
         let PreparedQuery {
             index_name,
@@ -42,12 +42,8 @@ impl PreparedQuery {
             type_name,
         } = self;
 
-        let index_term = cipher.compound_query(
-            &CompoundIndex::new(composed_index),
-            plaintext,
-            Some(format!("{}#{}", type_name, index_name)),
-            12,
-        )?;
+        let info = format!("{}#{}", type_name, index_name);
+        let index_term = query_compound_prf(composed_index, plaintext, info, Default::default())?;
 
         // With DynamoDB queries must always return a single term
         let term = if let IndexTerm::Binary(x) = index_term {

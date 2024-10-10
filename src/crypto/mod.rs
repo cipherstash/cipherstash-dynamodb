@@ -7,12 +7,9 @@ use crate::{
     encrypted_table::Cipher, traits::{PrimaryKeyError, PrimaryKeyParts, ReadConversionError, WriteConversionError}, Identifiable, IndexType, PrimaryKey
 };
 use cipherstash_client::{
-    credentials::{service_credentials::ServiceToken, Credentials},
     encryption::{
-        compound_indexer::{CompoundIndex, ExactIndex},
-        Encryption, EncryptionError, Plaintext, TypeParseError,
-    },
-    vitur_client::DecryptError,
+        compound_indexer::{accumulator, Accumulator, ComposableIndex, ComposablePlaintext, CompoundIndex, ExactIndex}, EncryptionError, IndexTerm, Plaintext, TypeParseError
+    }, zerokms,
 };
 use miette::Diagnostic;
 use std::borrow::Cow;
@@ -46,14 +43,16 @@ pub enum SealError {
     #[error("Assertion failed: {0}")]
     AssertionFailed(String),
 
-    // Note that we don't expose the specific error type here
-    // so as to avoid leaking any information
-    #[error("Encryption failed")]
-    EncryptionError(#[from] EncryptionError),
-    #[error("Decryption failed")]
-    DecryptionError(#[from] DecryptError),
+    #[error(transparent)]
+    //#[diagnostic(transparent)] // TODO
+    CryptoError(#[from] zerokms::Error),
+
+    /// Error resulting from Indexing in `cipherstash_client::encryption::compound_indexer`
+    #[error(transparent)]
+    IndexError(#[from] EncryptionError),
 }
 
+// TODO: Possibly remove this
 #[derive(Error, Debug)]
 pub enum CryptoError {
     #[error("EncryptionError: {0}")]
@@ -95,26 +94,59 @@ pub(crate) fn all_index_keys<'a>(
 /// Use a CipherStash [`ExactIndex`] to take the HMAC of a string with a provided salt
 ///
 /// This value is used for term index keys and "encrypted" partition / sort keys
-pub fn hmac(
+pub fn prf(
     value: &str,
     salt: Option<&str>,
     cipher: &Cipher,
+    // TODO: Pass a DatasetWithRootKey (use a Protected)
+    root_key: [u8; 32],
 ) -> Result<Vec<u8>, EncryptionError> {
     let plaintext = Plaintext::Utf8Str(Some(value.to_string()));
     let index = CompoundIndex::new(ExactIndex::new(vec![]));
 
-    cipher
-        .compound_index(
-            &index,
-            plaintext,
-            // passing None here results in no terms so pass an empty string
-            Some(salt.unwrap_or("")),
-            32,
-        )?
+    // passing None here results in no terms so pass an empty string
+    let salt = salt.unwrap_or("");
+    let accumulator = Accumulator::from_salt(salt);
+
+    index
+        .compose_index(root_key, plaintext.into(), accumulator)?
+        // TODO: Use a constant for the 32
+        .truncate(32)
+        .map(IndexTerm::from)?
         .as_binary()
         .ok_or(EncryptionError::IndexingError(
             "Invalid term type".to_string(),
         ))
+}
+
+// FIXME: Don't use the root key here
+pub fn query_compound_prf<I>(index: I, plaintext: ComposablePlaintext, info: String, root_key: [u8; 32]) -> Result<IndexTerm, SealError> where I: ComposableIndex + Send {
+    let index = CompoundIndex::new(index);
+    let accumulator = Accumulator::from_salt(info);
+
+    index
+        .compose_query(root_key, plaintext, accumulator)?
+        .exactly_one()
+        // FIXME: Don't use a magic number
+        .and_then(|term| term.truncate(12))
+        .and_then(|term| IndexTerm::try_from(term))
+        .map_err(EncryptionError::from)
+        .map_err(SealError::from)
+}
+
+// FIXME: Don't use the root key here
+pub fn compound_prf<I>(index: I, plaintext: ComposablePlaintext, info: String, root_key: [u8; 32]) -> Result<IndexTerm, SealError> where I: ComposableIndex + Send {
+    let index = CompoundIndex::new(index);
+    let accumulator = Accumulator::from_salt(info);
+
+    index
+        .compose_index(root_key, plaintext, accumulator)?
+        .exactly_one()
+        // FIXME: Don't use a magic number
+        .and_then(|term| term.truncate(12))
+        .and_then(|term| IndexTerm::try_from(term))
+        .map_err(EncryptionError::from)
+        .map_err(SealError::from)
 }
 
 // Contains all the necessary information to encrypt the primary key pair

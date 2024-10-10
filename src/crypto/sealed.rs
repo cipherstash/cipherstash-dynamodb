@@ -214,12 +214,13 @@ mod tests {
 
     // FIXME: Use the test cipher from CipherStash Client when that's ready
     async fn get_cipher() -> Result<Cipher, Box<dyn std::error::Error>> {
-        let console_config = ConsoleConfig::builder().with_env().build()?;
+        let console_config = ConsoleConfig::builder().with_env().build().into_diagnostic()?;
         let zero_kms_config = ZeroKMSConfig::builder()
             .decryption_log(true)
             .with_env()
             .console_config(&console_config)
-            .build_with_client_key()?;
+            .build_with_client_key()
+            .into_diagnostic()?;
 
         let cipher = ZeroKMS::new_with_client_key(
             &zero_kms_config.base_url(),
@@ -241,6 +242,7 @@ mod tests {
         let results = SealedTableEntry::unseal_all(vec![], spec, &cipher)
             .await
             .into_diagnostic()?;
+
         assert!(results.is_empty());
 
         Ok(())
