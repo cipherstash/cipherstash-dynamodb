@@ -1,8 +1,9 @@
 use cipherstash_dynamodb::{
-    Decryptable, Encryptable, EncryptedTable, Identifiable, QueryBuilder, Searchable,
+    encrypted_table::ScopedCipherWithCreds, Decryptable, Encryptable, EncryptedTable, Identifiable, QueryBuilder, Searchable
 };
 use itertools::Itertools;
 use serial_test::serial;
+use uuid::Uuid;
 use std::future::Future;
 
 mod common;
@@ -88,8 +89,11 @@ async fn test_query_single_exact() {
             .build()
             .expect("failed to build query");
 
+        let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
+        let scoped_cipher = ScopedCipherWithCreds::init(table.cipher(), dataset_id).await;
+    
         let term = query
-            .encrypt(table.cipher())
+            .encrypt(&scoped_cipher)
             .await
             .expect("failed to encrypt query");
 
@@ -128,13 +132,16 @@ async fn test_query_single_prefix() {
             .await
             .expect("failed to init table");
 
+        let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
+        let scoped_cipher = ScopedCipherWithCreds::init(table.cipher(), dataset_id).await;
+
         let query = QueryBuilder::<User>::new()
             .starts_with("name", "Dan")
             .build()
             .expect("failed to build query");
 
         let term = query
-            .encrypt(table.cipher())
+            .encrypt(&scoped_cipher)
             .await
             .expect("failed to encrypt query");
 
@@ -182,8 +189,11 @@ async fn test_query_compound() {
             .build()
             .expect("failed to build query");
 
+        let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
+        let scoped_cipher = ScopedCipherWithCreds::init(table.cipher(), dataset_id).await;
+    
         let term = query
-            .encrypt(table.cipher())
+            .encrypt(&scoped_cipher)
             .await
             .expect("failed to encrypt query");
 

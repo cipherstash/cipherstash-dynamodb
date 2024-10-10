@@ -18,21 +18,17 @@ use crate::{
 };
 use aws_sdk_dynamodb::types::{AttributeValue, Delete, Put, TransactWriteItem};
 use cipherstash_client::{
-    config::{console_config::ConsoleConfig, cts_config::CtsConfig},
-    credentials::{
+    config::{console_config::ConsoleConfig, cts_config::CtsConfig, zero_kms_config::ZeroKMSConfig}, credentials::{
         auto_refresh::AutoRefresh,
-        service_credentials::{ServiceCredentials, ServiceToken},
-        Credentials,
-    },
-    encryption::Encryption,
-    zerokms::ZeroKMS,
-    ZeroKMSConfig,
+        service_credentials::ServiceCredentials,
+    }, encryption::ScopedCipher, zerokms::{ZeroKMS, ZeroKMSWithClientKey}
 };
 use log::info;
+use uuid::Uuid;
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
-    ops::Deref,
+    ops::Deref, sync::Arc,
 };
 
 /// Index terms are truncated to this length
@@ -53,14 +49,17 @@ impl Deref for Dynamo {
     }
 }
 
+pub type Cipher = ZeroKMSWithClientKey<AutoRefresh<ServiceCredentials>>;
+pub type ScopedCipherWithCreds = ScopedCipher<AutoRefresh<ServiceCredentials>>;
+
 pub struct EncryptedTable<D = Dynamo> {
     db: D,
-    cipher: Box<Encryption<AutoRefresh<ServiceCredentials>>>,
+    cipher: Arc<Cipher>,
 }
 
 impl<D> EncryptedTable<D> {
-    pub fn cipher(&self) -> &Encryption<impl Credentials<Token = ServiceToken>> {
-        self.cipher.as_ref()
+    pub fn cipher(&self) -> Arc<Cipher> {
+        self.cipher.clone()
     }
 }
 
@@ -79,26 +78,18 @@ impl EncryptedTable<Headless> {
             .cts_config(&cts_config)
             .build_with_client_key()?;
 
-        let zerokms_client = ZeroKMS::new_with_client_key(
-            &zerokms_config.base_url(),
-            AutoRefresh::new(zerokms_config.credentials()),
-            zerokms_config.decryption_log_path().as_deref(),
-            zerokms_config.client_key(),
+        let cipher = ZeroKMS::new_with_client_key(
+            &zero_kms_config.base_url(),
+            AutoRefresh::new(zero_kms_config.credentials()),
+            zero_kms_config.decryption_log_path().as_deref(),
+            zero_kms_config.client_key(),
         );
-
-        info!("Fetching dataset config...");
-        let dataset_config = zerokms_client.load_dataset_config().await?;
-
-        let cipher = Box::new(Encryption::new(
-            dataset_config.index_root_key,
-            zerokms_client,
-        ));
 
         info!("Ready!");
 
         Ok(Self {
             db: Headless,
-            cipher,
+            cipher: Arc::new(cipher),
         })
     }
 }
@@ -282,62 +273,32 @@ impl<D> EncryptedTable<D> {
         QueryBuilder::with_backend(self)
     }
 
-    pub async fn unseal_all(
-        &self,
-        items: impl IntoIterator<Item = HashMap<String, AttributeValue>>,
-        spec: UnsealSpec<'_>,
-    ) -> Result<Vec<Unsealed>, DecryptError> {
-        let table_entries = SealedTableEntry::vec_from(items)?;
-        let results = SealedTableEntry::unseal_all(table_entries, spec, &self.cipher).await?;
-        Ok(results)
-    }
-
-    pub async fn unseal(
-        &self,
-        item: HashMap<String, AttributeValue>,
-        spec: UnsealSpec<'_>,
-    ) -> Result<Unsealed, DecryptError> {
-        let table_entry = SealedTableEntry::try_from(item)?;
-        let result = table_entry.unseal(spec, &self.cipher).await?;
-        Ok(result)
-    }
-
     pub async fn decrypt_all<T>(
         &self,
         items: impl IntoIterator<Item = HashMap<String, AttributeValue>>,
     ) -> Result<Vec<T>, DecryptError>
-    where
-        T: Decryptable + Identifiable,
+    where T: Decryptable + Identifiable,
     {
-        let items = self
-            .unseal_all(items, UnsealSpec::new_for_decryptable::<T>())
-            .await?;
+         // TODO: Temporary obvs
+         let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
+         let scoped_cipher = ScopedCipherWithCreds::init(self.cipher.clone(), dataset_id).await?;
 
-        Ok(items
-            .into_iter()
-            .map(|x| x.into_value::<T>())
-            .collect::<Result<Vec<_>, _>>()?)
-    }
-
-    pub async fn decrypt<T>(&self, item: HashMap<String, AttributeValue>) -> Result<T, DecryptError>
-    where
-        T: Decryptable + Identifiable,
-    {
-        let uspec = UnsealSpec::new_for_decryptable::<T>();
-        let item = self.unseal(item, uspec).await?;
-
-        Ok(item.into_value()?)
+        decrypt_all(&scoped_cipher, items).await
     }
 
     pub async fn create_delete_patch(
         &self,
         delete: PreparedDelete,
     ) -> Result<DynamoRecordPatch, DeleteError> {
-        let PrimaryKeyParts { pk, sk } = self.encrypt_primary_key_parts(delete.primary_key)?;
+        // TODO: Temporary obvs
+        let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
+        let scoped_cipher = ScopedCipherWithCreds::init(self.cipher.clone(), dataset_id).await;
+
+        let PrimaryKeyParts { pk, sk } = encrypt_primary_key_parts(&scoped_cipher, delete.primary_key)?;
 
         let delete_records = all_index_keys(&sk, delete.protected_indexes)
             .into_iter()
-            .map(|x| Ok::<_, DeleteError>(b64_encode(hmac(&x, Some(pk.as_str()), &self.cipher)?)))
+            .map(|x| Ok::<_, DeleteError>(b64_encode(scoped_cipher.mac::<32>(&x, Some(pk.as_str())))))
             .chain([Ok(sk)])
             .map(|sk| {
                 let sk = sk?;
@@ -367,14 +328,19 @@ impl<D> EncryptedTable<D> {
     ) -> Result<DynamoRecordPatch, PutError> {
         let mut seen_sk = HashSet::new();
 
+        // TODO: Temporary obvs
+        let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
+        let indexable_cipher = ScopedCipherWithCreds::init(self.cipher.clone(), dataset_id).await;
+
         let PreparedRecord {
             protected_attributes,
             protected_indexes,
             sealer,
         } = record;
 
+        // Do the encryption
         let sealed = sealer
-            .seal(protected_attributes, &self.cipher, DEFAULT_TERM_SIZE)
+            .seal(protected_attributes, &indexable_cipher, DEFAULT_TERM_SIZE)
             .await?;
 
         let mut put_records = Vec::with_capacity(sealed.len());
@@ -396,7 +362,8 @@ impl<D> EncryptedTable<D> {
         }
 
         for index_sk in all_index_keys(&sk, protected_indexes) {
-            let index_sk = b64_encode(hmac(&index_sk, Some(pk.as_str()), &self.cipher)?);
+            // FIXME
+            let index_sk = b64_encode(indexable_cipher.mac::<32>(&index_sk, Some(pk.as_str())));
 
             // If the current put has an index with the specified key then don't delete it.
             if seen_sk.contains(&index_sk) {
@@ -413,25 +380,6 @@ impl<D> EncryptedTable<D> {
             put_records,
             delete_records,
         })
-    }
-
-    /// Take a prepared primary key and encrypt it to get the [`PrimaryKeyParts`] which can be used
-    /// for retrieval.
-    pub fn encrypt_primary_key_parts(
-        &self,
-        prepared_primary_key: PreparedPrimaryKey,
-    ) -> Result<PrimaryKeyParts, PrimaryKeyError> {
-        let PrimaryKeyParts { mut pk, mut sk } = prepared_primary_key.primary_key_parts;
-
-        if prepared_primary_key.is_pk_encrypted {
-            pk = b64_encode(hmac(&pk, None, &self.cipher)?);
-        }
-
-        if prepared_primary_key.is_sk_encrypted {
-            sk = b64_encode(hmac(&sk, Some(pk.as_str()), &self.cipher)?);
-        }
-
-        Ok(PrimaryKeyParts { pk, sk })
     }
 }
 
@@ -455,8 +403,13 @@ impl EncryptedTable<Dynamo> {
     where
         T: Decryptable + Identifiable,
     {
+        // TODO: Temporary obvs
+        let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
+        let scoped_cipher = ScopedCipherWithCreds::init(self.cipher.clone(), dataset_id).await;
+
         let PrimaryKeyParts { pk, sk } =
-            self.encrypt_primary_key_parts(PreparedPrimaryKey::new::<T>(k))?;
+            encrypt_primary_key_parts(&scoped_cipher, PreparedPrimaryKey::new::<T>(k))?;
+
 
         let result = self
             .db
@@ -468,8 +421,10 @@ impl EncryptedTable<Dynamo> {
             .await
             .map_err(|e| GetError::Aws(format!("{e:?}")))?;
 
+        println!("RESULT {:?}", result);
+
         if let Some(item) = result.item {
-            Ok(Some(self.decrypt(item).await?))
+            Ok(Some(decrypt(&scoped_cipher, item).await?))
         } else {
             Ok(None)
         }
@@ -523,4 +478,52 @@ impl EncryptedTable<Dynamo> {
 
         Ok(())
     }
+}
+
+
+/// Take a prepared primary key and encrypt it to get the [`PrimaryKeyParts`] which can be used
+/// for retrieval.
+fn encrypt_primary_key_parts(
+    scoped_cipher: &ScopedCipherWithCreds,
+    prepared_primary_key: PreparedPrimaryKey,
+) -> Result<PrimaryKeyParts, PrimaryKeyError> {
+    let PrimaryKeyParts { mut pk, mut sk } = prepared_primary_key.primary_key_parts;
+
+    if prepared_primary_key.is_pk_encrypted {
+        pk = b64_encode(scoped_cipher.mac::<32>(&pk, None));
+    }
+
+    if prepared_primary_key.is_sk_encrypted {
+        sk = b64_encode(scoped_cipher.mac::<32>(&sk, Some(pk.as_str())));
+    }
+
+    Ok(PrimaryKeyParts { pk, sk })
+}
+
+async fn decrypt<T>(scoped_cipher: &ScopedCipherWithCreds, item: HashMap<String, AttributeValue>) -> Result<T, DecryptError>
+where
+    T: Decryptable + Identifiable,
+{
+    let uspec = UnsealSpec::new_for_decryptable::<T>();
+    let table_entry = SealedTableEntry::try_from(item)?;
+        let result = table_entry.unseal(uspec, scoped_cipher).await?;
+
+    Ok(result.into_value()?)
+}
+
+async fn decrypt_all<T>(
+    scoped_cipher: &ScopedCipherWithCreds,
+    items: impl IntoIterator<Item = HashMap<String, AttributeValue>>,
+) -> Result<Vec<T>, DecryptError>
+where
+    T: Decryptable + Identifiable,
+{
+    let spec = UnsealSpec::new_for_decryptable::<T>();
+    let table_entries = SealedTableEntry::vec_from(items)?;
+    let items = SealedTableEntry::unseal_all(table_entries, spec, scoped_cipher).await?;
+
+    Ok(items
+        .into_iter()
+        .map(|x| x.into_value::<T>())
+        .collect::<Result<Vec<_>, _>>()?)
 }

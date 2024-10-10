@@ -26,6 +26,7 @@ hex = "0.4.3"
 tracing = { version = "0.1", features = ["log"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"]}
 miette = "7.2.0"
+uuid = "1.10.0"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }

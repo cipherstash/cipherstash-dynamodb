@@ -2,10 +2,9 @@ use super::{
     flattened_encrypted_attributes::FlattenedEncryptedAttributes,
     normalized_protected_attributes::NormalizedKey,
 };
-use crate::{crypto::SealError, encrypted_table::AttributeName};
+use crate::{crypto::SealError, encrypted_table::{AttributeName, ScopedCipherWithCreds}};
 use cipherstash_client::{
-    credentials::{service_credentials::ServiceToken, Credentials},
-    encryption::{BytesWithDescriptor, Encryption, Plaintext},
+    encryption::{BytesWithDescriptor, Plaintext}, zerokms::EncryptPayload,
 };
 use itertools::Itertools;
 
@@ -32,13 +31,16 @@ impl FlattenedProtectedAttributes {
     /// The output is a vec of `chunk_into` [FlattenedEncryptedAttributes] objects.
     pub(crate) async fn encrypt_all(
         self,
-        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+        cipher: &ScopedCipherWithCreds,
         chunk_into: usize,
     ) -> Result<Vec<FlattenedEncryptedAttributes>, SealError> {
         let chunk_size = self.0.len() / chunk_into;
+        let payloads: Vec<BytesWithDescriptor> = self.0.into_iter().map(Into::into).collect();
 
         cipher
-            .encrypt(self.0.into_iter())
+            .encrypt(
+                payloads.iter().map(EncryptPayload::from),
+            )
             .await?
             .into_iter()
             .chunks(chunk_size)

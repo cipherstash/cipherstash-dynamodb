@@ -1,17 +1,15 @@
 use super::{
-    attrs::FlattenedProtectedAttributes, b64_encode, format_term_key, hmac, SealError,
-    SealedTableEntry, Unsealed, MAX_TERMS_PER_INDEX,
+    attrs::FlattenedProtectedAttributes, b64_encode, format_term_key, SealError, SealedTableEntry, Unsealed, MAX_TERMS_PER_INDEX
 };
 use crate::{
-    encrypted_table::{AttributeName, TableAttribute, TableAttributes, TableEntry},
+    encrypted_table::{AttributeName, ScopedCipherWithCreds, TableAttribute, TableAttributes, TableEntry},
     traits::PrimaryKeyParts,
     IndexType,
 };
 use cipherstash_client::{
-    credentials::{service_credentials::ServiceToken, Credentials},
     encryption::{
-        compound_indexer::{ComposableIndex, ComposablePlaintext, CompoundIndex},
-        Encryption, IndexTerm,
+        compound_indexer::{ComposableIndex, ComposablePlaintext},
+        IndexTerm,
     },
 };
 use itertools::Itertools;
@@ -55,7 +53,7 @@ impl RecordsWithTerms {
 
     async fn encrypt(
         self,
-        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+        cipher: &ScopedCipherWithCreds,
     ) -> Result<Vec<Sealed>, SealError> {
         let num_records = self.records.len();
         let mut pksks = Vec::with_capacity(num_records);
@@ -136,7 +134,8 @@ impl Sealer {
     fn index_all_terms<'a>(
         records: impl IntoIterator<Item = Sealer>,
         protected_attributes: impl AsRef<[Cow<'a, str>]>,
-        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+        cipher: &ScopedCipherWithCreds,
+        // FIXME: This might need to be a const generic
         term_length: usize,
     ) -> Result<RecordsWithTerms, SealError> {
         let protected_attributes = protected_attributes.as_ref();
@@ -148,12 +147,13 @@ impl Sealer {
                 let mut pk = sealer.pk;
                 let mut sk = sealer.sk;
 
+                // TODO: Use the same method as Get (encrypt_primary_key_parts)
                 if sealer.is_pk_encrypted {
-                    pk = b64_encode(hmac(&pk, None, cipher)?);
+                    pk = b64_encode(cipher.mac::<32>(&pk, None));
                 }
 
                 if sealer.is_sk_encrypted {
-                    sk = b64_encode(hmac(&sk, Some(pk.as_str()), cipher)?);
+                    sk = b64_encode(cipher.mac::<32>(&sk, Some(pk.as_str())));
                 }
 
                 let type_name = &sealer.type_name;
@@ -163,12 +163,8 @@ impl Sealer {
                     .unsealed_indexes
                     .into_iter()
                     .map(|(attr, index, index_name, index_type)| {
-                        let term = cipher.compound_index(
-                            &CompoundIndex::new(index),
-                            attr,
-                            Some(format!("{}#{}", type_name, index_name)),
-                            term_length,
-                        )?;
+                        let info = format!("{}#{}", type_name, index_name);
+                        let term = cipher.compound_index(index, attr, info)?;
 
                         Ok::<_, SealError>((index_name, index_type, term))
                     })
@@ -181,7 +177,7 @@ impl Sealer {
                             .take(MAX_TERMS_PER_INDEX)
                             .map(|x| (index_name.clone(), index_type, x))
                             .collect()),
-                        _ => Err(SealError::InvalidCiphertext("Invalid index term".into())),
+                        x => Err(SealError::InvalidCiphertext(format!("Invalid index term: `{x:?}"))),
                     })
                     .flatten_ok()
                     .try_collect()?;
@@ -190,11 +186,12 @@ impl Sealer {
                     .into_iter()
                     .enumerate()
                     .map(|(i, (index_name, index_type, value))| {
-                        let sk = b64_encode(hmac(
-                            &format_term_key(sk.as_str(), &index_name, index_type, i),
-                            Some(pk.as_str()),
-                            cipher,
-                        )?);
+                        let sk = b64_encode(
+                            cipher.mac::<32>(
+                                &format_term_key(sk.as_str(), &index_name, index_type, i),
+                                Some(pk.as_str()),
+                            ),
+                        );
 
                         Ok::<_, SealError>(Term { sk, value })
                     })
@@ -213,10 +210,10 @@ impl Sealer {
     pub(crate) async fn seal_all<'a>(
         records: impl IntoIterator<Item = Sealer>,
         protected_attributes: impl AsRef<[Cow<'a, str>]>,
-        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+        cipher: &ScopedCipherWithCreds,
         term_length: usize,
     ) -> Result<Vec<Sealed>, SealError> {
-        Self::index_all_terms(records, protected_attributes, cipher, term_length)?
+        Self::index_all_terms(records, protected_attributes, &cipher, term_length)?
             .encrypt(cipher)
             .await
     }
@@ -224,7 +221,7 @@ impl Sealer {
     pub(crate) async fn seal<'a>(
         self,
         protected_attributes: impl AsRef<[Cow<'a, str>]>,
-        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+        cipher: &ScopedCipherWithCreds,
         term_length: usize,
     ) -> Result<Sealed, SealError> {
         let mut vec = Self::seal_all([self], protected_attributes, cipher, term_length).await?;
@@ -241,7 +238,6 @@ impl Sealer {
     }
 }
 
-// FIXME: Remove this (only used for debugging)
 #[derive(Debug)]
 struct Term {
     sk: String,

@@ -1,25 +1,27 @@
 use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
 use cipherstash_client::{
-    credentials::{service_credentials::ServiceToken, Credentials},
     encryption::{
         compound_indexer::{ComposableIndex, ComposablePlaintext},
-        Encryption, Plaintext,
+        Plaintext
     },
 };
 use itertools::Itertools;
+use uuid::Uuid;
 use std::{borrow::Cow, collections::HashMap, marker::PhantomData};
 
 use crate::{
     traits::{Decryptable, Searchable},
     Identifiable, IndexType, SingleIndex,
 };
-use cipherstash_client::encryption::{compound_indexer::CompoundIndex, IndexTerm};
+use cipherstash_client::encryption::IndexTerm;
 
-use super::{Dynamo, EncryptedTable, QueryError};
+use super::{Dynamo, EncryptedTable, ScopedCipherWithCreds, QueryError, SealError};
 
+/// A builder for a query operation which returns records of type `S`.
+/// `B` is the storage backend used to store the data.
 pub struct QueryBuilder<S, B = ()> {
     parts: Vec<(String, SingleIndex, Plaintext)>,
-    backend: B,
+    storage: B,
     __searchable: PhantomData<S>,
 }
 
@@ -33,7 +35,7 @@ pub struct PreparedQuery {
 impl PreparedQuery {
     pub async fn encrypt(
         self,
-        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+        scoped_cipher: &ScopedCipherWithCreds,
     ) -> Result<AttributeValue, QueryError> {
         let PreparedQuery {
             index_name,
@@ -42,12 +44,8 @@ impl PreparedQuery {
             type_name,
         } = self;
 
-        let index_term = cipher.compound_query(
-            &CompoundIndex::new(composed_index),
-            plaintext,
-            Some(format!("{}#{}", type_name, index_name)),
-            12,
-        )?;
+        let info = format!("{}#{}", type_name, index_name);
+        let index_term = scoped_cipher.compound_query(composed_index, plaintext, info).map_err(SealError::from)?;
 
         // With DynamoDB queries must always return a single term
         let term = if let IndexTerm::Binary(x) = index_term {
@@ -64,8 +62,9 @@ impl PreparedQuery {
     pub async fn send(
         self,
         table: &EncryptedTable<Dynamo>,
+        scoped_cipher: &ScopedCipherWithCreds,
     ) -> Result<Vec<HashMap<String, AttributeValue>>, QueryError> {
-        let term = self.encrypt(&table.cipher).await?;
+        let term = self.encrypt(scoped_cipher).await?;
 
         let query = table
             .db
@@ -83,17 +82,12 @@ impl PreparedQuery {
     }
 }
 
-impl<S> Default for QueryBuilder<S> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl<S> QueryBuilder<S> {
     pub fn new() -> Self {
         Self {
             parts: vec![],
-            backend: Default::default(),
+            storage: Default::default(),
+            // FIXME: Why is this Default and not PhantomData?
             __searchable: Default::default(),
         }
     }
@@ -103,7 +97,7 @@ impl<S, B> QueryBuilder<S, B> {
     pub fn with_backend(backend: B) -> Self {
         Self {
             parts: vec![],
-            backend,
+            storage: backend,
             __searchable: Default::default(),
         }
     }
@@ -138,11 +132,15 @@ where
     where
         T: Decryptable + Identifiable,
     {
-        let table = self.backend;
+        // TODO: Temporary obvs
+        let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
+        let scoped_cipher = ScopedCipherWithCreds::init(self.storage.cipher.clone(), dataset_id).await;
+
+        let storage = self.storage;
         let query = self.build()?;
 
-        let items = query.send(table).await?;
-        let results = table.decrypt_all(items).await?;
+        let items = query.send(storage, &scoped_cipher).await?;
+        let results = super::decrypt_all(&scoped_cipher, items).await?;
 
         Ok(results)
     }

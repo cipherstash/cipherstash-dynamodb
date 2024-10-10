@@ -1,4 +1,5 @@
 use aws_sdk_dynamodb::{error::SdkError, operation};
+use cipherstash_client::zerokms;
 use miette::Diagnostic;
 use thiserror::Error;
 
@@ -9,7 +10,7 @@ pub use crate::{
 };
 
 pub use cipherstash_client::{
-    config::errors::ConfigError, encryption::EncryptionError, zerokms::Error as ZeroKmsError,
+    config::errors::ConfigError, encryption::EncryptionError,
 };
 
 pub use aws_sdk_dynamodb::error::BuildError;
@@ -64,9 +65,18 @@ pub enum DeleteError {
 /// Error returned by `EncryptedTable::query` when indexing, retrieving and decrypting records from DynamoDB
 #[derive(Error, Debug, Diagnostic)]
 pub enum DecryptError {
-    #[error("ReadConversionError: {0}")]
+    #[error(transparent)]
     ReadConversionError(#[from] ReadConversionError),
-    #[error("SealError: {0}")]
+    #[error(transparent)]
+    SealError(#[from] SealError),
+}
+
+/// Error returned by `EncryptedTable::query` when indexing, retrieving and decrypting records from DynamoDB
+#[derive(Error, Debug, Diagnostic)]
+pub enum EncryptError {
+    #[error(transparent)]
+    WriteConversionError(#[from] ReadConversionError),
+    #[error(transparent)]
     SealError(#[from] SealError),
 }
 
@@ -77,14 +87,15 @@ pub enum QueryError {
     PrimaryKeyError(#[from] PrimaryKeyError),
     #[error("InvaldQuery: {0}")]
     InvalidQuery(String),
-    #[error("CryptoError: {0}")]
-    CryptoError(#[from] CryptoError),
-    #[error("EncryptionError: {0}")]
-    EncryptionError(#[from] EncryptionError),
-    #[error("Decrypt Error: {0}")]
-    DecryptError(#[from] DecryptError),
     #[error("{0}")]
     Other(String),
+
+    #[error(transparent)]
+    SealError(#[from] SealError),
+
+    // TODO: Consider removing this
+    #[error(transparent)]
+    DecryptError(#[from] DecryptError),
 
     #[error(transparent)]
     DynamoError(#[from] SdkError<operation::query::QueryError>),
@@ -95,10 +106,11 @@ pub trait DynamoError: std::error::Error + Sized {}
 /// Error returned by `EncryptedTable::init` when connecting to CipherStash services
 #[derive(Error, Debug, Diagnostic)]
 pub enum InitError {
-    #[error("ConfigError: {0}")]
-    Config(#[from] ConfigError),
     #[error(transparent)]
-    ZeroKmsError(#[from] ZeroKmsError),
+    Config(#[from] ConfigError),
+
+    #[error(transparent)]
+    ZeroKMS(#[from] zerokms::Error),
 }
 
 /// The [`enum@Error`] type abstracts all errors returned by `cipherstash-dynamodb` for easy use with the `?` operator.
