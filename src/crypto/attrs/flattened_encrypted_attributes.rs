@@ -5,8 +5,8 @@ use crate::{
 };
 use cipherstash_client::{
     credentials::{service_credentials::ServiceToken, Credentials},
-    encryption::{Encryption, EncryptionError},
-    zero_kms::EncryptedRecord,
+    encryption::Encryption,
+    zerokms::EncryptedRecord,
 };
 use itertools::Itertools;
 
@@ -61,7 +61,7 @@ impl FlattenedEncryptedAttributes {
                 record
                     .to_vec()
                     .map(|data| (FlattenedAttrName::parse(&record.descriptor), data))
-                    .map_err(EncryptionError::from)
+                    .map_err(|_| SealError::AssertionFailed("Decryption failed".to_string()))
             })
             .fold_ok(
                 Ok(TableAttributes::new()),

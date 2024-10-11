@@ -13,7 +13,7 @@ use cipherstash_client::{
         compound_indexer::{CompoundIndex, ExactIndex},
         Encryption, EncryptionError, Plaintext, TypeParseError,
     },
-    vitur_client::DecryptError,
+    zerokms::Error as ZeroKmsError,
 };
 use miette::Diagnostic;
 use std::borrow::Cow;
@@ -49,10 +49,11 @@ pub enum SealError {
 
     // Note that we don't expose the specific error type here
     // so as to avoid leaking any information
-    #[error("Encryption failed")]
+    #[error(transparent)]
     EncryptionError(#[from] EncryptionError),
-    #[error("Decryption failed")]
-    DecryptionError(#[from] DecryptError),
+
+    #[error(transparent)]
+    ZeroKmsError(#[from] ZeroKmsError),
 }
 
 #[derive(Error, Debug)]

@@ -18,16 +18,15 @@ use crate::{
 };
 use aws_sdk_dynamodb::types::{AttributeValue, Delete, Put, TransactWriteItem};
 use cipherstash_client::{
-    config::{
-        console_config::ConsoleConfig, cts_config::CtsConfig, zero_kms_config::ZeroKMSConfig,
-    },
+    config::{console_config::ConsoleConfig, cts_config::CtsConfig},
     credentials::{
         auto_refresh::AutoRefresh,
         service_credentials::{ServiceCredentials, ServiceToken},
         Credentials,
     },
     encryption::Encryption,
-    zero_kms::ZeroKMS,
+    zerokms::ZeroKMS,
+    ZeroKMSConfig,
 };
 use log::info;
 use std::{
@@ -73,26 +72,26 @@ impl EncryptedTable<Headless> {
 
         let cts_config = CtsConfig::builder().with_env().build()?;
 
-        let zero_kms_config = ZeroKMSConfig::builder()
+        let zerokms_config = ZeroKMSConfig::builder()
             .decryption_log(true)
             .with_env()
             .console_config(&console_config)
             .cts_config(&cts_config)
             .build_with_client_key()?;
 
-        let zero_kms_client = ZeroKMS::new_with_client_key(
-            &zero_kms_config.base_url(),
-            AutoRefresh::new(zero_kms_config.credentials()),
-            zero_kms_config.decryption_log_path().as_deref(),
-            zero_kms_config.client_key(),
+        let zerokms_client = ZeroKMS::new_with_client_key(
+            &zerokms_config.base_url(),
+            AutoRefresh::new(zerokms_config.credentials()),
+            zerokms_config.decryption_log_path().as_deref(),
+            zerokms_config.client_key(),
         );
 
         info!("Fetching dataset config...");
-        let dataset_config = zero_kms_client.load_dataset_config().await?;
+        let dataset_config = zerokms_client.load_dataset_config().await?;
 
         let cipher = Box::new(Encryption::new(
             dataset_config.index_root_key,
-            zero_kms_client,
+            zerokms_client,
         ));
 
         info!("Ready!");
