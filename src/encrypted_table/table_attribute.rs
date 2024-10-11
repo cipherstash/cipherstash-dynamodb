@@ -1,6 +1,6 @@
 use super::{ReadConversionError, SealError};
 use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
-use cipherstash_client::zero_kms::EncryptedRecord;
+use cipherstash_client::zerokms::EncryptedRecord;
 use std::{
     collections::{BTreeMap, HashMap},
     str::FromStr,
@@ -42,7 +42,7 @@ impl TableAttribute {
     ) -> Result<EncryptedRecord, SealError> {
         if let TableAttribute::Bytes(s) = self {
             EncryptedRecord::from_slice(&s[..])
-                .map_err(SealError::from)
+                .map_err(|_| SealError::AssertionFailed("Could not parse EncryptedRecord".to_string()))
                 .and_then(|record| {
                     if record.descriptor == descriptor {
                         Ok(record)

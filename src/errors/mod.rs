@@ -9,7 +9,7 @@ pub use crate::{
 };
 
 pub use cipherstash_client::{
-    config::errors::ConfigError, encryption::EncryptionError, zero_kms::errors::LoadConfigError,
+    config::errors::ConfigError, encryption::EncryptionError, zerokms::Error as ZeroKmsError,
 };
 
 pub use aws_sdk_dynamodb::error::BuildError;
@@ -97,8 +97,8 @@ pub trait DynamoError: std::error::Error + Sized {}
 pub enum InitError {
     #[error("ConfigError: {0}")]
     Config(#[from] ConfigError),
-    #[error("LoadConfigError: {0}")]
-    LoadConfig(#[from] LoadConfigError),
+    #[error(transparent)]
+    ZeroKmsError(#[from] ZeroKmsError),
 }
 
 /// The [`enum@Error`] type abstracts all errors returned by `cipherstash-dynamodb` for easy use with the `?` operator.
