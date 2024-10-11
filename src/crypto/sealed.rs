@@ -1,6 +1,6 @@
 use crate::{
     crypto::attrs::FlattenedEncryptedAttributes,
-    encrypted_table::{Cipher, TableEntry},
+    encrypted_table::{ScopedCipher, TableEntry},
     traits::{ReadConversionError, WriteConversionError},
     Decryptable, Identifiable,
 };
@@ -68,7 +68,7 @@ impl SealedTableEntry {
     pub(crate) async fn unseal_all(
         items: Vec<Self>,
         spec: UnsealSpec<'_>,
-        cipher: &Cipher,
+        cipher: &ScopedCipher,
     ) -> Result<Vec<Unsealed>, SealError> {
         let UnsealSpec {
             protected_attributes,
@@ -130,7 +130,7 @@ impl SealedTableEntry {
     pub(crate) async fn unseal(
         self,
         spec: UnsealSpec<'_>,
-        cipher: &Cipher,
+        cipher: &ScopedCipher,
     ) -> Result<Unsealed, SealError> {
         let mut vec = Self::unseal_all(vec![self], spec, cipher).await?;
 
@@ -203,17 +203,18 @@ impl TryFrom<SealedTableEntry> for HashMap<String, AttributeValue> {
 
 #[cfg(test)]
 mod tests {
-    use crate::encrypted_table::Cipher;
+    use crate::encrypted_table::{Cipher, ScopedCipher};
 
     use super::SealedTableEntry;
     use cipherstash_client::{
         credentials::auto_refresh::AutoRefresh, ConsoleConfig, ZeroKMS, ZeroKMSConfig
     };
     use miette::IntoDiagnostic;
-    use std::borrow::Cow;
+    use uuid::Uuid;
+    use std::{borrow::Cow, sync::Arc};
 
     // FIXME: Use the test cipher from CipherStash Client when that's ready
-    async fn get_cipher() -> Result<Cipher, Box<dyn std::error::Error>> {
+    async fn get_cipher() -> Result<Arc<Cipher>, Box<dyn std::error::Error>> {
         let console_config = ConsoleConfig::builder().with_env().build().into_diagnostic()?;
         let zero_kms_config = ZeroKMSConfig::builder()
             .decryption_log(true)
@@ -229,7 +230,7 @@ mod tests {
             zero_kms_config.client_key(),
         );
 
-        Ok(cipher)
+        Ok(Arc::new(cipher))
     }
 
     #[tokio::test]
@@ -239,7 +240,11 @@ mod tests {
             sort_key_prefix: "test".to_string(),
         };
         let cipher = get_cipher().await?;
-        let results = SealedTableEntry::unseal_all(vec![], spec, &cipher)
+        // TODO: Temporary obvs
+        let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
+        let scoped_cipher = ScopedCipher::init(cipher, dataset_id).await;
+
+        let results = SealedTableEntry::unseal_all(vec![], spec, &scoped_cipher)
             .await
             .into_diagnostic()?;
 

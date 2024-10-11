@@ -4,12 +4,12 @@ mod sealed;
 mod sealer;
 mod unsealed;
 use crate::{
-    encrypted_table::Cipher, traits::{PrimaryKeyError, PrimaryKeyParts, ReadConversionError, WriteConversionError}, Identifiable, IndexType, PrimaryKey
+    traits::{PrimaryKeyError, PrimaryKeyParts, ReadConversionError, WriteConversionError}, Identifiable, IndexType, PrimaryKey
 };
 use cipherstash_client::{
     encryption::{
-        compound_indexer::{accumulator, Accumulator, ComposableIndex, ComposablePlaintext, CompoundIndex, ExactIndex}, EncryptionError, IndexTerm, Plaintext, TypeParseError
-    }, zerokms,
+        EncryptionError, TypeParseError
+    },zerokms
 };
 use miette::Diagnostic;
 use std::borrow::Cow;
@@ -91,7 +91,7 @@ pub(crate) fn all_index_keys<'a>(
         .collect()
 }
 
-/// Use a CipherStash [`ExactIndex`] to take the HMAC of a string with a provided salt
+/* /// Use a CipherStash [`ExactIndex`] to take the HMAC of a string with a provided salt
 ///
 /// This value is used for term index keys and "encrypted" partition / sort keys
 pub fn prf(
@@ -117,9 +117,9 @@ pub fn prf(
         .ok_or(EncryptionError::IndexingError(
             "Invalid term type".to_string(),
         ))
-}
+} */
 
-// FIXME: Don't use the root key here
+/*// FIXME: Don't use the root key here
 pub fn query_compound_prf<I>(index: I, plaintext: ComposablePlaintext, info: String, root_key: [u8; 32]) -> Result<IndexTerm, SealError> where I: ComposableIndex + Send {
     let index = CompoundIndex::new(index);
     let accumulator = Accumulator::from_salt(info);
@@ -139,15 +139,15 @@ pub fn compound_prf<I>(index: I, plaintext: ComposablePlaintext, info: String, r
     let index = CompoundIndex::new(index);
     let accumulator = Accumulator::from_salt(info);
 
-    index
+    let term = index
         .compose_index(root_key, plaintext, accumulator)?
-        .exactly_one()
         // FIXME: Don't use a magic number
-        .and_then(|term| term.truncate(12))
-        .and_then(|term| IndexTerm::try_from(term))
-        .map_err(EncryptionError::from)
-        .map_err(SealError::from)
-}
+        .truncate(12)
+        .map_err(EncryptionError::from)?;
+
+    // Saftey: This conversion is Infallible
+    Ok(IndexTerm::try_from(term).unwrap())
+} */
 
 // Contains all the necessary information to encrypt the primary key pair
 #[derive(Clone)]

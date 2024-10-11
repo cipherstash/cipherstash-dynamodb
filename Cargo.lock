@@ -106,6 +106,9 @@ name = "arrayvec"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96d30a06541fbafbc7f82ed10c06164cfbd2c401138f6addd8404629c4b16711"
+dependencies = [
+ "zeroize",
+]
 
 [[package]]
 name = "async-mutex"
@@ -545,6 +548,7 @@ dependencies = [
  "cc",
  "cfg-if",
  "constant_time_eq",
+ "zeroize",
 ]
 
 [[package]]
@@ -709,7 +713,7 @@ dependencies = [
 
 [[package]]
 name = "cipherstash-client"
-version = "0.12.2"
+version = "0.12.3"
 dependencies = [
  "aes-gcm-siv",
  "anyhow",
@@ -725,6 +729,7 @@ dependencies = [
  "futures",
  "hex",
  "hmac",
+ "itertools 0.12.1",
  "lazy_static",
  "log",
  "miette 5.10.0",
@@ -755,7 +760,7 @@ dependencies = [
 
 [[package]]
 name = "cipherstash-config"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "serde",
  "thiserror",
@@ -787,7 +792,7 @@ dependencies = [
  "cipherstash-dynamodb-derive",
  "env_logger",
  "hex",
- "itertools",
+ "itertools 0.11.0",
  "log",
  "miette 7.2.0",
  "serde_dynamo",
@@ -799,13 +804,14 @@ dependencies = [
  "tracing-subscriber",
  "tracing-test",
  "trybuild",
+ "uuid",
 ]
 
 [[package]]
 name = "cipherstash-dynamodb-derive"
 version = "0.8.0"
 dependencies = [
- "itertools",
+ "itertools 0.11.0",
  "paste",
  "proc",
  "proc-macro2",
@@ -1555,6 +1561,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2229,7 +2244,7 @@ dependencies = [
 
 [[package]]
 name = "recipher"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "aes",
  "async-trait",
@@ -2242,6 +2257,7 @@ dependencies = [
  "serde_cbor",
  "sha2",
  "thiserror",
+ "zeroize",
 ]
 
 [[package]]
@@ -3861,7 +3877,7 @@ dependencies = [
 
 [[package]]
 name = "zerokms-protocol"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
