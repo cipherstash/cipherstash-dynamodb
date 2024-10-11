@@ -13,7 +13,7 @@ use cipherstash_dynamodb::traits::TryFromPlaintext;
 
 // Error Dependencies
 use cipherstash_dynamodb::errors::{
-    BuildError, ConfigError, EncryptionError, LoadConfigError, SealError, WriteConversionError,
+    BuildError, ConfigError, EncryptionError, SealError, WriteConversionError,
 };
 
 // Encrypted Table

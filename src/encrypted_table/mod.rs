@@ -357,6 +357,8 @@ impl<D> EncryptedTable<D> {
 
         let PrimaryKeyParts { pk, sk } = sealed.primary_key();
 
+        println!("IN CREATE_PUT_PATCH {:?} {:?}", pk, sk);
+
         let (root, index_entries) = sealed.into_table_entries(index_predicate);
 
         seen_sk.insert(root.inner().sk.clone());

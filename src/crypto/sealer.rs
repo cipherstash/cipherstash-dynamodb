@@ -147,6 +147,7 @@ impl Sealer {
                 let mut pk = sealer.pk;
                 let mut sk = sealer.sk;
 
+                // TODO: Use the same method as Get (encrypt_primary_key_parts)
                 if sealer.is_pk_encrypted {
                     pk = b64_encode(cipher.mac::<32>(&pk, None));
                 }
@@ -186,7 +187,7 @@ impl Sealer {
                     .enumerate()
                     .map(|(i, (index_name, index_type, value))| {
                         let sk = b64_encode(
-                            cipher.mac::<12>(
+                            cipher.mac::<32>(
                                 &format_term_key(sk.as_str(), &index_name, index_type, i),
                                 Some(pk.as_str()),
                             ),
