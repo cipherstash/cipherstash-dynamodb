@@ -13,8 +13,7 @@ keywords = ["cryptography", "security", "databases", "encryption", "dynamodb"]
 categories = ["cryptography", "database"]
 
 [dependencies]
-cipherstash-client = { version = ">=0.12.3" }
-zerokms-protocol = ">=0.2.3"
+cipherstash-client = { version = ">=0.12.4" }
 cipherstash-dynamodb-derive = { version = "0.8", path = "cipherstash-dynamodb-derive" }
 
 aws-sdk-dynamodb = "1.3.0"

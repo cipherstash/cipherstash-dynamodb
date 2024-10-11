@@ -709,9 +709,9 @@ dependencies = [
 
 [[package]]
 name = "cipherstash-client"
-version = "0.12.3"
+version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03f9d179026cc5eb0db588334dae5e55fc7f0931712aa2146fd76ea8e26043eb"
+checksum = "0c3edf8625fefa8a3cbf9d034faac4c57772b529a1e2636e93bab7f7d016b179"
 dependencies = [
  "aes-gcm-siv",
  "anyhow",
@@ -805,7 +805,6 @@ dependencies = [
  "tracing-subscriber",
  "tracing-test",
  "trybuild",
- "zerokms-protocol",
 ]
 
 [[package]]
