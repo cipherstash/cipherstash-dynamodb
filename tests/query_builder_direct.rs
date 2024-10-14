@@ -1,5 +1,5 @@
 use cipherstash_dynamodb::{
-    encrypted_table::ScopedCipher, Decryptable, Encryptable, EncryptedTable, Identifiable, QueryBuilder, Searchable
+    encrypted_table::ScopedCipherWithCreds, Decryptable, Encryptable, EncryptedTable, Identifiable, QueryBuilder, Searchable
 };
 use itertools::Itertools;
 use serial_test::serial;
@@ -90,7 +90,7 @@ async fn test_query_single_exact() {
             .expect("failed to build query");
 
         let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
-        let scoped_cipher = ScopedCipher::init(table.cipher(), dataset_id).await;
+        let scoped_cipher = ScopedCipherWithCreds::init(table.cipher(), dataset_id).await;
     
         let term = query
             .encrypt(&scoped_cipher)
@@ -133,7 +133,7 @@ async fn test_query_single_prefix() {
             .expect("failed to init table");
 
         let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
-        let scoped_cipher = ScopedCipher::init(table.cipher(), dataset_id).await;
+        let scoped_cipher = ScopedCipherWithCreds::init(table.cipher(), dataset_id).await;
 
         let query = QueryBuilder::<User>::new()
             .starts_with("name", "Dan")
@@ -190,7 +190,7 @@ async fn test_query_compound() {
             .expect("failed to build query");
 
         let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
-        let scoped_cipher = ScopedCipher::init(table.cipher(), dataset_id).await;
+        let scoped_cipher = ScopedCipherWithCreds::init(table.cipher(), dataset_id).await;
     
         let term = query
             .encrypt(&scoped_cipher)

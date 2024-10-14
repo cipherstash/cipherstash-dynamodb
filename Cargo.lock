@@ -729,10 +729,10 @@ dependencies = [
  "futures",
  "hex",
  "hmac",
- "itertools 0.12.1",
  "lazy_static",
  "log",
  "miette 5.10.0",
+ "opaque-debug",
  "open",
  "ore-rs",
  "percent-encoding",
@@ -792,7 +792,7 @@ dependencies = [
  "cipherstash-dynamodb-derive",
  "env_logger",
  "hex",
- "itertools 0.11.0",
+ "itertools",
  "log",
  "miette 7.2.0",
  "serde_dynamo",
@@ -811,7 +811,7 @@ dependencies = [
 name = "cipherstash-dynamodb-derive"
 version = "0.8.0"
 dependencies = [
- "itertools 0.11.0",
+ "itertools",
  "paste",
  "proc",
  "proc-macro2",
@@ -1561,15 +1561,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "itertools"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
-dependencies = [
- "either",
-]
-
-[[package]]
 name = "itoa"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2251,6 +2242,7 @@ dependencies = [
  "cmac",
  "hex",
  "hex-literal",
+ "opaque-debug",
  "rand",
  "rand_chacha",
  "serde",
@@ -3883,9 +3875,11 @@ dependencies = [
  "base64 0.22.1",
  "cipherstash-config",
  "fake",
+ "opaque-debug",
  "rand",
  "serde",
  "static_assertions",
  "thiserror",
  "uuid",
+ "zeroize",
 ]

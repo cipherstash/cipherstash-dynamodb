@@ -15,7 +15,7 @@ use crate::{
 };
 use cipherstash_client::encryption::IndexTerm;
 
-use super::{Dynamo, EncryptedTable, ScopedCipher, QueryError, SealError};
+use super::{Dynamo, EncryptedTable, ScopedCipherWithCreds, QueryError, SealError};
 
 /// A builder for a query operation which returns records of type `S`.
 /// `B` is the storage backend used to store the data.
@@ -35,7 +35,7 @@ pub struct PreparedQuery {
 impl PreparedQuery {
     pub async fn encrypt(
         self,
-        scoped_cipher: &ScopedCipher,
+        scoped_cipher: &ScopedCipherWithCreds,
     ) -> Result<AttributeValue, QueryError> {
         let PreparedQuery {
             index_name,
@@ -62,7 +62,7 @@ impl PreparedQuery {
     pub async fn send(
         self,
         table: &EncryptedTable<Dynamo>,
-        scoped_cipher: &ScopedCipher,
+        scoped_cipher: &ScopedCipherWithCreds,
     ) -> Result<Vec<HashMap<String, AttributeValue>>, QueryError> {
         let term = self.encrypt(scoped_cipher).await?;
 
@@ -134,7 +134,7 @@ where
     {
         // TODO: Temporary obvs
         let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
-        let scoped_cipher = ScopedCipher::init(self.storage.cipher.clone(), dataset_id).await;
+        let scoped_cipher = ScopedCipherWithCreds::init(self.storage.cipher.clone(), dataset_id).await;
 
         let storage = self.storage;
         let query = self.build()?;

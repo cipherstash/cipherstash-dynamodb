@@ -1,6 +1,6 @@
 use crate::{
     crypto::attrs::FlattenedEncryptedAttributes,
-    encrypted_table::{ScopedCipher, TableEntry},
+    encrypted_table::{ScopedCipherWithCreds, TableEntry},
     traits::{ReadConversionError, WriteConversionError},
     Decryptable, Identifiable,
 };
@@ -68,7 +68,7 @@ impl SealedTableEntry {
     pub(crate) async fn unseal_all(
         items: Vec<Self>,
         spec: UnsealSpec<'_>,
-        cipher: &ScopedCipher,
+        cipher: &ScopedCipherWithCreds,
     ) -> Result<Vec<Unsealed>, SealError> {
         let UnsealSpec {
             protected_attributes,
@@ -130,7 +130,7 @@ impl SealedTableEntry {
     pub(crate) async fn unseal(
         self,
         spec: UnsealSpec<'_>,
-        cipher: &ScopedCipher,
+        cipher: &ScopedCipherWithCreds,
     ) -> Result<Unsealed, SealError> {
         let mut vec = Self::unseal_all(vec![self], spec, cipher).await?;
 
@@ -203,7 +203,7 @@ impl TryFrom<SealedTableEntry> for HashMap<String, AttributeValue> {
 
 #[cfg(test)]
 mod tests {
-    use crate::encrypted_table::{Cipher, ScopedCipher};
+    use crate::encrypted_table::{Cipher, ScopedCipherWithCreds};
 
     use super::SealedTableEntry;
     use cipherstash_client::{
@@ -242,7 +242,7 @@ mod tests {
         let cipher = get_cipher().await?;
         // TODO: Temporary obvs
         let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
-        let scoped_cipher = ScopedCipher::init(cipher, dataset_id).await;
+        let scoped_cipher = ScopedCipherWithCreds::init(cipher, dataset_id).await;
 
         let results = SealedTableEntry::unseal_all(vec![], spec, &scoped_cipher)
             .await
