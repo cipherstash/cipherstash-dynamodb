@@ -62,7 +62,7 @@ impl FlattenedEncryptedAttributes {
             .into_iter()
             .map(|record| {
                 record
-                    .to_vec()
+                    .to_mp_bytes()
                     .map(|data| (FlattenedAttrName::parse(&record.descriptor), data))
                     .map_err(|_| SealError::AssertionFailed("Decryption failed".to_string()))
             })

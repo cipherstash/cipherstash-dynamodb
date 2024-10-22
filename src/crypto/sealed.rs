@@ -242,7 +242,7 @@ mod tests {
         let cipher = get_cipher().await?;
         // TODO: Temporary obvs
         let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
-        let scoped_cipher = ScopedCipherWithCreds::init(cipher, dataset_id).await;
+        let scoped_cipher = ScopedCipherWithCreds::init(cipher, dataset_id).await.unwrap();
 
         let results = SealedTableEntry::unseal_all(vec![], spec, &scoped_cipher)
             .await

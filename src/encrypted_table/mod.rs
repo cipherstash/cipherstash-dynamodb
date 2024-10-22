@@ -281,7 +281,7 @@ impl<D> EncryptedTable<D> {
     {
          // TODO: Temporary obvs
          let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
-         let scoped_cipher = ScopedCipherWithCreds::init(self.cipher.clone(), dataset_id).await?;
+         let scoped_cipher = ScopedCipherWithCreds::init(self.cipher.clone(), dataset_id).await.unwrap();
 
         decrypt_all(&scoped_cipher, items).await
     }
@@ -292,7 +292,7 @@ impl<D> EncryptedTable<D> {
     ) -> Result<DynamoRecordPatch, DeleteError> {
         // TODO: Temporary obvs
         let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
-        let scoped_cipher = ScopedCipherWithCreds::init(self.cipher.clone(), dataset_id).await;
+        let scoped_cipher = ScopedCipherWithCreds::init(self.cipher.clone(), dataset_id).await.unwrap();
 
         let PrimaryKeyParts { pk, sk } = encrypt_primary_key_parts(&scoped_cipher, delete.primary_key)?;
 
@@ -330,7 +330,7 @@ impl<D> EncryptedTable<D> {
 
         // TODO: Temporary obvs
         let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
-        let indexable_cipher = ScopedCipherWithCreds::init(self.cipher.clone(), dataset_id).await;
+        let indexable_cipher = ScopedCipherWithCreds::init(self.cipher.clone(), dataset_id).await.unwrap();
 
         let PreparedRecord {
             protected_attributes,
@@ -405,7 +405,7 @@ impl EncryptedTable<Dynamo> {
     {
         // TODO: Temporary obvs
         let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
-        let scoped_cipher = ScopedCipherWithCreds::init(self.cipher.clone(), dataset_id).await;
+        let scoped_cipher = ScopedCipherWithCreds::init(self.cipher.clone(), dataset_id).await.unwrap();
 
         let PrimaryKeyParts { pk, sk } =
             encrypt_primary_key_parts(&scoped_cipher, PreparedPrimaryKey::new::<T>(k))?;
