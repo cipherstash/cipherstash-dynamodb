@@ -6,7 +6,6 @@ use cipherstash_client::{
     },
 };
 use itertools::Itertools;
-use uuid::Uuid;
 use std::{borrow::Cow, collections::HashMap, marker::PhantomData};
 
 use crate::{
@@ -15,7 +14,7 @@ use crate::{
 };
 use cipherstash_client::encryption::IndexTerm;
 
-use super::{Dynamo, EncryptedTable, ScopedCipherWithCreds, QueryError, SealError};
+use super::{Dynamo, EncryptedTable, ScopedZeroKmsCipher, QueryError, SealError};
 
 /// A builder for a query operation which returns records of type `S`.
 /// `B` is the storage backend used to store the data.
@@ -35,7 +34,7 @@ pub struct PreparedQuery {
 impl PreparedQuery {
     pub async fn encrypt(
         self,
-        scoped_cipher: &ScopedCipherWithCreds,
+        scoped_cipher: &ScopedZeroKmsCipher,
     ) -> Result<AttributeValue, QueryError> {
         let PreparedQuery {
             index_name,
@@ -62,7 +61,7 @@ impl PreparedQuery {
     pub async fn send(
         self,
         table: &EncryptedTable<Dynamo>,
-        scoped_cipher: &ScopedCipherWithCreds,
+        scoped_cipher: &ScopedZeroKmsCipher,
     ) -> Result<Vec<HashMap<String, AttributeValue>>, QueryError> {
         let term = self.encrypt(scoped_cipher).await?;
 
@@ -128,19 +127,18 @@ impl<S> QueryBuilder<S, &EncryptedTable<Dynamo>>
 where
     S: Searchable + Identifiable,
 {
+    // TODO: Add load_via
     pub async fn load<T>(self) -> Result<Vec<T>, QueryError>
     where
         T: Decryptable + Identifiable,
     {
-        // TODO: Temporary obvs
-        let dataset_id = Uuid::parse_str("93e10481-2692-4d65-a619-37e36a496e64").unwrap();
-        let scoped_cipher = ScopedCipherWithCreds::init(self.storage.cipher.clone(), dataset_id).await.unwrap();
+        let scoped_cipher = ScopedZeroKmsCipher::init(self.storage.cipher.clone(), None).await.unwrap();
 
         let storage = self.storage;
         let query = self.build()?;
 
         let items = query.send(storage, &scoped_cipher).await?;
-        let results = super::decrypt_all(&scoped_cipher, items).await?;
+        let results = super::decrypt_all(&storage.cipher, items).await?;
 
         Ok(results)
     }

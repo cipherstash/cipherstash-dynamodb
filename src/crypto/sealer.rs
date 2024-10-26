@@ -2,7 +2,7 @@ use super::{
     attrs::FlattenedProtectedAttributes, b64_encode, format_term_key, SealError, SealedTableEntry, Unsealed, MAX_TERMS_PER_INDEX
 };
 use crate::{
-    encrypted_table::{AttributeName, ScopedCipherWithCreds, TableAttribute, TableAttributes, TableEntry},
+    encrypted_table::{AttributeName, ScopedZeroKmsCipher, TableAttribute, TableAttributes, TableEntry},
     traits::PrimaryKeyParts,
     IndexType,
 };
@@ -53,7 +53,7 @@ impl RecordsWithTerms {
 
     async fn encrypt(
         self,
-        cipher: &ScopedCipherWithCreds,
+        cipher: &ScopedZeroKmsCipher,
     ) -> Result<Vec<Sealed>, SealError> {
         let num_records = self.records.len();
         let mut pksks = Vec::with_capacity(num_records);
@@ -134,7 +134,7 @@ impl Sealer {
     fn index_all_terms<'a>(
         records: impl IntoIterator<Item = Sealer>,
         protected_attributes: impl AsRef<[Cow<'a, str>]>,
-        cipher: &ScopedCipherWithCreds,
+        cipher: &ScopedZeroKmsCipher,
         // FIXME: This might need to be a const generic
         term_length: usize,
     ) -> Result<RecordsWithTerms, SealError> {
@@ -210,7 +210,7 @@ impl Sealer {
     pub(crate) async fn seal_all<'a>(
         records: impl IntoIterator<Item = Sealer>,
         protected_attributes: impl AsRef<[Cow<'a, str>]>,
-        cipher: &ScopedCipherWithCreds,
+        cipher: &ScopedZeroKmsCipher,
         term_length: usize,
     ) -> Result<Vec<Sealed>, SealError> {
         Self::index_all_terms(records, protected_attributes, &cipher, term_length)?
@@ -221,7 +221,7 @@ impl Sealer {
     pub(crate) async fn seal<'a>(
         self,
         protected_attributes: impl AsRef<[Cow<'a, str>]>,
-        cipher: &ScopedCipherWithCreds,
+        cipher: &ScopedZeroKmsCipher,
         term_length: usize,
     ) -> Result<Sealed, SealError> {
         let mut vec = Self::seal_all([self], protected_attributes, cipher, term_length).await?;
