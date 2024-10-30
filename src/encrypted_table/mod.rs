@@ -76,10 +76,10 @@ impl EncryptedTable<Headless> {
             .build_with_client_key()?;
 
         let cipher = ZeroKMS::new_with_client_key(
-            &zero_kms_config.base_url(),
-            AutoRefresh::new(zero_kms_config.credentials()),
-            zero_kms_config.decryption_log_path().as_deref(),
-            zero_kms_config.client_key(),
+            &zerokms_config.base_url(),
+            AutoRefresh::new(zerokms_config.credentials()),
+            zerokms_config.decryption_log_path().as_deref(),
+            zerokms_config.client_key(),
         );
 
         info!("Ready!");
