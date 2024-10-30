@@ -208,7 +208,7 @@ impl Sealer {
         protected_attributes: impl AsRef<[Cow<'a, str>]>,
         cipher: &ScopedZeroKmsCipher,
     ) -> Result<Vec<Sealed>, SealError> {
-        Self::index_all_terms(records, protected_attributes, &cipher)?
+        Self::index_all_terms(records, protected_attributes, cipher)?
             .encrypt(cipher)
             .await
     }

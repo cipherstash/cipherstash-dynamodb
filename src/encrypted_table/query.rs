@@ -83,10 +83,15 @@ impl PreparedQuery {
 
 impl<S> QueryBuilder<S> {
     pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl<S> Default for QueryBuilder<S> {
+    fn default() -> Self {
         Self {
             parts: vec![],
             storage: Default::default(),
-            // FIXME: Why is this Default and not PhantomData?
             __searchable: Default::default(),
         }
     }
