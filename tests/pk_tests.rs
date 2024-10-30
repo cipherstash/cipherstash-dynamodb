@@ -1,6 +1,8 @@
-use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Error, Identifiable, Searchable};
+use cipherstash_dynamodb::{
+    Decryptable, Encryptable, EncryptedTable, Error, Identifiable, Searchable,
+};
 use itertools::Itertools;
-use miette::{Report, IntoDiagnostic};
+use miette::{IntoDiagnostic, Report};
 use serial_test::serial;
 use std::future::Future;
 
@@ -54,8 +56,7 @@ where
 
     common::create_table(&client, table_name).await;
 
-    let table = EncryptedTable::init(client, table_name)
-        .await?;
+    let table = EncryptedTable::init(client, table_name).await?;
 
     table
         .put(User::new("dan@coderdan.co", "Dan Draper", "blue"))
@@ -76,11 +77,7 @@ where
 #[serial]
 async fn test_query_single_exact() -> TestResult {
     run_test(|table| async move {
-        let res: Vec<User> = table
-            .query()
-            .eq("pk", "dan@coderdan.co")
-            .send()
-            .await?;
+        let res: Vec<User> = table.query().eq("pk", "dan@coderdan.co").send().await?;
 
         assert_eq!(
             res,
@@ -168,10 +165,8 @@ async fn test_delete() -> TestResult {
             .delete::<User>(("dan@coderdan.co", "Dan Draper"))
             .await?;
 
-        let res = table
-            .get::<User>(("dan@coderdan.co", "Dan Draper"))
-            .await?;
-        
+        let res = table.get::<User>(("dan@coderdan.co", "Dan Draper")).await?;
+
         assert_eq!(res, None);
 
         let res = table

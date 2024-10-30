@@ -9,9 +9,7 @@ pub use crate::{
     traits::{ReadConversionError, WriteConversionError},
 };
 
-pub use cipherstash_client::{
-    config::errors::ConfigError, encryption::EncryptionError,
-};
+pub use cipherstash_client::{config::errors::ConfigError, encryption::EncryptionError};
 
 pub use aws_sdk_dynamodb::error::BuildError;
 

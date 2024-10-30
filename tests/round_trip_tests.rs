@@ -1,5 +1,7 @@
 use cipherstash_client::ZeroKMSConfig;
-use cipherstash_dynamodb::{encrypted_table::Dynamo, Decryptable, Encryptable, EncryptedTable, Identifiable, Searchable};
+use cipherstash_dynamodb::{
+    encrypted_table::Dynamo, Decryptable, Encryptable, EncryptedTable, Identifiable, Searchable,
+};
 use miette::IntoDiagnostic;
 use uuid::Uuid;
 mod common;
@@ -255,7 +257,8 @@ async fn test_invalid_specific_dataset() -> miette::Result<()> {
         .into_diagnostic()?;
 
     // Grant ourselves access to the dataset
-    client.grant_dataset(client_id, dataset.id)
+    client
+        .grant_dataset(client_id, dataset.id)
         .await
         .into_diagnostic()?;
 
@@ -272,10 +275,7 @@ async fn test_invalid_specific_dataset() -> miette::Result<()> {
     assert_eq!(s, record);
 
     // Test that we can't get the record via the default dataset
-    assert_none!(table
-        .get::<Crazy>(("person@example.com", "Person"))
-        .await?);
-
+    assert_none!(table.get::<Crazy>(("person@example.com", "Person")).await?);
 
     Ok(())
 }

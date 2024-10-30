@@ -203,18 +203,21 @@ impl TryFrom<SealedTableEntry> for HashMap<String, AttributeValue> {
 
 #[cfg(test)]
 mod tests {
-    use crate::encrypted_table::{ZeroKmsCipher};
+    use crate::encrypted_table::ZeroKmsCipher;
 
     use super::SealedTableEntry;
     use cipherstash_client::{
-        credentials::auto_refresh::AutoRefresh, ConsoleConfig, ZeroKMS, ZeroKMSConfig
+        credentials::auto_refresh::AutoRefresh, ConsoleConfig, ZeroKMS, ZeroKMSConfig,
     };
     use miette::IntoDiagnostic;
     use std::{borrow::Cow, sync::Arc};
 
     // FIXME: Use the test cipher from CipherStash Client when that's ready
     async fn get_cipher() -> Result<Arc<ZeroKmsCipher>, Box<dyn std::error::Error>> {
-        let console_config = ConsoleConfig::builder().with_env().build().into_diagnostic()?;
+        let console_config = ConsoleConfig::builder()
+            .with_env()
+            .build()
+            .into_diagnostic()?;
         let zero_kms_config = ZeroKMSConfig::builder()
             .decryption_log(true)
             .with_env()

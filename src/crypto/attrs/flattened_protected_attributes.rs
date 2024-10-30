@@ -2,9 +2,13 @@ use super::{
     flattened_encrypted_attributes::FlattenedEncryptedAttributes,
     normalized_protected_attributes::NormalizedKey,
 };
-use crate::{crypto::SealError, encrypted_table::{AttributeName, ScopedZeroKmsCipher}};
+use crate::{
+    crypto::SealError,
+    encrypted_table::{AttributeName, ScopedZeroKmsCipher},
+};
 use cipherstash_client::{
-    encryption::{BytesWithDescriptor, Plaintext}, zerokms::EncryptPayload,
+    encryption::{BytesWithDescriptor, Plaintext},
+    zerokms::EncryptPayload,
 };
 use itertools::Itertools;
 
@@ -38,9 +42,7 @@ impl FlattenedProtectedAttributes {
         let payloads: Vec<BytesWithDescriptor> = self.0.into_iter().map(Into::into).collect();
 
         cipher
-            .encrypt(
-                payloads.iter().map(EncryptPayload::from),
-            )
+            .encrypt(payloads.iter().map(EncryptPayload::from))
             .await?
             .into_iter()
             .chunks(chunk_size)

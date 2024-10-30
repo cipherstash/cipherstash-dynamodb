@@ -1,16 +1,17 @@
 use super::{
-    attrs::FlattenedProtectedAttributes, b64_encode, format_term_key, SealError, SealedTableEntry, Unsealed, MAX_TERMS_PER_INDEX
+    attrs::FlattenedProtectedAttributes, b64_encode, format_term_key, SealError, SealedTableEntry,
+    Unsealed, MAX_TERMS_PER_INDEX,
 };
 use crate::{
-    encrypted_table::{AttributeName, ScopedZeroKmsCipher, TableAttribute, TableAttributes, TableEntry},
+    encrypted_table::{
+        AttributeName, ScopedZeroKmsCipher, TableAttribute, TableAttributes, TableEntry,
+    },
     traits::PrimaryKeyParts,
     IndexType,
 };
-use cipherstash_client::{
-    encryption::{
-        compound_indexer::{ComposableIndex, ComposablePlaintext},
-        IndexTerm,
-    },
+use cipherstash_client::encryption::{
+    compound_indexer::{ComposableIndex, ComposablePlaintext},
+    IndexTerm,
 };
 use itertools::Itertools;
 use std::{borrow::Cow, collections::HashMap};
@@ -51,10 +52,7 @@ impl RecordsWithTerms {
         }
     }
 
-    async fn encrypt(
-        self,
-        cipher: &ScopedZeroKmsCipher,
-    ) -> Result<Vec<Sealed>, SealError> {
+    async fn encrypt(self, cipher: &ScopedZeroKmsCipher) -> Result<Vec<Sealed>, SealError> {
         let num_records = self.records.len();
         let mut pksks = Vec::with_capacity(num_records);
         let mut record_terms = Vec::with_capacity(num_records);
@@ -175,7 +173,9 @@ impl Sealer {
                             .take(MAX_TERMS_PER_INDEX)
                             .map(|x| (index_name.clone(), index_type, x))
                             .collect()),
-                        x => Err(SealError::InvalidCiphertext(format!("Invalid index term: `{x:?}"))),
+                        x => Err(SealError::InvalidCiphertext(format!(
+                            "Invalid index term: `{x:?}"
+                        ))),
                     })
                     .flatten_ok()
                     .try_collect()?;
@@ -184,12 +184,10 @@ impl Sealer {
                     .into_iter()
                     .enumerate()
                     .map(|(i, (index_name, index_type, value))| {
-                        let sk = b64_encode(
-                            cipher.mac::<32>(
-                                &format_term_key(sk.as_str(), &index_name, index_type, i),
-                                Some(pk.as_str()),
-                            ),
-                        );
+                        let sk = b64_encode(cipher.mac::<32>(
+                            &format_term_key(sk.as_str(), &index_name, index_type, i),
+                            Some(pk.as_str()),
+                        ));
 
                         Ok::<_, SealError>(Term { sk, value })
                     })

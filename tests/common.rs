@@ -84,8 +84,6 @@ pub async fn create_table(client: &Client, table_name: &str) {
         .expect("Failed to create table");
 }
 
-
-
 #[macro_export]
 macro_rules! assert_err {
     ($cond:expr,) => {

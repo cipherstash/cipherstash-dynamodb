@@ -4,12 +4,12 @@ mod sealed;
 mod sealer;
 mod unsealed;
 use crate::{
-    traits::{PrimaryKeyError, PrimaryKeyParts, ReadConversionError, WriteConversionError}, Identifiable, IndexType, PrimaryKey
+    traits::{PrimaryKeyError, PrimaryKeyParts, ReadConversionError, WriteConversionError},
+    Identifiable, IndexType, PrimaryKey,
 };
 use cipherstash_client::{
-    encryption::{
-        EncryptionError, TypeParseError
-    },zerokms
+    encryption::{EncryptionError, TypeParseError},
+    zerokms,
 };
 use miette::Diagnostic;
 use std::borrow::Cow;

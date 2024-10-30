@@ -1,5 +1,6 @@
 use cipherstash_dynamodb::{
-    encrypted_table::ScopedZeroKmsCipher, Decryptable, Encryptable, EncryptedTable, Identifiable, QueryBuilder, Searchable
+    encrypted_table::ScopedZeroKmsCipher, Decryptable, Encryptable, EncryptedTable, Identifiable,
+    QueryBuilder, Searchable,
 };
 use itertools::Itertools;
 use serial_test::serial;
@@ -87,8 +88,10 @@ async fn test_query_single_exact() {
             .build()
             .expect("failed to build query");
 
-        let scoped_cipher = ScopedZeroKmsCipher::init(table.cipher(), None).await.unwrap();
-    
+        let scoped_cipher = ScopedZeroKmsCipher::init(table.cipher(), None)
+            .await
+            .unwrap();
+
         let term = query
             .encrypt(&scoped_cipher)
             .await
@@ -129,7 +132,9 @@ async fn test_query_single_prefix() {
             .await
             .expect("failed to init table");
 
-        let scoped_cipher = ScopedZeroKmsCipher::init(table.cipher(), None).await.unwrap();
+        let scoped_cipher = ScopedZeroKmsCipher::init(table.cipher(), None)
+            .await
+            .unwrap();
 
         let query = QueryBuilder::<User>::new()
             .starts_with("name", "Dan")
@@ -185,8 +190,10 @@ async fn test_query_compound() {
             .build()
             .expect("failed to build query");
 
-        let scoped_cipher = ScopedZeroKmsCipher::init(table.cipher(), None).await.unwrap();
-    
+        let scoped_cipher = ScopedZeroKmsCipher::init(table.cipher(), None)
+            .await
+            .unwrap();
+
         let term = query
             .encrypt(&scoped_cipher)
             .await

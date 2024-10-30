@@ -1,9 +1,7 @@
 use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
-use cipherstash_client::{
-    encryption::{
-        compound_indexer::{ComposableIndex, ComposablePlaintext},
-        Plaintext
-    },
+use cipherstash_client::encryption::{
+    compound_indexer::{ComposableIndex, ComposablePlaintext},
+    Plaintext,
 };
 use itertools::Itertools;
 use std::{borrow::Cow, collections::HashMap, marker::PhantomData};
@@ -14,7 +12,7 @@ use crate::{
 };
 use cipherstash_client::encryption::IndexTerm;
 
-use super::{Dynamo, EncryptedTable, ScopedZeroKmsCipher, QueryError, SealError};
+use super::{Dynamo, EncryptedTable, QueryError, ScopedZeroKmsCipher, SealError};
 
 /// A builder for a query operation which returns records of type `S`.
 /// `B` is the storage backend used to store the data.
@@ -44,7 +42,9 @@ impl PreparedQuery {
         } = self;
 
         let info = format!("{}#{}", type_name, index_name);
-        let index_term = scoped_cipher.compound_query(composed_index, plaintext, info).map_err(SealError::from)?;
+        let index_term = scoped_cipher
+            .compound_query(composed_index, plaintext, info)
+            .map_err(SealError::from)?;
 
         // With DynamoDB queries must always return a single term
         let term = if let IndexTerm::Binary(x) = index_term {
@@ -132,7 +132,9 @@ where
     where
         T: Decryptable + Identifiable,
     {
-        let scoped_cipher = ScopedZeroKmsCipher::init(self.storage.cipher.clone(), None).await.unwrap();
+        let scoped_cipher = ScopedZeroKmsCipher::init(self.storage.cipher.clone(), None)
+            .await
+            .unwrap();
 
         let storage = self.storage;
         let query = self.build()?;
