@@ -1,5 +1,7 @@
-use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Identifiable, Searchable};
+use cipherstash_client::ZeroKMSConfig;
+use cipherstash_dynamodb::{encrypted_table::Dynamo, Decryptable, Encryptable, EncryptedTable, Identifiable, Searchable};
 use miette::IntoDiagnostic;
+use uuid::Uuid;
 mod common;
 
 #[derive(Debug, Clone, PartialEq, Identifiable, Encryptable, Decryptable, Searchable)]
@@ -123,26 +125,10 @@ struct Crazy {
     pt_k_none: Option<Vec<Vec<u8>>>,
 }
 
-#[tokio::test]
-async fn test_round_trip() -> Result<(), Box<dyn std::error::Error>> {
-    let config = aws_config::from_env()
-        .endpoint_url("http://localhost:8000")
-        .load()
-        .await;
-
-    let client = aws_sdk_dynamodb::Client::new(&config);
-
-    let table_name = "crazy-record";
-
-    common::create_table(&client, table_name).await;
-
-    let table = EncryptedTable::init(client, table_name)
-        .await
-        .expect("Failed to init table");
-
-    let r = Crazy {
-        email: "dan@coderdan.co".into(),
-        name: "Dan".into(),
+fn build_test_record(email: &str, name: &str) -> Crazy {
+    Crazy {
+        email: email.into(),
+        name: name.into(),
 
         ct_a: 123,
         ct_b: 321,
@@ -205,9 +191,31 @@ async fn test_round_trip() -> Result<(), Box<dyn std::error::Error>> {
         pt_i_none: None,
         pt_j_none: None,
         pt_k_none: None,
-    };
+    }
+}
 
-    table.put(r.clone()).await.into_diagnostic()?;
+async fn init_table() -> EncryptedTable<Dynamo> {
+    let config = aws_config::from_env()
+        .endpoint_url("http://localhost:8000")
+        .load()
+        .await;
+
+    let client = aws_sdk_dynamodb::Client::new(&config);
+
+    let table_name = "crazy-record";
+
+    common::create_table(&client, table_name).await;
+
+    EncryptedTable::init(client, table_name)
+        .await
+        .expect("Failed to init table")
+}
+
+#[tokio::test]
+async fn test_round_trip() -> Result<(), Box<dyn std::error::Error>> {
+    let table = init_table().await;
+    let record = build_test_record("dan@coderdan.co", "Dan");
+    table.put(record.clone()).await.into_diagnostic()?;
 
     let s: Crazy = table
         .get(("dan@coderdan.co", "Dan"))
@@ -215,7 +223,59 @@ async fn test_round_trip() -> Result<(), Box<dyn std::error::Error>> {
         .into_diagnostic()?
         .unwrap();
 
-    assert_eq!(s, r);
+    assert_eq!(s, record);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_invalid_dataset() -> Result<(), Box<dyn std::error::Error>> {
+    let table = init_table().await;
+    let record = build_test_record("dan@coderdan.co", "Dan");
+
+    // A random UUID doesn't exist
+    assert_err!(table.put_via(record.clone(), Uuid::new_v4()).await);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_invalid_specific_dataset() -> miette::Result<()> {
+    // TODO: Load client ID from env
+    let client_id = Uuid::parse_str("b91e5b26-f21f-4694-8bce-c61c10e42301").into_diagnostic()?;
+    let client = ZeroKMSConfig::builder()
+        .with_env()
+        .build()
+        .into_diagnostic()?
+        .create_client();
+
+    let dataset = client
+        .create_dataset("test-dataset", "Test dataset")
+        .await
+        .into_diagnostic()?;
+
+    // Grant ourselves access to the dataset
+    client.grant_dataset(client_id, dataset.id)
+        .await
+        .into_diagnostic()?;
+
+    let table = init_table().await;
+    let record = build_test_record("person@example.com", "Person");
+
+    table.put_via(record.clone(), dataset.id).await?;
+
+    let s: Crazy = table
+        .get_via(("person@example.com", "Person"), dataset.id)
+        .await?
+        .unwrap();
+
+    assert_eq!(s, record);
+
+    // Test that we can't get the record via the default dataset
+    assert_none!(table
+        .get::<Crazy>(("person@example.com", "Person"))
+        .await?);
+
 
     Ok(())
 }

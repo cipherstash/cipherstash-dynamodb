@@ -135,8 +135,6 @@ impl Sealer {
         records: impl IntoIterator<Item = Sealer>,
         protected_attributes: impl AsRef<[Cow<'a, str>]>,
         cipher: &ScopedZeroKmsCipher,
-        // FIXME: This might need to be a const generic
-        term_length: usize,
     ) -> Result<RecordsWithTerms, SealError> {
         let protected_attributes = protected_attributes.as_ref();
         let num_protected_attributes = protected_attributes.len();
@@ -211,9 +209,8 @@ impl Sealer {
         records: impl IntoIterator<Item = Sealer>,
         protected_attributes: impl AsRef<[Cow<'a, str>]>,
         cipher: &ScopedZeroKmsCipher,
-        term_length: usize,
     ) -> Result<Vec<Sealed>, SealError> {
-        Self::index_all_terms(records, protected_attributes, &cipher, term_length)?
+        Self::index_all_terms(records, protected_attributes, &cipher)?
             .encrypt(cipher)
             .await
     }
@@ -222,9 +219,8 @@ impl Sealer {
         self,
         protected_attributes: impl AsRef<[Cow<'a, str>]>,
         cipher: &ScopedZeroKmsCipher,
-        term_length: usize,
     ) -> Result<Sealed, SealError> {
-        let mut vec = Self::seal_all([self], protected_attributes, cipher, term_length).await?;
+        let mut vec = Self::seal_all([self], protected_attributes, cipher).await?;
 
         if vec.len() != 1 {
             let actual = vec.len();

@@ -31,9 +31,6 @@ use std::{
     ops::Deref, sync::Arc,
 };
 
-/// Index terms are truncated to this length
-const DEFAULT_TERM_SIZE: usize = 12;
-
 pub struct Headless;
 
 pub struct Dynamo {
@@ -324,7 +321,7 @@ impl<D> EncryptedTable<D> {
     ) -> Result<DynamoRecordPatch, PutError> {
         let mut seen_sk = HashSet::new();
 
-        let indexable_cipher = ScopedZeroKmsCipher::init(self.cipher.clone(), dataset_id).await.unwrap();
+        let indexable_cipher = ScopedZeroKmsCipher::init(self.cipher.clone(), dataset_id).await?;
 
         let PreparedRecord {
             protected_attributes,
@@ -334,7 +331,7 @@ impl<D> EncryptedTable<D> {
 
         // Do the encryption
         let sealed = sealer
-            .seal(protected_attributes, &indexable_cipher, DEFAULT_TERM_SIZE)
+            .seal(protected_attributes, &indexable_cipher)
             .await?;
 
         let mut put_records = Vec::with_capacity(sealed.len());

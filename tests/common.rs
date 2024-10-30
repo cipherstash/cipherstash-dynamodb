@@ -83,3 +83,51 @@ pub async fn create_table(client: &Client, table_name: &str) {
         .await
         .expect("Failed to create table");
 }
+
+
+
+#[macro_export]
+macro_rules! assert_err {
+    ($cond:expr,) => {
+        $crate::assert_err!($cond);
+    };
+    ($cond:expr) => {
+        match $cond {
+            Ok(t) => {
+                panic!("assertion failed, expected Err(..), got Ok({:?})", t);
+            },
+            Err(e) => e,
+        }
+    };
+    ($cond:expr, $($arg:tt)+) => {
+        match $cond {
+            Ok(t) => {
+                panic!("assertion failed, expected Err(..), got Ok({:?}): {}", t, format_args!($($arg)+));
+            },
+            Err(e) => e,
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! assert_none {
+    ($cond:expr,) => {
+        $crate::assert_none!($cond);
+    };
+    ($cond:expr) => {
+        match $cond {
+            Some(t) => {
+                panic!("assertion failed, expected Err(..), got Ok({:?})", t);
+            },
+            None => (),
+        }
+    };
+    ($cond:expr, $($arg:tt)+) => {
+        match $cond {
+            Ok(t) => {
+                panic!("assertion failed, expected None, got Some({:?}): {}", t, format_args!($($arg)+));
+            },
+            Err(e) => (),
+        }
+    };
+}

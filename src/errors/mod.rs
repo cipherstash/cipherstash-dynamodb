@@ -34,6 +34,9 @@ pub enum PutError {
 
     #[error(transparent)]
     DynamoError(#[from] SdkError<operation::transact_write_items::TransactWriteItemsError>),
+
+    #[error("ZeroKMS Error: {0}")]
+    ZeroKMS(#[from] zerokms::Error),
 }
 
 /// Error returned by `EncryptedTable::get` when retrieving and decrypting records from DynamoDB
