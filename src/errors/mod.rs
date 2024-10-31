@@ -98,11 +98,7 @@ pub enum QueryError {
     Other(String),
 
     #[error(transparent)]
-    SealError(#[from] SealError),
-
-    // TODO: Consider removing this
-    #[error(transparent)]
-    DecryptError(#[from] DecryptError),
+    DecryptError(#[from] SealError),
 
     #[error(transparent)]
     DynamoError(#[from] SdkError<operation::query::QueryError>),

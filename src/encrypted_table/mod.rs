@@ -276,7 +276,7 @@ impl<D> EncryptedTable<D> {
     pub async fn decrypt_all<T>(
         &self,
         items: impl IntoIterator<Item = HashMap<String, AttributeValue>>,
-    ) -> Result<Vec<T>, DecryptError>
+    ) -> Result<Vec<T>, SealError>
     where
         T: Decryptable + Identifiable,
     {
@@ -566,16 +566,16 @@ where
 async fn decrypt_all<T>(
     scoped_cipher: &ZeroKmsCipher,
     items: impl IntoIterator<Item = HashMap<String, AttributeValue>>,
-) -> Result<Vec<T>, DecryptError>
+) -> Result<Vec<T>, SealError>
 where
     T: Decryptable + Identifiable,
 {
     let spec = UnsealSpec::new_for_decryptable::<T>();
     let table_entries = SealedTableEntry::vec_from(items)?;
-    let items = SealedTableEntry::unseal_all(table_entries, spec, scoped_cipher).await?;
 
-    Ok(items
+    SealedTableEntry::unseal_all(table_entries, spec, scoped_cipher)
+        .await?
         .into_iter()
         .map(|x| x.into_value::<T>())
-        .collect::<Result<Vec<_>, _>>()?)
+        .collect()
 }
