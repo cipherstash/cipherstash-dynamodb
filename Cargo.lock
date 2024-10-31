@@ -709,9 +709,9 @@ dependencies = [
 
 [[package]]
 name = "cipherstash-client"
-version = "0.12.4"
+version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c3edf8625fefa8a3cbf9d034faac4c57772b529a1e2636e93bab7f7d016b179"
+checksum = "6e0113cd7297fb38e255dd7c2ef0ae52112080c91399a76583e0b4e36deb1ac4"
 dependencies = [
  "aes-gcm-siv",
  "anyhow",
@@ -782,7 +782,7 @@ dependencies = [
 
 [[package]]
 name = "cipherstash-dynamodb"
-version = "0.8.2"
+version = "0.8.1"
 dependencies = [
  "async-trait",
  "aws-config",
