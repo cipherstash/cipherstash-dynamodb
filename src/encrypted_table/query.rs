@@ -5,6 +5,7 @@ use cipherstash_client::encryption::{
 };
 use itertools::Itertools;
 use std::{borrow::Cow, collections::HashMap, marker::PhantomData};
+use uuid::Uuid;
 
 use crate::{
     traits::{Decryptable, Searchable},
@@ -132,14 +133,32 @@ impl<S> QueryBuilder<S, &EncryptedTable<Dynamo>>
 where
     S: Searchable + Identifiable,
 {
-    // TODO: Add load_via
+    /// Load all records of type `T` matching the query.
+    /// The default dataset is used.
+    ///
+    /// While a client can decrypt records from any dataset it has access to,
+    /// queries are always scoped to a single dataset.
     pub async fn load<T>(self) -> Result<Vec<T>, QueryError>
     where
         T: Decryptable + Identifiable,
     {
-        let scoped_cipher = ScopedZeroKmsCipher::init(self.storage.cipher.clone(), None)
-            .await
-            .unwrap();
+        self.load_inner(None).await
+    }
+
+    /// Similar to `load`, but the query is scoped to a specific dataset.
+    pub async fn load_via<T>(self, dataset_id: Uuid) -> Result<Vec<T>, QueryError>
+    where
+        T: Decryptable + Identifiable,
+    {
+        self.load_inner(Some(dataset_id)).await
+    }
+
+    async fn load_inner<T>(self, dataset_id: Option<Uuid>) -> Result<Vec<T>, QueryError>
+    where
+        T: Decryptable + Identifiable,
+    {
+        let scoped_cipher =
+            ScopedZeroKmsCipher::init(self.storage.cipher.clone(), dataset_id).await?;
 
         let storage = self.storage;
         let query = self.build()?;

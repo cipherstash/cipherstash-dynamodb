@@ -397,17 +397,15 @@ impl EncryptedTable<Dynamo> {
         })
     }
 
+    /// Get a record from the table by primary key from the default dataset.
     pub async fn get<T>(&self, k: impl Into<T::PrimaryKey>) -> Result<Option<T>, GetError>
     where
         T: Decryptable + Identifiable,
     {
-        // TODO: Don't unwrap
-        let scoped_cipher = ScopedZeroKmsCipher::init(self.cipher.clone(), None)
-            .await
-            .unwrap();
-        self.get_inner(k, scoped_cipher).await
+        self.get_inner(k, None).await
     }
 
+    /// Get a record from the table by primary key from a specific dataset.
     pub async fn get_via<T>(
         &self,
         k: impl Into<T::PrimaryKey>,
@@ -416,21 +414,19 @@ impl EncryptedTable<Dynamo> {
     where
         T: Decryptable + Identifiable,
     {
-        // TODO: Don't unwrap
-        let scoped_cipher = ScopedZeroKmsCipher::init(self.cipher.clone(), Some(dataset_id))
-            .await
-            .unwrap();
-        self.get_inner(k, scoped_cipher).await
+        self.get_inner(k, Some(dataset_id)).await
     }
 
     async fn get_inner<T>(
         &self,
         k: impl Into<T::PrimaryKey>,
-        cipher: ScopedZeroKmsCipher,
+        dataset_id: Option<Uuid>,
     ) -> Result<Option<T>, GetError>
     where
         T: Decryptable + Identifiable,
     {
+        let cipher = ScopedZeroKmsCipher::init(self.cipher.clone(), dataset_id).await?;
+
         let PrimaryKeyParts { pk, sk } =
             encrypt_primary_key_parts(&cipher, PreparedPrimaryKey::new::<T>(k))?;
 
@@ -451,6 +447,7 @@ impl EncryptedTable<Dynamo> {
         }
     }
 
+    /// Delete a record from the table by primary key from the default dataset.
     pub async fn delete<E: Searchable + Identifiable>(
         &self,
         k: impl Into<E::PrimaryKey>,
@@ -458,6 +455,7 @@ impl EncryptedTable<Dynamo> {
         self.delete_inner::<E>(k.into(), None).await
     }
 
+    /// Delete a record from the table by primary key from a specific dataset.
     pub async fn delete_via<E: Searchable + Identifiable>(
         &self,
         k: impl Into<E::PrimaryKey>,
@@ -489,6 +487,7 @@ impl EncryptedTable<Dynamo> {
         Ok(())
     }
 
+    /// Put a record into the table using the default dataset.
     pub async fn put<T>(&self, record: T) -> Result<(), PutError>
     where
         T: Searchable + Identifiable,
@@ -496,6 +495,7 @@ impl EncryptedTable<Dynamo> {
         self.put_inner(record, None).await
     }
 
+    /// Put a record into the table using a specific dataset.
     pub async fn put_via<T>(&self, record: T, dataset_id: Uuid) -> Result<(), PutError>
     where
         T: Searchable + Identifiable,

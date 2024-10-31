@@ -48,6 +48,9 @@ pub enum GetError {
     Encryption(#[from] EncryptionError),
     #[error("AwsError: {0}")]
     Aws(String),
+
+    #[error("ZeroKMS Error: {0}")]
+    ZeroKMS(#[from] zerokms::Error),
 }
 
 /// Error returned by `EncryptedTable::delete` when indexing and deleting records in DynamoDB
@@ -100,6 +103,9 @@ pub enum QueryError {
 
     #[error(transparent)]
     DynamoError(#[from] SdkError<operation::query::QueryError>),
+
+    #[error("ZeroKMS Error: {0}")]
+    ZeroKMS(#[from] zerokms::Error),
 }
 
 pub trait DynamoError: std::error::Error + Sized {}

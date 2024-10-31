@@ -5,9 +5,91 @@ use aws_sdk_dynamodb::{
     },
     Client,
 };
+use cipherstash_dynamodb::EncryptedTable;
+use miette::Diagnostic;
+use std::{env, future::Future, sync::OnceLock};
+use uuid::Uuid;
+
+static SECONDARY_DATASET_ID: OnceLock<Uuid> = OnceLock::new();
+
+#[derive(Debug, thiserror::Error, Diagnostic)]
+#[error("Check failed: {0}")]
+pub struct CheckFailed(String);
+
+#[allow(dead_code)]
+pub fn check_eq<A, B>(a: A, b: B) -> miette::Result<()>
+where
+    A: std::fmt::Debug + PartialEq<B>,
+    B: std::fmt::Debug,
+{
+    if a == b {
+        Ok(())
+    } else {
+        Err(CheckFailed(format!("Expected {:?} to equal {:?}", a, b)).into())
+    }
+}
+
+#[allow(dead_code)]
+pub fn check_err<R, E>(result: Result<R, E>) -> miette::Result<()>
+where
+    E: std::fmt::Debug,
+    R: std::fmt::Debug,
+{
+    if result.is_err() {
+        Ok(())
+    } else {
+        Err(CheckFailed(format!("Expected error, got {:?}", result)).into())
+    }
+}
+
+#[allow(dead_code)]
+pub fn check_none<R>(result: Option<R>) -> miette::Result<()>
+where
+    R: std::fmt::Debug,
+{
+    if result.is_none() {
+        Ok(())
+    } else {
+        Err(CheckFailed(format!("Expected None, got {:?}", result)).into())
+    }
+}
+
+#[allow(dead_code)]
+pub fn fail_not_found() -> CheckFailed {
+    CheckFailed("Record not found".into())
+}
+
+/// Run a test with an encrypted table.
+/// The table will be created before the test and deleted after the test.
+/// The name is used as a prefix in case its helpful to distinguish between tests.
+/// A random is appended to the name to ensure uniqueness for async tests.
+#[allow(dead_code)]
+pub async fn with_encrypted_table<F: Future<Output = miette::Result<()>>>(
+    table_name: &str,
+    mut f: impl FnMut(EncryptedTable) -> F,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = aws_config::from_env()
+        .endpoint_url("http://localhost:8000")
+        .load()
+        .await;
+
+    let table_name = format!("{}-{}", table_name, Uuid::new_v4());
+    let client = aws_sdk_dynamodb::Client::new(&config);
+
+    create_table(&client, &table_name).await;
+    let table = EncryptedTable::init(client.clone(), &table_name).await?;
+    let result = f(table).await;
+
+    delete_table(&client, &table_name).await;
+    Ok(result?)
+}
+
+pub async fn delete_table(client: &Client, table_name: &str) {
+    let _ = client.delete_table().table_name(table_name).send().await;
+}
 
 pub async fn create_table(client: &Client, table_name: &str) {
-    let _ = client.delete_table().table_name(table_name).send().await;
+    delete_table(client, table_name).await;
 
     client
         .create_table()
@@ -82,6 +164,16 @@ pub async fn create_table(client: &Client, table_name: &str) {
         .send()
         .await
         .expect("Failed to create table");
+}
+
+#[allow(dead_code)]
+pub fn secondary_dataset_id() -> Uuid {
+    *SECONDARY_DATASET_ID.get_or_init(|| {
+        env::var("TEST_SECOND_DATASET_ID")
+            .expect("TEST_SECOND_DATASET_ID must be set")
+            .parse()
+            .expect("TEST_SECOND_DATASET_ID must be a valid UUID")
+    })
 }
 
 #[macro_export]
