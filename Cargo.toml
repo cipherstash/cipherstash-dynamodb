@@ -6,14 +6,14 @@ repository = "https://github.com/cipherstash/cipherstash-dynamodb"
 documentation = "https://docs.rs/cipherstash-dynamodb"
 readme = "README.md"
 description = "CipherStash SDK for searchable, in-use encryption for DynamoDB"
-version = "0.8.2"
+version = "0.8.1"
 edition = "2021"
 authors = ["CipherStash <info@cipherstash.com>"]
 keywords = ["cryptography", "security", "databases", "encryption", "dynamodb"]
 categories = ["cryptography", "database"]
 
 [dependencies]
-cipherstash-client = { version = ">=0.12.4" }
+cipherstash-client = { version = "0.12.5" }
 cipherstash-dynamodb-derive = { version = "0.8", path = "cipherstash-dynamodb-derive" }
 
 aws-sdk-dynamodb = "1.3.0"

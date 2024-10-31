@@ -95,7 +95,7 @@ async fn run_test<F: Future<Output = ()>>(mut f: impl FnMut(EncryptedTable) -> F
         .expect("Failed to init table");
 
     // Uncomment to regenerate the query_regression data json file
-    // regrenerate_data(&client, table_name).await;
+    //regrenerate_data(&client, table_name).await;
 
     let items: Vec<serde_dynamo::Item> =
         serde_json::from_str(include_str!("./query_regression_data.json"))
