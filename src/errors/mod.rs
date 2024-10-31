@@ -64,6 +64,9 @@ pub enum DeleteError {
     AwsBuildError(#[from] BuildError),
     #[error("AwsError: {0}")]
     Aws(String),
+
+    #[error("ZeroKMS Error: {0}")]
+    ZeroKMS(#[from] zerokms::Error),
 }
 
 /// Error returned by `EncryptedTable::query` when indexing, retrieving and decrypting records from DynamoDB

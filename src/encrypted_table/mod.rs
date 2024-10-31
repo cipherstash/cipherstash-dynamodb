@@ -288,9 +288,7 @@ impl<D> EncryptedTable<D> {
         delete: PreparedDelete,
         dataset_id: Option<Uuid>,
     ) -> Result<DynamoRecordPatch, DeleteError> {
-        let scoped_cipher = ScopedZeroKmsCipher::init(self.cipher.clone(), dataset_id)
-            .await
-            .unwrap();
+        let scoped_cipher = ScopedZeroKmsCipher::init(self.cipher.clone(), dataset_id).await?;
 
         let PrimaryKeyParts { pk, sk } =
             encrypt_primary_key_parts(&scoped_cipher, delete.primary_key)?;

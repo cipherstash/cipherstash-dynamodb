@@ -1,7 +1,7 @@
-use cipherstash_dynamodb::{
-    Decryptable, Encryptable, Identifiable, Searchable,
+use cipherstash_dynamodb::{Decryptable, Encryptable, Identifiable, Searchable};
+use common::{
+    check_eq, check_err, check_none, fail_not_found, secondary_dataset_id, with_encrypted_table,
 };
-use common::{check_eq, check_err, check_none, fail_not_found, secondary_dataset_id, with_encrypted_table};
 use uuid::Uuid;
 mod common;
 

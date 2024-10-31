@@ -20,6 +20,7 @@ use super::{Dynamo, EncryptedTable, QueryError, ScopedZeroKmsCipher, SealError};
 pub struct QueryBuilder<S, B = ()> {
     parts: Vec<(String, SingleIndex, Plaintext)>,
     storage: B,
+    dataset_id: Option<Uuid>,
     __searchable: PhantomData<S>,
 }
 
@@ -93,6 +94,7 @@ impl<S> Default for QueryBuilder<S> {
         Self {
             parts: vec![],
             storage: Default::default(),
+            dataset_id: None,
             __searchable: Default::default(),
         }
     }
@@ -103,8 +105,15 @@ impl<S, B> QueryBuilder<S, B> {
         Self {
             parts: vec![],
             storage: backend,
+            dataset_id: None,
             __searchable: Default::default(),
         }
+    }
+
+    /// Specify the dataset to query against.
+    pub fn via(mut self, dataset_id: Uuid) -> Self {
+        self.dataset_id = Some(dataset_id);
+        self
     }
 
     pub fn eq(mut self, name: impl Into<String>, plaintext: impl Into<Plaintext>) -> Self {
@@ -138,27 +147,12 @@ where
     ///
     /// While a client can decrypt records from any dataset it has access to,
     /// queries are always scoped to a single dataset.
-    pub async fn load<T>(self) -> Result<Vec<T>, QueryError>
-    where
-        T: Decryptable + Identifiable,
-    {
-        self.load_inner(None).await
-    }
-
-    /// Similar to `load`, but the query is scoped to a specific dataset.
-    pub async fn load_via<T>(self, dataset_id: Uuid) -> Result<Vec<T>, QueryError>
-    where
-        T: Decryptable + Identifiable,
-    {
-        self.load_inner(Some(dataset_id)).await
-    }
-
-    async fn load_inner<T>(self, dataset_id: Option<Uuid>) -> Result<Vec<T>, QueryError>
+    pub(crate) async fn load<T>(self) -> Result<Vec<T>, QueryError>
     where
         T: Decryptable + Identifiable,
     {
         let scoped_cipher =
-            ScopedZeroKmsCipher::init(self.storage.cipher.clone(), dataset_id).await?;
+            ScopedZeroKmsCipher::init(self.storage.cipher.clone(), self.dataset_id).await?;
 
         let storage = self.storage;
         let query = self.build()?;

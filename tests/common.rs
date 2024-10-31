@@ -64,10 +64,10 @@ pub fn fail_not_found() -> CheckFailed {
 /// The name is used as a prefix in case its helpful to distinguish between tests.
 /// A random is appended to the name to ensure uniqueness for async tests.
 #[allow(dead_code)]
-pub async fn with_encrypted_table<F: Future<Output = miette::Result<()>>>(
+pub async fn with_encrypted_table<O, F: Future<Output = miette::Result<O>>>(
     table_name: &str,
     mut f: impl FnMut(EncryptedTable) -> F,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<O, Box<dyn std::error::Error>> {
     let config = aws_config::from_env()
         .endpoint_url("http://localhost:8000")
         .load()
