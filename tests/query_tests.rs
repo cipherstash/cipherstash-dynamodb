@@ -1,9 +1,10 @@
 use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Identifiable, Searchable};
+use common::{
+    check_eq, check_err, check_none, fail_not_found, secondary_dataset_id, with_encrypted_table,
+};
 use itertools::Itertools;
-use miette::IntoDiagnostic;
-use serial_test::serial;
-use std::future::Future;
-
+use miette::Context;
+use uuid::Uuid;
 mod common;
 
 #[derive(
@@ -68,150 +69,255 @@ impl PublicUser {
     }
 }
 
-async fn run_test<F: Future<Output = ()>>(mut f: impl FnMut(EncryptedTable) -> F) {
-    let config = aws_config::from_env()
-        .endpoint_url("http://localhost:8000")
-        .load()
-        .await;
-
-    let client = aws_sdk_dynamodb::Client::new(&config);
-
-    let table_name = "test-users-pk";
-
-    common::create_table(&client, table_name).await;
-
-    let table = EncryptedTable::init(client, table_name)
-        .await
-        .expect("Failed to init table");
-
+async fn setup(table: &EncryptedTable) -> miette::Result<()> {
     table
         .put(User::new("dan@coderdan.co", "Dan Draper", "blue"))
-        .await
-        .expect("Failed to insert Dan");
+        .await?;
 
     table
         .put(User::new("jane@smith.org", "Jane Smith", "red"))
-        .await
-        .expect("Failed to insert Jane");
+        .await?;
 
     table
         .put(User::new("daniel@example.com", "Daniel Johnson", "green"))
-        .await
-        .expect("Failed to insert Daniel");
+        .await?;
 
-    f(table).await;
+    table
+        .put_via(
+            User::new("dan@coderdan.co", "Dan Draper", "red"),
+            secondary_dataset_id(),
+        )
+        .await?;
+
+    table
+        .put_via(
+            User::new("danielle@internet.org", "Danielle Rogers", "yellow"),
+            secondary_dataset_id(),
+        )
+        .await?;
+
+    Ok(())
 }
 
 #[tokio::test]
-#[serial]
-async fn test_query_single_exact() {
-    run_test(|table| async move {
+async fn test_query_single_exact() -> Result<(), Box<dyn std::error::Error>> {
+    with_encrypted_table("query-tests", |table| async move {
+        setup(&table).await?;
+
+        let res: Vec<User> = table.query().eq("email", "dan@coderdan.co").send().await?;
+
+        check_eq(
+            res,
+            vec![User::new("dan@coderdan.co", "Dan Draper", "blue")],
+        )
+    })
+    .await
+}
+
+#[tokio::test]
+async fn test_query_single_exact_via_secondary() -> Result<(), Box<dyn std::error::Error>> {
+    with_encrypted_table("query-tests", |table| async move {
+        setup(&table).await?;
+
         let res: Vec<User> = table
             .query()
+            .via(secondary_dataset_id())
             .eq("email", "dan@coderdan.co")
             .send()
-            .await
-            .expect("Failed to query");
+            .await?;
 
-        assert_eq!(
+        check_eq(
             res,
-            vec![User::new("dan@coderdan.co", "Dan Draper", "blue")]
-        );
+            // A record with the same PK/SK but different tag (ie. not the same record as the default dataset)
+            vec![User::new("dan@coderdan.co", "Dan Draper", "red")],
+        )
     })
-    .await;
+    .await
 }
 
 #[tokio::test]
-#[serial]
-async fn test_query_single_prefix() {
-    run_test(|table| async move {
+async fn test_query_single_prefix() -> Result<(), Box<dyn std::error::Error>> {
+    with_encrypted_table("query-tests", |table| async move {
+        setup(&table).await?;
+
         let res: Vec<User> = table
             .query()
             .starts_with("name", "Dan")
             .send()
             .await
-            .expect("Failed to query")
+            .wrap_err("Failed to query")?
             .into_iter()
             .sorted()
             .collect_vec();
 
-        assert_eq!(
+        check_eq(
             res,
             vec![
                 User::new("dan@coderdan.co", "Dan Draper", "blue"),
-                User::new("daniel@example.com", "Daniel Johnson", "green")
-            ]
-        );
+                User::new("daniel@example.com", "Daniel Johnson", "green"),
+            ],
+        )
     })
-    .await;
+    .await
 }
 
 #[tokio::test]
-#[serial]
-async fn test_query_compound() {
-    run_test(|table| async move {
+async fn test_query_single_prefix_via_secondary() -> Result<(), Box<dyn std::error::Error>> {
+    with_encrypted_table("query-tests", |table| async move {
+        setup(&table).await?;
+
+        let res: Vec<User> = table
+            .query()
+            .via(secondary_dataset_id())
+            .starts_with("name", "Dan")
+            .send()
+            .await
+            .wrap_err("Failed to query")?
+            .into_iter()
+            .sorted()
+            .collect_vec();
+
+        check_eq(
+            res,
+            vec![
+                User::new("dan@coderdan.co", "Dan Draper", "red"),
+                User::new("danielle@internet.org", "Danielle Rogers", "yellow"),
+            ],
+        )
+    })
+    .await
+}
+
+#[tokio::test]
+async fn test_query_compound() -> Result<(), Box<dyn std::error::Error>> {
+    with_encrypted_table("query-tests", |table| async move {
+        setup(&table).await?;
+
         let res: Vec<User> = table
             .query()
             .starts_with("name", "Dan")
             .eq("email", "dan@coderdan.co")
             .send()
+            .await?;
+
+        check_eq(
+            res,
+            vec![User::new("dan@coderdan.co", "Dan Draper", "blue")],
+        )
+    })
+    .await
+}
+
+#[tokio::test]
+async fn test_query_compound_via_secondary() -> Result<(), Box<dyn std::error::Error>> {
+    with_encrypted_table("query-tests", |table| async move {
+        setup(&table).await?;
+
+        let res: Vec<User> = table
+            .query()
+            .via(secondary_dataset_id())
+            .starts_with("name", "Dan")
+            .eq("email", "dan@coderdan.co")
+            .send()
+            .await?;
+
+        check_eq(res, vec![User::new("dan@coderdan.co", "Dan Draper", "red")])
+    })
+    .await
+}
+
+#[tokio::test]
+async fn test_get_by_partition_key() -> Result<(), Box<dyn std::error::Error>> {
+    with_encrypted_table("query-tests", |table| async move {
+        setup(&table)
             .await
-            .expect("Failed to query");
+            .wrap_err(format!("Setup failed (line {})", std::line!()))?;
 
-        assert_eq!(
-            res,
-            vec![User::new("dan@coderdan.co", "Dan Draper", "blue")]
-        );
+        let res: User = table
+            .get("dan@coderdan.co")
+            .await
+            .wrap_err(format!("User get failed (line {})", std::line!()))?
+            .ok_or(fail_not_found())?;
+
+        check_eq(res, User::new("dan@coderdan.co", "Dan Draper", "blue"))
     })
-    .await;
+    .await
 }
 
 #[tokio::test]
-#[serial]
-async fn test_get_by_partition_key() {
-    run_test(|table| async move {
-        let res: Option<User> = table.get("dan@coderdan.co").await.expect("Failed to send");
-        assert_eq!(
-            res,
-            Some(User::new("dan@coderdan.co", "Dan Draper", "blue"))
-        );
+async fn test_get_by_partition_key_via_secondary() -> Result<(), Box<dyn std::error::Error>> {
+    with_encrypted_table("query-tests", |table| async move {
+        setup(&table)
+            .await
+            .wrap_err(format!("Setup failed (line {})", std::line!()))?;
+
+        let res: User = table
+            .get_via("dan@coderdan.co", secondary_dataset_id())
+            .await
+            .wrap_err(format!("User get failed (line {})", std::line!()))?
+            .ok_or(fail_not_found())?;
+
+        check_eq(res, User::new("dan@coderdan.co", "Dan Draper", "red"))
     })
-    .await;
+    .await
 }
 
 #[tokio::test]
-#[serial]
-async fn test_delete() {
-    run_test(|table| async move {
+async fn test_query_via_invalid() -> Result<(), Box<dyn std::error::Error>> {
+    with_encrypted_table("query-tests", |table| async move {
+        setup(&table).await?;
+
+        check_err(
+            table
+                .query::<User>()
+                // Random dataset that doesn't exist
+                .via(Uuid::new_v4())
+                .eq("email", "dan@coderdan.co")
+                .send()
+                .await,
+        )
+    })
+    .await
+}
+
+// TODO: Move this to a separate file
+#[tokio::test]
+async fn test_delete() -> Result<(), Box<dyn std::error::Error>> {
+    with_encrypted_table("query-tests", |table| async move {
+        setup(&table).await?;
+
         table
             .delete::<User>("dan@coderdan.co")
             .await
-            .expect("Failed to send");
+            .wrap_err("Failed to delete")?;
 
         let res = table
             .get::<User>("dan@coderdan.co")
             .await
-            .expect("Failed to send");
-        assert_eq!(res, None);
+            .wrap_err("Failed to send GET request")?;
+
+        check_eq(res, None)?;
 
         let res = table
             .query::<User>()
             .starts_with("name", "Dan")
             .send()
             .await
-            .expect("Failed to send");
-        assert_eq!(
+            .wrap_err("Failed to send")?;
+
+        check_eq(
             res,
-            vec![User::new("daniel@example.com", "Daniel Johnson", "green")]
-        );
+            vec![User::new("daniel@example.com", "Daniel Johnson", "green")],
+        )?;
 
         let res = table
             .query::<User>()
             .eq("email", "dan@coderdan.co")
             .send()
             .await
-            .expect("Failed to send");
-        assert_eq!(res, vec![]);
+            .wrap_err("Failed to send")?;
+
+        check_eq(res, vec![])?;
 
         let res = table
             .query::<User>()
@@ -219,39 +325,61 @@ async fn test_delete() {
             .starts_with("name", "Dan")
             .send()
             .await
-            .expect("Failed to send");
-        assert_eq!(res, vec![])
+            .wrap_err("Failed to send")?;
+
+        check_eq(res, vec![])
     })
-    .await;
+    .await
 }
 
 #[tokio::test]
-#[serial]
 async fn test_insert_retrieve_nothing_encrypted() -> Result<(), Box<dyn std::error::Error>> {
-    let config = aws_config::from_env()
-        .endpoint_url("http://localhost:8000")
-        .load()
-        .await;
+    with_encrypted_table("query-tests-nothing-encrypted", |table| async move {
+        table
+            .put(PublicUser::new("dan@coderdan.co", "Dan Draper", "blue"))
+            .await
+            .wrap_err("Failed to insert")?;
 
-    let client = aws_sdk_dynamodb::Client::new(&config);
+        table
+            .get::<PublicUser>("dan@coderdan.co")
+            .await
+            .wrap_err("Failed to retrieve record")?
+            .ok_or(fail_not_found())?;
 
-    let table_name = "test-public-users-pk";
+        Ok(())
+    })
+    .await
+}
 
-    common::create_table(&client, table_name).await;
+#[tokio::test]
+async fn test_insert_retrieve_nothing_encrypted_via_secondary(
+) -> Result<(), Box<dyn std::error::Error>> {
+    with_encrypted_table("query-tests-nothing-encrypted", |table| async move {
+        table
+            .put_via(
+                PublicUser::new("dan@coderdan.co", "Dan Draper", "blue"),
+                secondary_dataset_id(),
+            )
+            .await
+            .wrap_err("Failed to insert")?;
 
-    let table = EncryptedTable::init(client, table_name)
-        .await
-        .into_diagnostic()?;
+        // Because PK is always MAC'd with the dataset specific key, we can't retrieve it without the dataset ID
+        // This ensures tenant isolation even when nothing is encrypted
+        table
+            .get_via::<PublicUser>("dan@coderdan.co", secondary_dataset_id())
+            .await
+            .wrap_err("Failed to retrieve record")?
+            .ok_or(fail_not_found())?;
 
-    table
-        .put(PublicUser::new("dan@coderdan.co", "Dan Draper", "blue"))
-        .await
-        .into_diagnostic()?;
+        // Therefore, we should not be able to retrieve this record from the default dataset
+        check_none(
+            table
+                .get::<PublicUser>("dan@coderdan.co")
+                .await
+                .wrap_err("Failed to retrieve record")?,
+        )?;
 
-    table
-        .get::<PublicUser>("dan@coderdan.co")
-        .await
-        .into_diagnostic()?;
-
-    Ok(())
+        Ok(())
+    })
+    .await
 }

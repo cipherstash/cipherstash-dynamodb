@@ -65,7 +65,7 @@ async fn test_headless_roundtrip() {
             PreparedRecord::prepare_record(user.clone()).expect("failed to prepare record");
 
         let patch = table
-            .create_put_patch(user_record, |_, _| true)
+            .create_put_patch(user_record, None, |_, _| true)
             .await
             .expect("failed to encrypt");
 

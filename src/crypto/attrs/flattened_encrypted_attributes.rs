@@ -1,13 +1,9 @@
 use crate::{
     crypto::{attrs::flattened_protected_attributes::FlattenedAttrName, SealError},
-    encrypted_table::TableAttributes,
+    encrypted_table::{TableAttributes, ZeroKmsCipher},
     traits::TableAttribute,
 };
-use cipherstash_client::{
-    credentials::{service_credentials::ServiceToken, Credentials},
-    encryption::Encryption,
-    zerokms::EncryptedRecord,
-};
+use cipherstash_client::{encryption::Plaintext, zerokms::EncryptedRecord};
 use itertools::Itertools;
 
 use super::FlattenedProtectedAttributes;
@@ -36,7 +32,7 @@ impl FlattenedEncryptedAttributes {
     /// Decrypt self, returning a [FlattenedProtectedAttributes].
     pub(crate) async fn decrypt_all(
         self,
-        cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
+        cipher: &ZeroKmsCipher,
     ) -> Result<FlattenedProtectedAttributes, SealError> {
         let descriptors = self
             .attrs
@@ -47,8 +43,16 @@ impl FlattenedEncryptedAttributes {
         cipher
             .decrypt(self.attrs.into_iter())
             .await
-            .map(|records| records.into_iter().zip(descriptors.into_iter()).collect())
-            .map_err(SealError::from)
+            .map(|records| {
+                records
+                    .into_iter()
+                    // FIXME: We should change the decrypt method to return a plaintext and/or make a Plaintext::from_bytes method which consumes the bytes
+                    .map(|bytes| Plaintext::from_slice(&bytes).unwrap())
+                    .zip(descriptors.into_iter())
+                    .collect()
+            })
+            // FIXME: EncryptedRecord should return an error exposed in cipherstash_client
+            .map_err(|_| SealError::AssertionFailed("FIXME".to_string()))
     }
 
     /// Denormalize the encrypted records into a TableAttributes.
@@ -59,7 +63,7 @@ impl FlattenedEncryptedAttributes {
             .into_iter()
             .map(|record| {
                 record
-                    .to_vec()
+                    .to_mp_bytes()
                     .map(|data| (FlattenedAttrName::parse(&record.descriptor), data))
                     .map_err(|_| SealError::AssertionFailed("Decryption failed".to_string()))
             })

@@ -1,5 +1,8 @@
-use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Identifiable, Searchable};
-use miette::IntoDiagnostic;
+use cipherstash_dynamodb::{Decryptable, Encryptable, Identifiable, Searchable};
+use common::{
+    check_eq, check_err, check_none, fail_not_found, secondary_dataset_id, with_encrypted_table,
+};
+use uuid::Uuid;
 mod common;
 
 #[derive(Debug, Clone, PartialEq, Identifiable, Encryptable, Decryptable, Searchable)]
@@ -123,26 +126,10 @@ struct Crazy {
     pt_k_none: Option<Vec<Vec<u8>>>,
 }
 
-#[tokio::test]
-async fn test_round_trip() -> Result<(), Box<dyn std::error::Error>> {
-    let config = aws_config::from_env()
-        .endpoint_url("http://localhost:8000")
-        .load()
-        .await;
-
-    let client = aws_sdk_dynamodb::Client::new(&config);
-
-    let table_name = "crazy-record";
-
-    common::create_table(&client, table_name).await;
-
-    let table = EncryptedTable::init(client, table_name)
-        .await
-        .expect("Failed to init table");
-
-    let r = Crazy {
-        email: "dan@coderdan.co".into(),
-        name: "Dan".into(),
+fn build_test_record(email: &str, name: &str) -> Crazy {
+    Crazy {
+        email: email.into(),
+        name: name.into(),
 
         ct_a: 123,
         ct_b: 321,
@@ -205,17 +192,53 @@ async fn test_round_trip() -> Result<(), Box<dyn std::error::Error>> {
         pt_i_none: None,
         pt_j_none: None,
         pt_k_none: None,
-    };
+    }
+}
 
-    table.put(r.clone()).await.into_diagnostic()?;
+#[tokio::test]
+async fn test_round_trip() -> Result<(), Box<dyn std::error::Error>> {
+    with_encrypted_table("round-trip", |table| async move {
+        let record = build_test_record("dan@coderdan.co", "Dan");
+        table.put(record.clone()).await?;
 
-    let s: Crazy = table
-        .get(("dan@coderdan.co", "Dan"))
-        .await
-        .into_diagnostic()?
-        .unwrap();
+        let s: Crazy = table
+            .get(("dan@coderdan.co", "Dan"))
+            .await?
+            .ok_or(fail_not_found())?;
 
-    assert_eq!(s, r);
+        check_eq(s, record)
+    })
+    .await
+}
 
-    Ok(())
+#[tokio::test]
+async fn test_invalid_dataset() -> Result<(), Box<dyn std::error::Error>> {
+    with_encrypted_table("round-trip", |table| async move {
+        let record = build_test_record("dan@coderdan.co", "Dan");
+
+        // A random UUID doesn't exist
+        check_err(table.put_via(record.clone(), Uuid::new_v4()).await)
+    })
+    .await
+}
+
+#[tokio::test]
+async fn test_invalid_specific_dataset() -> Result<(), Box<dyn std::error::Error>> {
+    with_encrypted_table("round-trip", |table| async move {
+        let record = build_test_record("person@example.com", "Person");
+        table
+            .put_via(record.clone(), secondary_dataset_id())
+            .await?;
+
+        let s: Crazy = table
+            .get_via(("person@example.com", "Person"), secondary_dataset_id())
+            .await?
+            .ok_or(fail_not_found())?;
+
+        check_eq(s, record)?;
+
+        // Test that we can't get the record via the default dataset
+        check_none(table.get::<Crazy>(("person@example.com", "Person")).await?)
+    })
+    .await
 }

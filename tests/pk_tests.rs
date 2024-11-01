@@ -1,6 +1,8 @@
-use cipherstash_dynamodb::{Decryptable, Encryptable, EncryptedTable, Identifiable, Searchable};
+use cipherstash_dynamodb::{
+    Decryptable, Encryptable, EncryptedTable, Error, Identifiable, Searchable,
+};
 use itertools::Itertools;
-use miette::IntoDiagnostic;
+use miette::{IntoDiagnostic, Report};
 use serial_test::serial;
 use std::future::Future;
 
@@ -37,11 +39,11 @@ impl User {
     }
 }
 
-type TestResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
+type TestResult = Result<(), Report>;
 
-async fn run_test<F>(mut f: impl FnMut(EncryptedTable) -> F) -> TestResult
+async fn run_test<F>(mut f: impl FnMut(EncryptedTable) -> F) -> Result<(), Error>
 where
-    F: Future<Output = TestResult>,
+    F: Future<Output = Result<(), Error>>,
 {
     let config = aws_config::from_env()
         .endpoint_url("http://localhost:8000")
@@ -54,24 +56,19 @@ where
 
     common::create_table(&client, table_name).await;
 
-    let table = EncryptedTable::init(client, table_name)
-        .await
-        .into_diagnostic()?;
+    let table = EncryptedTable::init(client, table_name).await?;
 
     table
         .put(User::new("dan@coderdan.co", "Dan Draper", "blue"))
-        .await
-        .into_diagnostic()?;
+        .await?;
 
     table
         .put(User::new("jane@smith.org", "Jane Smith", "red"))
-        .await
-        .into_diagnostic()?;
+        .await?;
 
     table
         .put(User::new("daniel@example.com", "Daniel Johnson", "green"))
-        .await
-        .into_diagnostic()?;
+        .await?;
 
     f(table).await
 }
@@ -80,12 +77,7 @@ where
 #[serial]
 async fn test_query_single_exact() -> TestResult {
     run_test(|table| async move {
-        let res: Vec<User> = table
-            .query()
-            .eq("pk", "dan@coderdan.co")
-            .send()
-            .await
-            .into_diagnostic()?;
+        let res: Vec<User> = table.query().eq("pk", "dan@coderdan.co").send().await?;
 
         assert_eq!(
             res,
@@ -95,6 +87,7 @@ async fn test_query_single_exact() -> TestResult {
         Ok(())
     })
     .await
+    .into_diagnostic()
 }
 
 #[tokio::test]
@@ -121,6 +114,7 @@ async fn test_query_single_prefix() -> TestResult {
         Ok(())
     })
     .await
+    .into_diagnostic()
 }
 
 #[tokio::test]
@@ -142,6 +136,7 @@ async fn test_query_compound() -> TestResult {
         Ok(())
     })
     .await
+    .into_diagnostic()
 }
 
 #[tokio::test]
@@ -158,6 +153,7 @@ async fn test_get_by_partition_key() -> TestResult {
         Ok(())
     })
     .await
+    .into_diagnostic()
 }
 
 #[tokio::test]
@@ -167,21 +163,18 @@ async fn test_delete() -> TestResult {
     run_test(|table| async move {
         table
             .delete::<User>(("dan@coderdan.co", "Dan Draper"))
-            .await
-            .into_diagnostic()?;
+            .await?;
 
-        let res = table
-            .get::<User>(("dan@coderdan.co", "Dan Draper"))
-            .await
-            .expect("Failed to send");
+        let res = table.get::<User>(("dan@coderdan.co", "Dan Draper")).await?;
+
         assert_eq!(res, None);
 
         let res = table
             .query::<User>()
             .starts_with("sk", "Dan")
             .send()
-            .await
-            .expect("Failed to send");
+            .await?;
+
         assert_eq!(
             res,
             vec![User::new("daniel@example.com", "Daniel Johnson", "green")]
@@ -191,8 +184,8 @@ async fn test_delete() -> TestResult {
             .query::<User>()
             .eq("pk", "dan@coderdan.co")
             .send()
-            .await
-            .expect("Failed to send");
+            .await?;
+
         assert_eq!(res, vec![]);
 
         let res = table
@@ -200,11 +193,12 @@ async fn test_delete() -> TestResult {
             .eq("pk", "dan@coderdan.co")
             .starts_with("sk", "Dan")
             .send()
-            .await
-            .expect("Failed to send");
+            .await?;
+
         assert_eq!(res, vec![]);
 
         Ok(())
     })
     .await
+    .into_diagnostic()
 }

@@ -41,7 +41,7 @@ impl TableAttribute {
         descriptor: &str,
     ) -> Result<EncryptedRecord, SealError> {
         if let TableAttribute::Bytes(s) = self {
-            EncryptedRecord::from_slice(&s[..])
+            EncryptedRecord::from_mp_bytes(&s[..])
                 .map_err(|_| SealError::AssertionFailed("Could not parse EncryptedRecord".to_string()))
                 .and_then(|record| {
                     if record.descriptor == descriptor {

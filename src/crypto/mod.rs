@@ -8,12 +8,8 @@ use crate::{
     Identifiable, IndexType, PrimaryKey,
 };
 use cipherstash_client::{
-    credentials::{service_credentials::ServiceToken, Credentials},
-    encryption::{
-        compound_indexer::{CompoundIndex, ExactIndex},
-        Encryption, EncryptionError, Plaintext, TypeParseError,
-    },
-    zerokms::Error as ZeroKmsError,
+    encryption::{EncryptionError, TypeParseError},
+    zerokms,
 };
 use miette::Diagnostic;
 use std::borrow::Cow;
@@ -47,15 +43,15 @@ pub enum SealError {
     #[error("Assertion failed: {0}")]
     AssertionFailed(String),
 
-    // Note that we don't expose the specific error type here
-    // so as to avoid leaking any information
     #[error(transparent)]
-    EncryptionError(#[from] EncryptionError),
+    CryptoError(#[from] zerokms::Error),
 
+    /// Error resulting from Indexing in `cipherstash_client::encryption::compound_indexer`
     #[error(transparent)]
-    ZeroKmsError(#[from] ZeroKmsError),
+    IndexError(#[from] EncryptionError),
 }
 
+// TODO: Possibly remove this
 #[derive(Error, Debug)]
 pub enum CryptoError {
     #[error("EncryptionError: {0}")]
@@ -94,32 +90,6 @@ pub(crate) fn all_index_keys<'a>(
         .collect()
 }
 
-/// Use a CipherStash [`ExactIndex`] to take the HMAC of a string with a provided salt
-///
-/// This value is used for term index keys and "encrypted" partition / sort keys
-pub fn hmac(
-    value: &str,
-    salt: Option<&str>,
-    cipher: &Encryption<impl Credentials<Token = ServiceToken>>,
-) -> Result<Vec<u8>, EncryptionError> {
-    let plaintext = Plaintext::Utf8Str(Some(value.to_string()));
-    let index = CompoundIndex::new(ExactIndex::new(vec![]));
-
-    cipher
-        .compound_index(
-            &index,
-            plaintext,
-            // passing None here results in no terms so pass an empty string
-            Some(salt.unwrap_or("")),
-            32,
-        )?
-        .as_binary()
-        .ok_or(EncryptionError::IndexingError(
-            "Invalid term type".to_string(),
-        ))
-}
-
-// Contains all the necessary information to encrypt the primary key pair
 #[derive(Clone)]
 pub struct PreparedPrimaryKey {
     pub primary_key_parts: PrimaryKeyParts,
