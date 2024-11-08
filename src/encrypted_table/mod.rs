@@ -78,10 +78,10 @@ impl EncryptedTable<Headless> {
             .cts_config(&cts_config)
             .build_with_client_key()?;
 
-        Self::init_headless_with_zk_config(zerokms_config).await
+        Self::init_headless_with_zerokms_config(zerokms_config).await
     }
 
-    pub async fn init_headless_with_zk_config(
+    pub async fn init_headless_with_zerokms_config(
         zerokms_config: ZeroKMSConfig<ClientKey>,
     ) -> Result<Self, InitError> {
         info!("Initializing...");
@@ -419,12 +419,12 @@ impl EncryptedTable<Dynamo> {
         })
     }
 
-    pub async fn init_with_zk_config(
+    pub async fn init_with_zerokms_config(
         zerokms_config: ZeroKMSConfig<ClientKey>,
         db: aws_sdk_dynamodb::Client,
         table_name: impl Into<String>,
     ) -> Result<Self, InitError> {
-        let table = EncryptedTable::init_headless_with_zk_config(zerokms_config).await?;
+        let table = EncryptedTable::init_headless_with_zerokms_config(zerokms_config).await?;
 
         Ok(Self {
             db: Dynamo {
