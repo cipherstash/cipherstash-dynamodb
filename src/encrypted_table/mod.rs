@@ -23,7 +23,7 @@ use cipherstash_client::{
     },
     credentials::{auto_refresh::AutoRefresh, service_credentials::ServiceCredentials},
     encryption::ScopedCipher,
-    zerokms::{ZeroKMS, ZeroKMSWithClientKey},
+    zerokms::{ClientKey, ZeroKMS, ZeroKMSWithClientKey},
 };
 use log::info;
 use std::{
@@ -67,8 +67,6 @@ impl<D> EncryptedTable<D> {
 
 impl EncryptedTable<Headless> {
     pub async fn init_headless() -> Result<Self, InitError> {
-        info!("Initializing...");
-
         let console_config = ConsoleConfig::builder().with_env().build()?;
 
         let cts_config = CtsConfig::builder().with_env().build()?;
@@ -79,6 +77,14 @@ impl EncryptedTable<Headless> {
             .console_config(&console_config)
             .cts_config(&cts_config)
             .build_with_client_key()?;
+
+        Self::init_headless_with_zerokms_config(zerokms_config).await
+    }
+
+    pub async fn init_headless_with_zerokms_config(
+        zerokms_config: ZeroKMSConfig<ClientKey>,
+    ) -> Result<Self, InitError> {
+        info!("Initializing...");
 
         let cipher = ZeroKMS::new_with_client_key(
             &zerokms_config.base_url(),
@@ -403,6 +409,22 @@ impl EncryptedTable<Dynamo> {
         table_name: impl Into<String>,
     ) -> Result<Self, InitError> {
         let table = EncryptedTable::init_headless().await?;
+
+        Ok(Self {
+            db: Dynamo {
+                table_name: table_name.into(),
+                db,
+            },
+            cipher: table.cipher,
+        })
+    }
+
+    pub async fn init_with_zerokms_config(
+        zerokms_config: ZeroKMSConfig<ClientKey>,
+        db: aws_sdk_dynamodb::Client,
+        table_name: impl Into<String>,
+    ) -> Result<Self, InitError> {
+        let table = EncryptedTable::init_headless_with_zerokms_config(zerokms_config).await?;
 
         Ok(Self {
             db: Dynamo {
