@@ -6,6 +6,7 @@ readme = "../README.md"
 description = "Derive macros for the CipherStash client for DynamoDB"
 version = "0.8.0"
 edition = "2021"
+repository = "https://github.com/cipherstash/cipherstash-dynamodb/"
 
 [lib]
 proc-macro = true
