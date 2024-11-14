@@ -580,3 +580,43 @@ A library for storing and _searching_ encrypted data in DynamoDB.
  - [ ] Sort keys are not currently hashed (but this may change in the future)
 
 
+## Releasing
+
+> [!IMPORTANT]
+> This is only relevant to cipherstash-dynamodb maintainers.
+
+To publish a new release to crates.io and GitHub:
+
+1. Create a branch for your changes:
+   ```bash
+   git checkout -b bump-version-to-x.x.x
+   ```
+1. Increment the version number in [`Cargo.toml`](./Cargo.toml), remembering to follow [Semantic Versioning](https://semver.org/)
+1. Update the lock file:
+   ```bash
+   cargo update -w
+   ```
+1. Commit the changes:
+   ```bash
+   git add Cargo.toml Cargo.lock
+   git commit -m "Bump version to x.x.x"
+   ```
+1. Push the branch to GitHub:
+   ```bash
+   git push
+1. Create a pull request on GitHub, get it reviewed, and get it merged
+1. Pull the latest changes:
+   ```bash
+   git checkout main
+   git pull
+   ```
+1. Release to crates.io and tag on GitHub:
+   ```bash
+   # Dry run to test everything looks good
+   cargo release
+
+   # Do the release
+   cargo release --execute --no-confirm
+   ```
+
+The new release should be [visible on crates.io](https://crates.io/crates/cipherstash-dynamodb/versions), and the [new tag published on GitHub](https://github.com/cipherstash/cipherstash-dynamodb/tags).
