@@ -100,7 +100,7 @@ impl IndexType {
                 let index_type = Self::type_to_ident(index_type)?;
 
                 Ok(quote! {
-                    Box::new(cipherstash_dynamodb::encryption::compound_indexer::#index_type::new(vec![]))
+                    Box::new(cipherstash_dynamodb::encryption::compound_indexer::#index_type::default())
                 })
             }
 
@@ -111,9 +111,9 @@ impl IndexType {
                 Ok(quote! {
                     Box::new(
                         cipherstash_dynamodb::encryption::compound_indexer::CompoundIndex::new(
-                            cipherstash_dynamodb::encryption::compound_indexer::#index_a::new(vec![])
+                            cipherstash_dynamodb::encryption::compound_indexer::#index_a::default()
                         ).and(
-                            cipherstash_dynamodb::encryption::compound_indexer::#index_b::new(vec![])
+                            cipherstash_dynamodb::encryption::compound_indexer::#index_b::default()
                         ))
                 })
             }

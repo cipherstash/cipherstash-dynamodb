@@ -162,6 +162,30 @@ async fn test_query_single_prefix() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[tokio::test]
+async fn test_query_single_prefix_case_insensitive() -> Result<(), Box<dyn std::error::Error>> {
+    with_encrypted_table("query-tests", |table| async move {
+        setup(&table).await?;
+
+        let res: Vec<User> = table
+            .query()
+            .starts_with("name", "danie")
+            .send()
+            .await
+            .wrap_err("Failed to query")?
+            .into_iter()
+            .sorted()
+            .collect_vec();
+
+        check_eq(
+            res,
+            vec![User::new("daniel@example.com", "Daniel Johnson", "green")],
+        )
+    })
+    .await
+}
+
+/// Verifies that prefix queries are case insensitive when part of a simple query.
+#[tokio::test]
 async fn test_query_single_prefix_via_secondary() -> Result<(), Box<dyn std::error::Error>> {
     with_encrypted_table("query-tests", |table| async move {
         setup(&table).await?;
@@ -196,6 +220,27 @@ async fn test_query_compound() -> Result<(), Box<dyn std::error::Error>> {
         let res: Vec<User> = table
             .query()
             .starts_with("name", "Dan")
+            .eq("email", "dan@coderdan.co")
+            .send()
+            .await?;
+
+        check_eq(
+            res,
+            vec![User::new("dan@coderdan.co", "Dan Draper", "blue")],
+        )
+    })
+    .await
+}
+
+/// Verifies that prefix queries are case insensitive when part of a compound query.
+#[tokio::test]
+async fn test_query_compound_case_insensitive() -> Result<(), Box<dyn std::error::Error>> {
+    with_encrypted_table("query-tests", |table| async move {
+        setup(&table).await?;
+
+        let res: Vec<User> = table
+            .query()
+            .starts_with("name", "dan")
             .eq("email", "dan@coderdan.co")
             .send()
             .await?;
