@@ -957,7 +957,7 @@ dependencies = [
  "serde_dynamo",
  "serde_json",
  "serial_test",
- "thiserror 1.0.65",
+ "thiserror 2.0.16",
  "tokio",
  "tracing",
  "tracing-subscriber",

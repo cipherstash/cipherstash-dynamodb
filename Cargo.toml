@@ -20,7 +20,7 @@ aws-sdk-dynamodb = "1.3.0"
 async-trait = "0.1.73"
 log = "0.4.20"
 itertools = "0.14"
-thiserror = "1.0.50"
+thiserror = "2.0"
 base64 = "0.22.1"
 hex = "0.4.3"
 tracing = { version = "0.1", features = ["log"] }
