@@ -1,5 +1,5 @@
 error: field named 'pk' must be annotated with #[partition_key]
- --> tests/./ui/pk-field-no-partition.rs:5:5
+ --> tests/ui/pk-field-no-partition.rs
   |
-5 |     pk: String,
+  |     pk: String,
   |     ^^^^^^^^^^

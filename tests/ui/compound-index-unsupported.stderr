@@ -1,5 +1,5 @@
 error: Unsupported index type: blah
- --> tests/./ui/compound-index-unsupported.rs:8:27
+ --> tests/ui/compound-index-unsupported.rs
   |
-8 |     #[cipherstash(query = "blah", compound = "email#name")]
+  |     #[cipherstash(query = "blah", compound = "email#name")]
   |                           ^^^^^^

@@ -1,7 +1,7 @@
 error: field 'email' cannot be used as partition key as struct contains field named 'pk' which must be used
- --> tests/./ui/pk-field-wrong-partition.rs:5:5
+ --> tests/ui/pk-field-wrong-partition.rs
   |
-5 | /     #[partition_key]
-6 | |     #[cipherstash(query = "exact", compound = "email#name")]
-7 | |     email: String,
+  | /     #[partition_key]
+  | |     #[cipherstash(query = "exact", compound = "email#name")]
+  | |     email: String,
   | |_________________^

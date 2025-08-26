@@ -1,5 +1,5 @@
 error: field named 'sk' must be annotated with #[sort_key]
-  --> tests/./ui/sk-field-no-sort.rs:11:5
-   |
-11 |     sk: String,
-   |     ^^^^^^^^^^
+ --> tests/ui/sk-field-no-sort.rs
+  |
+  |     sk: String,
+  |     ^^^^^^^^^^

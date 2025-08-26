@@ -1,5 +1,5 @@
 error: Compound attribute was specified but no query options were. Specify how this field should be queried with the attribute #[cipherstash(query = <option>, compound = "email#name")]
- --> tests/./ui/compound-index-missing-config.rs:5:42
+ --> tests/ui/compound-index-missing-config.rs
   |
-5 |     #[cipherstash(compound = "email#name")]
+  |     #[cipherstash(compound = "email#name")]
   |                                          ^
