@@ -40,6 +40,7 @@ jobs:
         env:
           CS_WORKSPACE_ID: ${{ secrets.CS_WORKSPACE_ID }}
           CS_CLIENT_ACCESS_KEY: ${{ secrets.CS_CLIENT_ACCESS_KEY }}
+          CS_WORKSPACE_CRN: "crn:ap-southeast-2.aws:${{ secrets.CS_WORKSPACE_ID }}"
           CS_CLIENT_ID: ${{ secrets.CS_CLIENT_ID }}
           CS_CLIENT_KEY: ${{ secrets.CS_CLIENT_KEY }}
           CS_VITUR_IDP_HOST: "https://ap-southeast-2.aws.auth.viturhosted.net"
