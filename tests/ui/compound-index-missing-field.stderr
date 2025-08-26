@@ -1,7 +1,7 @@
 error: Not all fields were annotated with the #[cipherstash(compound)] attribute. Missing fields: name
- --> tests/./ui/compound-index-missing-field.rs:3:10
+ --> tests/ui/compound-index-missing-field.rs
   |
-3 | #[derive(Encryptable)]
+  | #[derive(Encryptable)]
   |          ^^^^^^^^^^^
   |
   = note: this error originates in the derive macro `Encryptable` (in Nightly builds, run with -Z macro-backtrace for more info)

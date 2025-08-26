@@ -207,7 +207,7 @@ mod tests {
 
     use super::SealedTableEntry;
     use cipherstash_client::{
-        credentials::auto_refresh::AutoRefresh, ConsoleConfig, ZeroKMS, ZeroKMSConfig,
+        config::EnvSource, credentials::auto_refresh::AutoRefresh, ConsoleConfig, ZeroKMSConfig,
     };
     use miette::IntoDiagnostic;
     use std::{borrow::Cow, sync::Arc};
@@ -218,19 +218,16 @@ mod tests {
             .with_env()
             .build()
             .into_diagnostic()?;
-        let zero_kms_config = ZeroKMSConfig::builder()
+
+        let zerokms_config = ZeroKMSConfig::builder()
             .decryption_log(true)
-            .with_env()
+            .add_source(EnvSource::default())
             .console_config(&console_config)
             .build_with_client_key()
             .into_diagnostic()?;
 
-        let cipher = ZeroKMS::new_with_client_key(
-            &zero_kms_config.base_url(),
-            AutoRefresh::new(zero_kms_config.credentials()),
-            zero_kms_config.decryption_log_path().as_deref(),
-            zero_kms_config.client_key(),
-        );
+        let cipher = zerokms_config
+            .create_client_with_credentials(AutoRefresh::new(zerokms_config.credentials()));
 
         Ok(Arc::new(cipher))
     }

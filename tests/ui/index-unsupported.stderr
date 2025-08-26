@@ -1,5 +1,5 @@
 error: Unsupported index type: blah
- --> tests/./ui/index-unsupported.rs:5:27
+ --> tests/ui/index-unsupported.rs
   |
-5 |     #[cipherstash(query = "blah")]
+  |     #[cipherstash(query = "blah")]
   |                           ^^^^^^

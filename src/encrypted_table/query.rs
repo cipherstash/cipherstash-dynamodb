@@ -1,7 +1,10 @@
 use aws_sdk_dynamodb::{primitives::Blob, types::AttributeValue};
-use cipherstash_client::encryption::{
-    compound_indexer::{ComposableIndex, ComposablePlaintext},
-    Plaintext,
+use cipherstash_client::{
+    encryption::{
+        compound_indexer::{ComposableIndex, ComposablePlaintext},
+        Plaintext,
+    },
+    IdentifiedBy,
 };
 use itertools::Itertools;
 use std::{borrow::Cow, collections::HashMap, marker::PhantomData};
@@ -77,7 +80,8 @@ impl PreparedQuery {
 
         query
             .send()
-            .await?
+            .await
+            .map_err(|e| QueryError::DynamoError(Box::new(e)))?
             .items
             .ok_or_else(|| QueryError::Other("Expected items entry on aws response".into()))
     }
@@ -151,8 +155,10 @@ where
     where
         T: Decryptable + Identifiable,
     {
+        let keyset_id = self.dataset_id.map(IdentifiedBy::Uuid);
+
         let scoped_cipher =
-            ScopedZeroKmsCipher::init(self.storage.cipher.clone(), self.dataset_id).await?;
+            ScopedZeroKmsCipher::init(self.storage.cipher.clone(), keyset_id).await?;
 
         let storage = self.storage;
         let query = self.build()?;

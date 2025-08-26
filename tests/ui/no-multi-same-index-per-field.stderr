@@ -1,7 +1,7 @@
 error: Index 'name' with type 'exact' has been defined more than once
- --> tests/./ui/no-multi-same-index-per-field.rs:3:10
+ --> tests/ui/no-multi-same-index-per-field.rs
   |
-3 | #[derive(Encryptable)]
+  | #[derive(Encryptable)]
   |          ^^^^^^^^^^^
   |
   = note: this error originates in the derive macro `Encryptable` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -1,46 +1,49 @@
 error[E0277]: the trait bound `PkSk: From<&str>` is not satisfied
-  --> tests/./ui/using-pk-instead-of-pk-sk.rs:25:40
-   |
-25 |     let user: Option<User> = table.get("user@example.com").await?;
-   |                                    --- ^^^^^^^^^^^^^^^^^^ the trait `From<&str>` is not implemented for `PkSk`, which is required by `&str: Into<_>`
-   |                                    |
-   |                                    required by a bound introduced by this call
-   |
-   = help: the trait `From<(_, _)>` is implemented for `PkSk`
-   = help: for that trait implementation, expected `(_, _)`, found `&str`
-   = note: required for `&str` to implement `Into<PkSk>`
+ --> tests/ui/using-pk-instead-of-pk-sk.rs
+  |
+  |     let user: Option<User> = table.get("user@example.com").await?;
+  |                                    --- ^^^^^^^^^^^^^^^^^^ the trait `From<&str>` is not implemented for `PkSk`
+  |                                    |
+  |                                    required by a bound introduced by this call
+  |
+  = help: the trait `From<&str>` is not implemented for `PkSk`
+          but trait `From<(_, _)>` is implemented for it
+  = help: for that trait implementation, expected `(_, _)`, found `&str`
+  = note: required for `&str` to implement `Into<PkSk>`
 note: required by a bound in `EncryptedTable::get`
-  --> src/encrypted_table/mod.rs
-   |
-   |     pub async fn get<T>(&self, k: impl Into<T::PrimaryKey>) -> Result<Option<T>, GetError>
-   |                                        ^^^^^^^^^^^^^^^^^^^ required by this bound in `EncryptedTable::get`
+ --> src/encrypted_table/mod.rs
+  |
+  |     pub async fn get<T>(&self, k: impl Into<T::PrimaryKey>) -> Result<Option<T>, GetError>
+  |                                        ^^^^^^^^^^^^^^^^^^^ required by this bound in `EncryptedTable::get`
 
 error[E0277]: the trait bound `PkSk: From<&str>` is not satisfied
-  --> tests/./ui/using-pk-instead-of-pk-sk.rs:25:30
-   |
-25 |     let user: Option<User> = table.get("user@example.com").await?;
-   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `From<&str>` is not implemented for `PkSk`, which is required by `&str: Into<_>`
-   |
-   = help: the trait `From<(_, _)>` is implemented for `PkSk`
-   = help: for that trait implementation, expected `(_, _)`, found `&str`
-   = note: required for `&str` to implement `Into<PkSk>`
+ --> tests/ui/using-pk-instead-of-pk-sk.rs
+  |
+  |     let user: Option<User> = table.get("user@example.com").await?;
+  |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `From<&str>` is not implemented for `PkSk`
+  |
+  = help: the trait `From<&str>` is not implemented for `PkSk`
+          but trait `From<(_, _)>` is implemented for it
+  = help: for that trait implementation, expected `(_, _)`, found `&str`
+  = note: required for `&str` to implement `Into<PkSk>`
 note: required by a bound in `EncryptedTable::get`
-  --> src/encrypted_table/mod.rs
-   |
-   |     pub async fn get<T>(&self, k: impl Into<T::PrimaryKey>) -> Result<Option<T>, GetError>
-   |                                        ^^^^^^^^^^^^^^^^^^^ required by this bound in `EncryptedTable::get`
+ --> src/encrypted_table/mod.rs
+  |
+  |     pub async fn get<T>(&self, k: impl Into<T::PrimaryKey>) -> Result<Option<T>, GetError>
+  |                                        ^^^^^^^^^^^^^^^^^^^ required by this bound in `EncryptedTable::get`
 
 error[E0277]: the trait bound `PkSk: From<&str>` is not satisfied
-  --> tests/./ui/using-pk-instead-of-pk-sk.rs:25:60
-   |
-25 |     let user: Option<User> = table.get("user@example.com").await?;
-   |                                                            ^^^^^ the trait `From<&str>` is not implemented for `PkSk`, which is required by `&str: Into<_>`
-   |
-   = help: the trait `From<(_, _)>` is implemented for `PkSk`
-   = help: for that trait implementation, expected `(_, _)`, found `&str`
-   = note: required for `&str` to implement `Into<PkSk>`
+ --> tests/ui/using-pk-instead-of-pk-sk.rs
+  |
+  |     let user: Option<User> = table.get("user@example.com").await?;
+  |                                                            ^^^^^ the trait `From<&str>` is not implemented for `PkSk`
+  |
+  = help: the trait `From<&str>` is not implemented for `PkSk`
+          but trait `From<(_, _)>` is implemented for it
+  = help: for that trait implementation, expected `(_, _)`, found `&str`
+  = note: required for `&str` to implement `Into<PkSk>`
 note: required by a bound in `EncryptedTable::get`
-  --> src/encrypted_table/mod.rs
-   |
-   |     pub async fn get<T>(&self, k: impl Into<T::PrimaryKey>) -> Result<Option<T>, GetError>
-   |                                        ^^^^^^^^^^^^^^^^^^^ required by this bound in `EncryptedTable::get`
+ --> src/encrypted_table/mod.rs
+  |
+  |     pub async fn get<T>(&self, k: impl Into<T::PrimaryKey>) -> Result<Option<T>, GetError>
+  |                                        ^^^^^^^^^^^^^^^^^^^ required by this bound in `EncryptedTable::get`

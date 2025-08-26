@@ -169,10 +169,10 @@ pub async fn create_table(client: &Client, table_name: &str) {
 #[allow(dead_code)]
 pub fn secondary_dataset_id() -> Uuid {
     *SECONDARY_DATASET_ID.get_or_init(|| {
-        env::var("TEST_SECOND_DATASET_ID")
-            .expect("TEST_SECOND_DATASET_ID must be set")
+        env::var("CS_TENANT_KEYSET_ID_1")
+            .expect("CS_TENANT_KEYSET_ID_1 must be set")
             .parse()
-            .expect("TEST_SECOND_DATASET_ID must be a valid UUID")
+            .expect("CS_TENANT_KEYSET_ID_1 must be a valid UUID")
     })
 }
 
