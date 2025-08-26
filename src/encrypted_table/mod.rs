@@ -20,10 +20,12 @@ use aws_sdk_dynamodb::types::{AttributeValue, Delete, Put, TransactWriteItem};
 use cipherstash_client::{
     config::{
         console_config::ConsoleConfig, cts_config::CtsConfig, zero_kms_config::ZeroKMSConfig,
+        EnvSource,
     },
-    credentials::{auto_refresh::AutoRefresh, service_credentials::ServiceCredentials},
+    credentials::{auto_refresh::AutoRefresh, ServiceCredentials},
     encryption::ScopedCipher,
-    zerokms::{ClientKey, ZeroKMS, ZeroKMSWithClientKey},
+    zerokms::{ClientKey, ZeroKMSWithClientKey},
+    IdentifiedBy,
 };
 use log::info;
 use std::{
@@ -73,7 +75,7 @@ impl EncryptedTable<Headless> {
 
         let zerokms_config = ZeroKMSConfig::builder()
             .decryption_log(true)
-            .with_env()
+            .add_source(EnvSource::default())
             .console_config(&console_config)
             .cts_config(&cts_config)
             .build_with_client_key()?;
@@ -86,12 +88,8 @@ impl EncryptedTable<Headless> {
     ) -> Result<Self, InitError> {
         info!("Initializing...");
 
-        let cipher = ZeroKMS::new_with_client_key(
-            &zerokms_config.base_url(),
-            AutoRefresh::new(zerokms_config.credentials()),
-            zerokms_config.decryption_log_path().as_deref(),
-            zerokms_config.client_key(),
-        );
+        let cipher = zerokms_config
+            .create_client_with_credentials(AutoRefresh::new(zerokms_config.credentials()));
 
         info!("Ready!");
 
@@ -312,7 +310,8 @@ impl<D> EncryptedTable<D> {
         delete: PreparedDelete,
         dataset_id: Option<DatasetId>,
     ) -> Result<DynamoRecordPatch, DeleteError> {
-        let scoped_cipher = ScopedZeroKmsCipher::init(self.cipher.clone(), dataset_id).await?;
+        let keyset_id = dataset_id.map(IdentifiedBy::Uuid);
+        let scoped_cipher = ScopedZeroKmsCipher::init(self.cipher.clone(), keyset_id).await?;
 
         let PrimaryKeyParts { pk, sk } =
             encrypt_primary_key_parts(&scoped_cipher, delete.primary_key)?;
@@ -352,7 +351,8 @@ impl<D> EncryptedTable<D> {
     ) -> Result<DynamoRecordPatch, PutError> {
         let mut seen_sk = HashSet::new();
 
-        let indexable_cipher = ScopedZeroKmsCipher::init(self.cipher.clone(), dataset_id).await?;
+        let keyset_id = dataset_id.map(IdentifiedBy::Uuid);
+        let indexable_cipher = ScopedZeroKmsCipher::init(self.cipher.clone(), keyset_id).await?;
 
         let PreparedRecord {
             protected_attributes,
@@ -463,7 +463,8 @@ impl EncryptedTable<Dynamo> {
     where
         T: Decryptable + Identifiable,
     {
-        let cipher = ScopedZeroKmsCipher::init(self.cipher.clone(), dataset_id).await?;
+        let keyset_id = dataset_id.map(IdentifiedBy::Uuid);
+        let cipher = ScopedZeroKmsCipher::init(self.cipher.clone(), keyset_id).await?;
 
         let PrimaryKeyParts { pk, sk } =
             encrypt_primary_key_parts(&cipher, PreparedPrimaryKey::new::<T>(k))?;
@@ -563,7 +564,8 @@ impl EncryptedTable<Dynamo> {
                 .transact_write_items()
                 .set_transact_items(Some(items.to_vec()))
                 .send()
-                .await?;
+                .await
+                .map_err(|e| PutError::DynamoError(Box::new(e)))?;
         }
 
         Ok(())

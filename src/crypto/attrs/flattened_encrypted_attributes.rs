@@ -41,7 +41,7 @@ impl FlattenedEncryptedAttributes {
             .collect_vec();
 
         cipher
-            .decrypt(self.attrs.into_iter())
+            .decrypt(self.attrs.into_iter(), None, None, None)
             .await
             .map(|records| {
                 records

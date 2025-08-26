@@ -2,7 +2,7 @@ use crate::crypto::{SealError, Unsealed};
 pub use crate::encrypted_table::{TableAttribute, TryFromTableAttr};
 use cipherstash_client::encryption::EncryptionError;
 pub use cipherstash_client::{
-    credentials::{service_credentials::ServiceToken, Credentials},
+    credentials::{Credentials, ServiceToken},
     encryption::{
         compound_indexer::{
             ComposableIndex, ComposablePlaintext, CompoundIndex, ExactIndex, PrefixIndex,

@@ -31,7 +31,7 @@ pub enum PutError {
     Encryption(#[from] EncryptionError),
 
     #[error(transparent)]
-    DynamoError(#[from] SdkError<operation::transact_write_items::TransactWriteItemsError>),
+    DynamoError(#[from] Box<SdkError<operation::transact_write_items::TransactWriteItemsError>>),
 
     #[error("ZeroKMS Error: {0}")]
     ZeroKMS(#[from] zerokms::Error),
@@ -101,7 +101,7 @@ pub enum QueryError {
     DecryptError(#[from] SealError),
 
     #[error(transparent)]
-    DynamoError(#[from] SdkError<operation::query::QueryError>),
+    DynamoError(#[from] Box<SdkError<operation::query::QueryError>>),
 
     #[error("ZeroKMS Error: {0}")]
     ZeroKMS(#[from] zerokms::Error),
