@@ -19,7 +19,7 @@ cipherstash-dynamodb-derive = { version = "0.8", path = "cipherstash-dynamodb-de
 aws-sdk-dynamodb = "1.3.0"
 async-trait = "0.1.73"
 log = "0.4.20"
-itertools = "0.11.0"
+itertools = "0.14"
 thiserror = "1.0.50"
 base64 = "0.22.1"
 hex = "0.4.3"
