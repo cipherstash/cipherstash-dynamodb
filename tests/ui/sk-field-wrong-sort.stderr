@@ -1,7 +1,7 @@
 error: field 'name' cannot be used as sort key as struct contains field named 'sk' which must be used
  --> tests/ui/sk-field-wrong-sort.rs
   |
-  | /     #[cipherstash(query = "prefix", compound = "email#name")]
-  | |     #[sort_key]
-  | |     name: String,
-  | |________________^
+ 8 | /     #[cipherstash(query = "prefix", compound = "email#name")]
+ 9 | |     #[sort_key]
+   | |     name: String,
+   | |________________^
