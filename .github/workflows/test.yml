@@ -27,7 +27,7 @@ jobs:
           - 8000:8000
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - uses: Swatinem/rust-cache@v2
 
@@ -58,7 +58,7 @@ jobs:
   format:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - uses: Swatinem/rust-cache@v2
 
@@ -72,7 +72,7 @@ jobs:
   clippy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - uses: Swatinem/rust-cache@v2
 
