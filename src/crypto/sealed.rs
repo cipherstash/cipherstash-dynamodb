@@ -118,7 +118,7 @@ impl SealedTableEntry {
                 .chunks(chunk_size)
                 .into_iter()
                 .map(|fpa| fpa.into_iter().collect::<NormalizedProtectedAttributes>())
-                .zip_eq(unprotected_items.into_iter())
+                .zip_eq(unprotected_items)
                 .map(|(fpa, unprotected)| Ok(Unsealed::new_from_parts(fpa, unprotected)))
                 .collect()
         }

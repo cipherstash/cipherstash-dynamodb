@@ -74,8 +74,8 @@ impl RecordsWithTerms {
         if protected.is_empty() {
             unprotecteds
                 .into_iter()
-                .zip_eq(record_terms.into_iter())
-                .zip_eq(pksks.into_iter())
+                .zip_eq(record_terms)
+                .zip_eq(pksks)
                 .map(|record| {
                     let (attributes, terms, pksk) = flatten_tuple_3(record);
                     Ok(Sealed {
@@ -91,9 +91,9 @@ impl RecordsWithTerms {
 
             encrypted
                 .into_iter()
-                .zip_eq(unprotecteds.into_iter())
-                .zip_eq(record_terms.into_iter())
-                .zip_eq(pksks.into_iter())
+                .zip_eq(unprotecteds)
+                .zip_eq(record_terms)
+                .zip_eq(pksks)
                 .map(|record| {
                     let (enc_attrs, unprotecteds, terms, pksk) = flatten_tuple_4(record);
                     enc_attrs.denormalize().map(|protected_attrs| Sealed {

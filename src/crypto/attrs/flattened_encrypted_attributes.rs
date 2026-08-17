@@ -41,14 +41,14 @@ impl FlattenedEncryptedAttributes {
             .collect_vec();
 
         cipher
-            .decrypt(self.attrs.into_iter(), None, None, None)
+            .decrypt(self.attrs, None, None, None)
             .await
             .map(|records| {
                 records
                     .into_iter()
                     // FIXME: We should change the decrypt method to return a plaintext and/or make a Plaintext::from_bytes method which consumes the bytes
                     .map(|bytes| Plaintext::from_slice(&bytes).unwrap())
-                    .zip(descriptors.into_iter())
+                    .zip(descriptors)
                     .collect()
             })
             // FIXME: EncryptedRecord should return an error exposed in cipherstash_client
