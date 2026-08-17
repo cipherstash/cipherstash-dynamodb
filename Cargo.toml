@@ -16,7 +16,7 @@ categories = ["cryptography", "database"]
 cipherstash-client = { version = "0.28.0" }
 cipherstash-dynamodb-derive = { version = "0.8", path = "cipherstash-dynamodb-derive" }
 
-aws-sdk-dynamodb = "1.106.0"
+aws-sdk-dynamodb = { version = "1.106.0", default-features = false, features = ["default-https-client", "rt-tokio"] }
 async-trait = "0.1.73"
 log = "0.4.20"
 itertools = "0.14"
