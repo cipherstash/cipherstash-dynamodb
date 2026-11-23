@@ -9,6 +9,9 @@ mod common;
     Identifiable, Encryptable, Decryptable, Searchable, Debug, PartialEq, Ord, PartialOrd, Eq,
 )]
 #[cipherstash(sort_key_prefix = None)]
+// A field can carry a compound index and a single-field index of the same kind,
+// so repeating `query = "..."` across `cipherstash` attributes is intended.
+#[allow(clippy::duplicated_attributes)]
 pub struct User {
     #[partition_key]
     pub tenant_id: String,
