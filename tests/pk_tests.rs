@@ -11,6 +11,9 @@ mod common;
 #[derive(
     Identifiable, Encryptable, Decryptable, Searchable, Debug, PartialEq, Ord, PartialOrd, Eq,
 )]
+// A field can carry a compound index and a single-field index of the same kind,
+// so repeating `query = "..."` across `cipherstash` attributes is intended.
+#[allow(clippy::duplicated_attributes)]
 pub struct User {
     #[cipherstash(query = "exact", compound = "pk#sk")]
     #[cipherstash(query = "exact")]
