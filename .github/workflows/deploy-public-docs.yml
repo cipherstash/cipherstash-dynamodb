@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Checkout Source Repo
         id: source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: cipherstash-dynamodb
 
@@ -21,7 +21,7 @@ jobs:
         run: echo "::set-output name=hash::$(git -C cipherstash-dynamodb rev-parse --short HEAD)"
 
       - name: Checkout Dest Repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: "cipherstash/rustdoc-cipherstash-com"
           path: rustdoc-cipherstash-com
